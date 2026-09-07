@@ -1,0 +1,12 @@
+# 仅用于本地开发。复制为 .dev.vars，绝对不要提交真实生产密钥。
+# 以下是 Cloudflare 官方“总是通过”的 Turnstile 测试密钥，仅限本地测试。
+TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+TURNSTILE_SECRET="1x0000000000000000000000000000000AA"
+BOOTSTRAP_INVITE_CODE="replace-with-a-long-random-first-admin-code"
+INVITE_PEPPER="replace-with-random-secret"
+DEVICE_PEPPER="replace-with-another-random-secret"
+MAX_USERS="500"
+# R2 全站安全上限，默认 8GiB。专业用户个人配额仍受这个总上限保护。
+MEDIA_GLOBAL_LIMIT_BYTES="8589934592"
+# 若本地不使用 Turnstile 测试密钥，可临时设为 true；生产环境禁止设置。
+ALLOW_INSECURE_DEV="false"

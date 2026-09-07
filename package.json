@@ -1,0 +1,64 @@
+{
+  "name": "-life_tree.xuling.tv",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "trees:index": "node scripts/generate-tree-index.mjs",
+    "predev": "npm run trees:index",
+    "dev": "vite",
+    "prebuild": "npm run trees:index",
+    "build": "vite build",
+    "preview": "vite preview",
+    "cf:dev": "npm run build && wrangler pages dev dist",
+    "cf:deploy": "npm run build && wrangler pages deploy dist",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "lint": "run-s \"lint:*\"",
+    "lint:oxlint": "oxlint . --fix",
+    "lint:eslint": "eslint . --fix --cache",
+    "format": "prettier --write --experimental-cli src/"
+  },
+  "dependencies": {
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-vue": "^5.1.12",
+    "cropperjs": "^2.1.1",
+    "jszip": "^3.10.1",
+    "katex": "0.16.47",
+    "mammoth": "^1.12.1",
+    "micromark": "^3.2.0",
+    "micromark-extension-gfm": "^2.0.3",
+    "micromark-extension-math": "2.1.2",
+    "pdf-lib": "^1.17.1",
+    "pinia": "^3.0.4",
+    "playwright": "^1.62.1",
+    "prismjs": "^1.30.0",
+    "simple-mind-map": "^0.13.1-fix.2",
+    "turndown": "^7.2.4",
+    "vue": "^3.5.38",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-oxlint": "~1.69.0",
+    "eslint-plugin-vue": "~10.9.2",
+    "globals": "^17.6.0",
+    "npm-run-all2": "^9.0.2",
+    "oxlint": "~1.69.0",
+    "prettier": "3.8.4",
+    "vite": "^8.1.4",
+    "vite-plugin-vue-devtools": "^8.1.2",
+    "vue-eslint-parser": "^10.4.1",
+    "wrangler": "^4.36.0"
+  },
+  "engines": {
+    "node": "^22.18.0 || >=24.12.0"
+  },
+  "overrides": {
+    "uuid": "11.1.1",
+    "quill": "2.0.2"
+  }
+}

@@ -1,0 +1,356 @@
+:root {
+  --rich-content-font-family: "Noto Serif SC", "Songti SC", "STSong", Georgia, serif;
+  --rich-content-font-size: 16px;
+  --rich-content-line-height: 1.7;
+  --rich-content-color: #30343b;
+  --rich-content-quote-border: #75aa99;
+  --rich-content-quote-background: #f4f8f6;
+  --rich-content-quote-color: #597068;
+  --rich-content-citation-background: rgba(22, 131, 216, 0.1);
+  --rich-content-citation-color: #087fd1;
+}
+
+/*
+ * 富文本内容样式：作用于 .post-content（旧阅读页）、.markdown-preview、
+ * 以及 .article-content（WikiPostDetail 阅读页）——保证编辑器里看到的
+ * 待办事项 / 代码高亮 / 引用块在阅读页以同样式呈现。
+ */
+
+.post-content .markdown-table-scroll,
+.markdown-preview .markdown-table-scroll,
+.article-content .markdown-table-scroll {
+  width: 100%;
+  margin: 1.7em 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.post-content .markdown-table-scroll:focus-visible,
+.markdown-preview .markdown-table-scroll:focus-visible,
+.article-content .markdown-table-scroll:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 3px;
+}
+
+.post-content .markdown-table-scroll > table,
+.markdown-preview .markdown-table-scroll > table,
+.article-content .markdown-table-scroll > table {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  margin: 0;
+  table-layout: auto;
+  white-space: normal;
+}
+
+.post-content .markdown-table-scroll th:first-child,
+.markdown-preview .markdown-table-scroll th:first-child,
+.article-content .markdown-table-scroll th:first-child {
+  width: auto;
+}
+
+/* 引用块：与编辑器一致的绿色带（--rich-content-quote-* 变量） */
+.post-content blockquote,
+.markdown-preview blockquote,
+.article-content blockquote {
+  margin: 1.7em 0;
+  padding: 13px 18px;
+  border-left: 4px solid var(--rich-content-quote-border);
+  border-radius: 0 9px 9px 0;
+  background: var(--rich-content-quote-background);
+  color: var(--rich-content-quote-color);
+}
+
+.post-content pre,
+.markdown-preview pre,
+.article-content pre {
+  position: relative;
+  max-width: 100%;
+  margin: 1.6em 0;
+  overflow: auto;
+  padding: 2.5rem 1rem 1rem;
+  border: 1px solid #d8e1e8;
+  border-radius: 9px;
+  background: #f6f8fa;
+  color: #24292f;
+  font: 0.9em/1.65 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  tab-size: 2;
+  -webkit-overflow-scrolling: touch;
+}
+
+.post-content pre[data-code-language]::before,
+.markdown-preview pre[data-code-language]::before,
+.article-content pre[data-code-language]::before {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.75rem;
+  color: #7b8794;
+  content: attr(data-code-language);
+  font: 700 0.68rem/1.2 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.post-content pre code,
+.markdown-preview pre code,
+.article-content pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: pre;
+}
+
+.post-content :not(pre) > code,
+.markdown-preview :not(pre) > code,
+.article-content :not(pre) > code {
+  padding: 0.13em 0.34em;
+  border-radius: 4px;
+  background: #eef2f6;
+  color: #b42318;
+  font: 0.9em/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.post-content .token.comment,
+.post-content .token.prolog,
+.post-content .token.doctype,
+.post-content .token.cdata,
+.markdown-preview .token.comment,
+.markdown-preview .token.prolog,
+.markdown-preview .token.doctype,
+.markdown-preview .token.cdata,
+.article-content .token.comment,
+.article-content .token.prolog,
+.article-content .token.doctype,
+.article-content .token.cdata { color: #6e7781; }
+
+.post-content .token.punctuation,
+.markdown-preview .token.punctuation,
+.article-content .token.punctuation { color: #57606a; }
+
+.post-content .token.property,
+.post-content .token.tag,
+.post-content .token.boolean,
+.post-content .token.number,
+.post-content .token.constant,
+.post-content .token.symbol,
+.markdown-preview .token.property,
+.markdown-preview .token.tag,
+.markdown-preview .token.boolean,
+.markdown-preview .token.number,
+.markdown-preview .token.constant,
+.markdown-preview .token.symbol,
+.article-content .token.property,
+.article-content .token.tag,
+.article-content .token.boolean,
+.article-content .token.number,
+.article-content .token.constant,
+.article-content .token.symbol { color: #0550ae; }
+
+.post-content .token.selector,
+.post-content .token.attr-name,
+.post-content .token.string,
+.post-content .token.char,
+.post-content .token.builtin,
+.post-content .token.inserted,
+.markdown-preview .token.selector,
+.markdown-preview .token.attr-name,
+.markdown-preview .token.string,
+.markdown-preview .token.char,
+.markdown-preview .token.builtin,
+.markdown-preview .token.inserted,
+.article-content .token.selector,
+.article-content .token.attr-name,
+.article-content .token.string,
+.article-content .token.char,
+.article-content .token.builtin,
+.article-content .token.inserted { color: #0a7b45; }
+
+.post-content .token.operator,
+.post-content .token.entity,
+.post-content .token.url,
+.post-content .language-css .token.string,
+.post-content .style .token.string,
+.markdown-preview .token.operator,
+.markdown-preview .token.entity,
+.markdown-preview .token.url,
+.markdown-preview .language-css .token.string,
+.markdown-preview .style .token.string,
+.article-content .token.operator,
+.article-content .token.entity,
+.article-content .token.url,
+.article-content .language-css .token.string,
+.article-content .style .token.string { color: #953800; }
+
+.post-content .token.atrule,
+.post-content .token.attr-value,
+.post-content .token.keyword,
+.markdown-preview .token.atrule,
+.markdown-preview .token.attr-value,
+.markdown-preview .token.keyword,
+.article-content .token.atrule,
+.article-content .token.attr-value,
+.article-content .token.keyword { color: #cf222e; }
+
+.post-content .token.function,
+.post-content .token.class-name,
+.markdown-preview .token.function,
+.markdown-preview .token.class-name,
+.article-content .token.function,
+.article-content .token.class-name { color: #8250df; }
+
+.post-content .token.regex,
+.post-content .token.important,
+.post-content .token.variable,
+.markdown-preview .token.regex,
+.markdown-preview .token.important,
+.markdown-preview .token.variable,
+.article-content .token.regex,
+.article-content .token.important,
+.article-content .token.variable { color: #116329; }
+
+/* 待办事项：与编辑器一致的 checkbox + 文本布局 */
+.post-content div[data-w-e-type="todo"],
+.markdown-preview div[data-w-e-type="todo"],
+.article-content div[data-w-e-type="todo"] {
+  display: flex;
+  margin: 0.45em 0;
+  align-items: flex-start;
+  gap: 0.55em;
+}
+
+.post-content input[type="checkbox"],
+.markdown-preview input[type="checkbox"],
+.article-content input[type="checkbox"] {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  margin: 0.55em 0 0;
+  accent-color: #2563eb;
+}
+
+/* WangEditor renders custom cards outside Vue's scoped styles. */
+.w-e-text-container .life-post-card {
+  display: block;
+  width: min(100%, 410px);
+  margin: 1.25rem auto;
+  overflow: hidden;
+  border: 1px solid #c8c8c0;
+  border-radius: 4px;
+  background: #f8f9fa;
+}
+
+.w-e-text-container .life-post-card > table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #202122;
+  font-family: Arial, "Noto Sans SC", sans-serif;
+  font-size: 0.86rem;
+}
+
+.w-e-text-container .life-post-card caption {
+  padding: 0;
+  background: var(--classification-color, #eadf77);
+}
+
+.w-e-text-container .life-post-card th,
+.w-e-text-container .life-post-card td {
+  padding: 0;
+  border-top: 1px solid rgba(162, 164, 166, 0.35);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.w-e-text-container .life-post-card th {
+  width: 48%;
+  background: var(--classification-tint, #faf7dd);
+}
+
+.w-e-text-container .life-post-card input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+}
+
+.w-e-text-container .life-post-card caption input {
+  padding: 9px 10px;
+  color: var(--classification-header-text, #202122);
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.w-e-text-container .life-post-card td input {
+  background: #fff;
+}
+
+.w-e-text-container .life-post-card input:focus {
+  box-shadow: inset 0 0 0 2px rgba(35, 111, 82, 0.5);
+}
+
+.w-e-text-container .life-post-card th > span,
+.w-e-text-container .life-post-card th > small {
+  display: block;
+  padding: 0 8px;
+}
+
+.w-e-text-container .life-post-card th > span {
+  padding-top: 6px;
+  font-weight: 700;
+}
+
+.w-e-text-container .life-post-card th > small {
+  padding-bottom: 6px;
+  color: #54595d;
+  font-size: 0.72rem;
+}
+
+.w-e-text-container .life-post-card .pdf-card-image img {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+}
+
+.w-e-text-container .life-post-card .life-card-caption {
+  margin: 0;
+  border-top: 1px solid rgba(162, 164, 166, 0.35);
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .post-content .markdown-table-scroll,
+  .markdown-preview .markdown-table-scroll,
+  .article-content .markdown-table-scroll {
+    width: calc(100% + 8px);
+    margin-right: -4px;
+    margin-left: -4px;
+    padding: 0 4px 5px;
+  }
+
+  .post-content .markdown-table-scroll > table,
+  .markdown-preview .markdown-table-scroll > table,
+  .article-content .markdown-table-scroll > table {
+    min-width: 34rem;
+  }
+
+  .post-content pre,
+  .markdown-preview pre,
+  .article-content pre {
+    border-radius: 7px;
+    font-size: 0.82em;
+  }
+}

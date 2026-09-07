@@ -1,0 +1,57 @@
+# Dependencies
+/node_modules/
+
+# Web build and test output
+/dist/
+/.verify-dist/
+/coverage/
+/playwright-report/
+/test-results/
+*.tsbuildinfo
+
+# Local environment files (keep sanitized examples)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Cloudflare local state
+/.wrangler*/
+
+# Editors and local agent settings
+/.vscode/
+/.idea/
+/.agents/
+/.codex/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs, caches, and temporary files
+*.log
+*.tmp
+*.temp
+/.cache/
+/.tmp-*
+/npx
+/111.txt
+/src/assets/111.txt
+/src/assets/pic/jmgmksz-fox1.0.png
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local research corpus (not part of the Web application)
+/research/
+
+# Native application shells (this repository is Web-only)
+/android/
+/ios/
+/src-tauri/
+/capacitor.config.*

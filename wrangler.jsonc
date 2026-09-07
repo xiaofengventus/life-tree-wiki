@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "life-tree",
+  "compatibility_date": "2026-07-21",
+  "pages_build_output_dir": "./dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "life-tree",
+      "database_id": "5ef680ae-adc0-4ec9-b142-2d7b1fa2069b",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "life-tree-media",
+    },
+  ],
+}

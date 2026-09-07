@@ -1,0 +1,40 @@
+.life-math-inline {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0.08em;
+  vertical-align: -0.08em;
+}
+
+.life-math-block {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35em 0.2em;
+  text-align: center;
+  -webkit-overflow-scrolling: touch;
+}
+
+.life-math-block > .katex-display {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+}
+
+.life-formula-editor-node {
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.life-formula-editor-node.is-selected {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 3px;
+}
+
+.life-math-error {
+  color: #b42318;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+}

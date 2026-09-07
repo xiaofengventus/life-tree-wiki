@@ -1,0 +1,36 @@
+@import './base.css';
+
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  color-scheme: light;
+  --color-background: #fff;
+  --color-background-soft: #fff;
+  --color-background-mute: #f9fafb;
+  --color-heading: #111827;
+  --color-text: #1f2937;
+}
+
+html,
+body {
+  background: #fff;
+}
+
+a {
+  text-decoration: none;
+  color: #2563eb;
+  transition: color 0.2s, background-color 0.2s;
+  padding: 3px;
+}
+
+@media (hover: hover) {
+  a:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+  }
+}
