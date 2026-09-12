@@ -1,0 +1,51 @@
+{
+ "width": 1520,
+ "results": [
+  {
+   "test": "正文下拉面板",
+   "visible": true,
+   "clipped": {
+    "panelTop": 116,
+    "barBottom": 120,
+    "belowBar": true
+   }
+  },
+  {
+   "test": "颜色分组菜单",
+   "visible": false
+  },
+  {
+   "test": "新菜单 卡片",
+   "found": 1,
+   "dialogOpen": true,
+   "text": "← 返回 / 文章卡片 / 选择内容类型后，继续使用原有的编辑和插入方式。 / × / 文章卡片 / 每张卡片可显示在正文当前位置、目录下方，或同时显示在两个位置。 / ＋ 生物卡片 / ＋ 自定义卡片 / "
+  },
+  {
+   "test": "新菜单 进化树",
+   "found": 1,
+   "dialogOpen": false,
+   "text": ""
+  },
+  {
+   "test": "新菜单 Markdown",
+   "found": 1,
+   "dialogOpen": false,
+   "text": ""
+  },
+  {
+   "test": "参考文献面板",
+   "visible": true
+  },
+  {
+   "test": "浮动工具栏开关",
+   "before": "true",
+   "after": "false",
+   "changed": true
+  },
+  {
+   "test": "导入下拉",
+   "visible": true
+  }
+ ],
+ "errors": []
+}

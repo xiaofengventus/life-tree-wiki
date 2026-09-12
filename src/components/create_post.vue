@@ -634,97 +634,11 @@
           class="editor-wrapper"
           :class="{ 'floating-tools-disabled': !floatingToolbarsEnabled }"
         >
-          <div class="editor-toolbar-fixed">
-            <Toolbar
-              :editor="editorRef"
-              :default-config="toolbarConfig"
-              mode="default"
-            />
-            <div class="editor-toolbar-extras">
-              <div class="insert-card-actions">
-                <button
-                  type="button"
-                  class="insert-card-btn"
-                  @click="insertCardIntoEditor('taxonomy')"
-                >
-                  ＋ 生物卡片
-                </button>
-                <button
-                  type="button"
-                  class="insert-card-btn"
-                  @click="insertCardIntoEditor('custom')"
-                >
-                  ＋ 自定义卡片
-                </button>
-              </div>
-              <button
-                type="button"
-                class="floating-tools-toggle"
-                :class="{ active: floatingToolbarsEnabled }"
-                :aria-pressed="floatingToolbarsEnabled"
-                @click="toggleFloatingToolbars"
-              >
-                <span class="floating-tools-toggle-track" aria-hidden="true"
-                  ><i></i
-                ></span>
-                浮动工具栏{{ floatingToolbarsEnabled ? "已开启" : "已关闭" }}
-              </button>
-              <button
-                type="button"
-                class="citation-panel-toggle-btn"
-                :class="{ active: !citationPanelCollapsed }"
-                @click="citationPanelCollapsed = !citationPanelCollapsed"
-              >
-                📚 参考文献
-              </button>
-              <div class="io-dropdown">
-                <button
-                  type="button"
-                  class="io-dropdown-btn"
-                  @click="
-                    importMenuOpen = !importMenuOpen;
-                    exportMenuOpen = false;
-                  "
-                >
-                  导入 ▾
-                </button>
-                <div v-show="importMenuOpen" class="io-dropdown-menu">
-                  <button type="button" @click="handleImport('docx')">
-                    📄 Word 文档
-                  </button>
-                  <button type="button" @click="handleImport('md')">
-                    📝 Markdown
-                  </button>
-                  <button type="button" @click="handleImport('html')">
-                    🌐 富文本HTML
-                  </button>
-                </div>
-              </div>
-              <div class="io-dropdown">
-                <button
-                  type="button"
-                  class="io-dropdown-btn"
-                  @click="
-                    exportMenuOpen = !exportMenuOpen;
-                    importMenuOpen = false;
-                  "
-                >
-                  导出 ▾
-                </button>
-                <div v-show="exportMenuOpen" class="io-dropdown-menu">
-                  <button type="button" @click="handleExport('docx')">
-                    📄 Word 文档
-                  </button>
-                  <button type="button" @click="handleExport('md')">
-                    📝 Markdown
-                  </button>
-                  <button type="button" @click="handleExport('html')">
-                    🌐 富文本HTML
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <EditorToolbar
+            :editor="editorRef"
+            :citation-panel-open="!citationPanelCollapsed"
+            :floating-tools-enabled="floatingToolbarsEnabled"
+          />
           <Editor
             v-model="content"
             :default-config="editorConfig"
@@ -1313,7 +1227,8 @@ import {
   shallowRef,
   watch,
 } from "vue";
-import { Editor, Toolbar } from "@wangeditor/editor-for-vue";
+import { Editor } from "@wangeditor/editor-for-vue";
+import EditorToolbar from "@/components/EditorToolbar.vue";
 import ImageCropperDialog from "@/components/ImageCropperDialog.vue";
 import "@wangeditor/editor/dist/css/style.css";
 import { useRoute } from "vue-router";
@@ -1372,14 +1287,15 @@ import {
 } from "@/utils/wangEditorFormula";
 import {
   INSERT_MENU_EVENT,
-  INSERT_MENU_KEY,
   registerInsertContentMenu,
 } from "@/utils/wangEditorInsertMenu";
 import { registerEditorUxModule } from "@/utils/wangEditorUx";
 import {
-  CODE_SAMPLE_MENU_KEY,
-  registerCodeSampleModule,
-} from "@/utils/wangEditorCodeSample";
+  TOOLBAR_MENU_EVENT,
+  registerToolbarMenus,
+} from "@/utils/wangEditorToolbarMenus";
+import { registerCodeSampleModule } from "@/utils/wangEditorCodeSample";
+import { formatToolbarShortcut } from "@/utils/toolbarTooltips";
 import { normalizeLegacyImageCaptionHtml } from "@/utils/imageCaptionHtml";
 import { isEditorOwnedPaste, normalizePastedHtml } from "@/utils/pasteClean";
 import {
@@ -1402,6 +1318,7 @@ registerFormulaModule();
 registerInsertContentMenu();
 registerEditorUxModule();
 registerCodeSampleModule();
+registerToolbarMenus();
 
 const emit = defineEmits(["submit"]);
 const props = defineProps({
@@ -1445,9 +1362,8 @@ const mediaPickerTarget = ref("");
 const mediaPickerCardId = ref("");
 const mediaPickerInitialDescription = ref("");
 const citations = ref([]);
-const citationPanelCollapsed = ref(false);
-const importMenuOpen = ref(false);
-const exportMenuOpen = ref(false);
+// 默认收起：引用面板由工具栏最左端的「参考文献」按钮按需展开（true = 收起）
+const citationPanelCollapsed = ref(true);
 const importExportMessage = ref("");
 const importExportLoading = ref(false);
 const citationDialogOpen = ref(false);
@@ -1479,6 +1395,7 @@ const insertToolbarStyle = computed(() => ({
   left: `${insertToolbarPosition.value.left}px`,
   top: `${insertToolbarPosition.value.top}px`,
 }));
+
 const mediaPickerDescriptionLabel = computed(() =>
   mediaPickerTarget.value === "card"
     ? "卡片图片说明"
@@ -1688,58 +1605,6 @@ const draftStatusText = computed(() => {
     : "未修改；当前使用手动保存";
 });
 
-const toolbarConfig = {
-  toolbarKeys: [
-    "headerSelect",
-    "bold",
-    "italic",
-    "underline",
-    "through",
-    "fontSize",
-    "color",
-    "bgColor",
-    "bulletedList",
-    "numberedList",
-    "todo",
-    "blockquote",
-    "codeBlock",
-    "codeSelectLang",
-    CODE_SAMPLE_MENU_KEY,
-    "insertLink",
-    "uploadImage",
-    CITATION_MENU_KEY,
-    FORMULA_MENU_KEY,
-    "undo",
-    "redo",
-  ],
-};
-
-const toolbarTooltipDefinitions = {
-  fontSize: { label: "Font size" },
-  headerSelect: { label: "正文与标题" },
-  bold: { label: "加粗", shortcut: "mod+B" },
-  italic: { label: "斜体", shortcut: "mod+I" },
-  underline: { label: "下划线", shortcut: "mod+U" },
-  through: { label: "删除线", shortcut: "mod+Shift+X" },
-  color: { label: "文字颜色" },
-  bgColor: { label: "背景色" },
-  clearStyle: { label: "清除格式" },
-  bulletedList: { label: "无序列表" },
-  numberedList: { label: "有序列表" },
-  todo: { label: "待办事项" },
-  blockquote: { label: "引用" },
-  codeBlock: { label: "代码块" },
-  codeSelectLang: { label: "代码语言" },
-  [CODE_SAMPLE_MENU_KEY]: { label: "代码块案例（输入 / 输出对照）" },
-  insertLink: { label: "插入链接" },
-  uploadImage: { label: "上传图片" },
-  [INSERT_MENU_KEY]: { label: "插入内容", shortcut: "mod+Shift+I" },
-  [CITATION_MENU_KEY]: { label: "插入正文引用", shortcut: "mod+Alt+K" },
-  [FORMULA_MENU_KEY]: { label: "插入数学公式", shortcut: "mod+Alt+M" },
-  undo: { label: "撤销", shortcut: "mod+Z" },
-  redo: { label: "重做", shortcut: "mod+Shift+Z" },
-};
-
 const editorConfig = {
   placeholder: "请输入文章内容，可以选择文字后设置颜色……",
   /**
@@ -1836,45 +1701,6 @@ const canSavePrivate = computed(
 );
 const submitting = computed(() => props.submitting);
 const editorWrapperRef = ref(null);
-
-function isApplePlatform() {
-  if (typeof navigator === "undefined") return false;
-  const platform =
-    navigator.userAgentData?.platform || navigator.platform || "";
-  return /mac|iphone|ipad|ipod/i.test(platform);
-}
-
-function formatToolbarShortcut(shortcut) {
-  if (!shortcut) return "";
-  const apple = isApplePlatform();
-  if (shortcut === "redo") {
-    return apple ? "⌘ + Shift + Z" : "Ctrl + Y / Ctrl + Shift + Z";
-  }
-  return shortcut
-    .replace(/^mod/i, apple ? "⌘" : "Ctrl")
-    .split("+")
-    .join(" + ");
-}
-
-function applyToolbarShortcutTooltips() {
-  const wrapper = editorWrapperRef.value;
-  if (!wrapper) return;
-  wrapper.querySelectorAll("[data-menu-key]").forEach((button) => {
-    const key = button.getAttribute("data-menu-key");
-    const definition = toolbarTooltipDefinitions[key];
-    if (!definition) return;
-    const shortcut = formatToolbarShortcut(definition.shortcut);
-    const tooltip = shortcut
-      ? `${definition.label}\n${shortcut}`
-      : definition.label;
-    button.setAttribute("data-tooltip", tooltip);
-    button.setAttribute(
-      "aria-label",
-      shortcut ? `${definition.label}，快捷键 ${shortcut}` : definition.label,
-    );
-    button.classList.add("w-e-menu-tooltip-v5");
-  });
-}
 
 function hasOpenEditorDialog() {
   return (
@@ -2018,17 +1844,9 @@ function openInsertToolSection(section) {
   insertPanelOpen.value = true;
 }
 
-let toolbarObserver;
-
 async function handleCreated(editor) {
   editorRef.value = editor;
   await nextTick();
-  applyToolbarShortcutTooltips();
-  toolbarObserver = new MutationObserver(applyToolbarShortcutTooltips);
-  toolbarObserver.observe(editorWrapperRef.value, {
-    childList: true,
-    subtree: true,
-  });
   if (content.value) {
     editor.setHtml(
       normalizeCitationLinks(
@@ -2277,6 +2095,35 @@ function openInsertPanel(event) {
   insertPanelOpen.value = true;
 }
 
+/**
+ * 工具栏菜单派发的事件（菜单在 EditorToolbar.vue 里，只负责派发，业务在这里）：
+ * - `open-section` —— 插入类，打开插入面板对应分区；
+ * - `toggle-citation` / `toggle-floating-tools` —— 开关类，切状态
+ *   （按钮的点亮由 EditorToolbar 自己根据传入的 props 同步）；
+ * - `import` / `export` —— 下拉类，按选中的格式走原有导入导出流程。
+ */
+function handleToolbarMenuEvent(event) {
+  const detail = event?.detail;
+  if (detail?.editor !== editorRef.value) return;
+  if (detail.action === "toggle-citation") {
+    citationPanelCollapsed.value = !citationPanelCollapsed.value;
+    return;
+  }
+  if (detail.action === "toggle-floating-tools") {
+    toggleFloatingToolbars();
+    return;
+  }
+  if (detail.action === "import") {
+    handleImport(detail.format);
+    return;
+  }
+  if (detail.action === "export") {
+    handleExport(detail.format);
+    return;
+  }
+  if (detail.section) openInsertToolSection(detail.section);
+}
+
 function closeInsertPanel() {
   insertPanelOpen.value = false;
   insertPanelSection.value = "menu";
@@ -2503,7 +2350,6 @@ function useLibraryImage({ image, description }) {
 
 // 导入/导出功能
 async function handleImport(format) {
-  importMenuOpen.value = false;
   if (importExportLoading.value) return;
 
   const acceptMap = {
@@ -2549,7 +2395,6 @@ async function handleImport(format) {
 }
 
 async function handleExport(format) {
-  exportMenuOpen.value = false;
   if (importExportLoading.value) return;
 
   const editor = editorRef.value;
@@ -3190,6 +3035,7 @@ watch(
     if (previous && !value) draftAutosave.setReady(true);
   },
 );
+// 两个开关的状态可能被别处改动（如本地缓存回填），EditorToolbar 会通过 props 自行同步按钮高亮
 onMounted(() => {
   floatingToolbarsEnabled.value =
     window.localStorage.getItem("life-editor-floating-tools") !== "off";
@@ -3197,6 +3043,7 @@ onMounted(() => {
   window.addEventListener(CITATION_MENU_EVENT, openCitationDialog);
   window.addEventListener(FORMULA_MENU_EVENT, openFormulaDialog);
   window.addEventListener(INSERT_MENU_EVENT, openInsertPanel);
+  window.addEventListener(TOOLBAR_MENU_EVENT, handleToolbarMenuEvent);
   window.addEventListener(IMAGE_CAPTION_MENU_EVENT, openImageCaptionDialog);
   window.addEventListener(POST_CARD_CONTENT_EVENT, syncSidebarCardsFromEditor);
   document.addEventListener("selectionchange", handleEditorSelectionChange);
@@ -3209,6 +3056,7 @@ onBeforeUnmount(() => {
   window.removeEventListener(CITATION_MENU_EVENT, openCitationDialog);
   window.removeEventListener(FORMULA_MENU_EVENT, openFormulaDialog);
   window.removeEventListener(INSERT_MENU_EVENT, openInsertPanel);
+  window.removeEventListener(TOOLBAR_MENU_EVENT, handleToolbarMenuEvent);
   window.removeEventListener(IMAGE_CAPTION_MENU_EVENT, openImageCaptionDialog);
   window.removeEventListener(
     POST_CARD_CONTENT_EVENT,
@@ -3218,7 +3066,6 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleEditorShortcut);
   window.removeEventListener("resize", handleEditorSelectionChange);
   window.removeEventListener("scroll", handleEditorSelectionChange, true);
-  toolbarObserver?.disconnect();
   editorRef.value?.destroy();
 });
 </script>
@@ -3348,142 +3195,10 @@ onBeforeUnmount(() => {
   margin-bottom: 20px;
 }
 
-/* 编辑器工具栏固定样式 - 工具栏和偏好设置在同一行 */
+/* 编辑器工具栏（EditorToolbar.vue）是 position:fixed，这里为它留出高度 */
 .editor-wrapper {
   position: relative;
-  padding-top: 56px;
-}
-
-.editor-toolbar-fixed {
-  position: fixed;
-  top: 64px;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
-  display: flex;
-  align-items: center;
-  height: 56px;
-}
-
-.editor-toolbar-fixed :deep(.w-e-toolbar) {
-  flex: 1;
-  position: static;
-  border: none;
-  box-shadow: none;
-  padding: 0 24px;
-}
-
-.editor-toolbar-extras {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  height: 56px;
-  flex-shrink: 0;
-}
-
-.insert-card-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.insert-card-btn {
-  padding: 6px 12px;
-  border: 1.5px solid #2f806a;
-  border-radius: 6px;
-  background: #e8f3ee;
-  color: #2b6b57;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
-}
-
-.insert-card-btn:hover {
-  background: #2f806a;
-  color: #fff;
-}
-
-.editor-toolbar-extras .citation-panel-toggle-btn {
-  padding: 6px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background: #fff;
-  color: #475569;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.editor-toolbar-extras .citation-panel-toggle-btn:hover {
-  border-color: #2f806a;
-  color: #2f806a;
-}
-
-.editor-toolbar-extras .citation-panel-toggle-btn.active {
-  border-color: #2f806a;
-  background: #eff8f3;
-  color: #2f806a;
-}
-
-/* 导入/导出下拉菜单 */
-.io-dropdown {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.io-dropdown-btn {
-  padding: 6px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background: #fff;
-  color: #475569;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.io-dropdown-btn:hover {
-  border-color: #2f806a;
-  color: #2f806a;
-}
-
-.io-dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
-  overflow: hidden;
-  z-index: 200;
-  min-width: 140px;
-}
-
-.io-dropdown-menu button {
-  display: block;
-  width: 100%;
-  padding: 8px 14px;
-  border: none;
-  background: #fff;
-  color: #334155;
-  font-size: 0.82rem;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.io-dropdown-menu button:hover {
-  background: #f1f5f9;
-  color: #2f806a;
+  padding-top: var(--editor-toolbar-height, 56px);
 }
 
 .editor-wrapper :deep(.w-e-text-container) {
@@ -3986,55 +3701,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-}
-
-.floating-tools-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 8px;
-  border: 1px solid #cbd5e1;
-  border-radius: 999px;
-  background: #fff;
-  color: #64748b;
-  font: inherit;
-  cursor: pointer;
-}
-
-.floating-tools-toggle.active {
-  border-color: #70acd5;
-  background: #eff8fe;
-  color: #176fa9;
-}
-
-.floating-tools-toggle-track {
-  position: relative;
-  display: inline-block;
-  width: 26px;
-  height: 14px;
-  border-radius: 999px;
-  background: #a8b4bf;
-  transition: background 0.16s;
-}
-
-.floating-tools-toggle-track i {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
-  transition: transform 0.16s;
-}
-
-.floating-tools-toggle.active .floating-tools-toggle-track {
-  background: #2486ce;
-}
-
-.floating-tools-toggle.active .floating-tools-toggle-track i {
-  transform: translateX(12px);
 }
 
 .editor-wrapper.floating-tools-disabled :deep(.w-e-hover-bar) {
@@ -5252,17 +4918,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .editor-toolbar-extras {
-    padding: 7px 9px;
-    gap: 6px;
-  }
-  .floating-tools-toggle span {
-    display: none;
-  }
-  .citation-panel-toggle-btn {
-    padding: 6px 8px;
-    font-size: 0.75rem;
-  }
   .caret-insert-toolbar-label {
     display: none;
   }

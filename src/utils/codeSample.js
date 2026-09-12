@@ -7,7 +7,8 @@
  *      `language-xxx` 与 `data-code-language` 本来就会被保留。
  *
  * 作者在代码块里用单独一行 `---`（或 `===`）分隔输入和输出。
- * 没有分隔符时只渲染输入栏。
+ * 空的一侧不渲染：只写了输入就单栏显示「输入」，只写了输出就单栏显示「输出」，
+ * 两侧都写了才是双栏对照。这样写一个小案例时不用被空栏占掉一半宽度。
  */
 
 export const CODE_SAMPLE_LANGUAGE = "sample";
@@ -82,14 +83,20 @@ function paneHtml({ kind, index, body }) {
 
 /**
  * 渲染成卡片 HTML。`index` 是这个块在文中的序号（第 1 个是 0）。
+ *
+ * 空的一侧不渲染 —— 只写输入就是单栏「输入」，只写输出就是单栏「输出」。
+ * 两侧都空（例如只敲了一个 `---`）时保留「输入」占位栏，避免卡片只剩一个标题。
  */
 export function codeSampleHtml(text, index = 0) {
   const safeIndex = Number.isInteger(index) && index >= 0 ? index : 0;
-  const { hasSeparator, input, output } = parseCodeSampleText(text);
-  const panes = [
-    paneHtml({ kind: "input", index: safeIndex, body: input }),
-  ];
-  if (hasSeparator) {
+  const { input, output } = parseCodeSampleText(text);
+  const hasInput = Boolean(input);
+  const hasOutput = Boolean(output);
+  const panes = [];
+  if (hasInput || !hasOutput) {
+    panes.push(paneHtml({ kind: "input", index: safeIndex, body: input }));
+  }
+  if (hasOutput) {
     panes.push(paneHtml({ kind: "output", index: safeIndex, body: output }));
   }
   return [
@@ -99,7 +106,7 @@ export function codeSampleHtml(text, index = 0) {
     `<span class="life-code-sample-title">样例</span>`,
     `<span class="life-code-sample-title-en">Sample</span>`,
     `</div>`,
-    `<div class="life-code-sample-grid${hasSeparator ? "" : " is-single"}">`,
+    `<div class="life-code-sample-grid${panes.length < 2 ? " is-single" : ""}">`,
     panes.join(""),
     `</div>`,
     `</div>`,

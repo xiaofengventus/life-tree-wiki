@@ -1,0 +1,207 @@
+{
+ "viewport": 1520,
+ "fixedBar": {
+  "x": 0,
+  "w": 1520,
+  "h": 56,
+  "right": 1520
+ },
+ "citationBtn": {
+  "x": 14,
+  "w": 30,
+  "h": 30,
+  "right": 44
+ },
+ "wToolbar": {
+  "x": 48,
+  "w": 809,
+  "h": 32,
+  "right": 857
+ },
+ "wToolbarFlexWrap": "wrap",
+ "wToolbarPadding": "0px",
+ "wToolbarDisplay": "flex",
+ "extras": {
+  "x": 861,
+  "w": 186,
+  "h": 32,
+  "right": 1047
+ },
+ "extrasChildren": [
+  {
+   "tag": "floating-tools-toggle active",
+   "x": 861,
+   "w": 42,
+   "h": 30,
+   "right": 903
+  },
+  {
+   "tag": "io-dropdown",
+   "x": 907,
+   "w": 68,
+   "h": 32,
+   "right": 975
+  },
+  {
+   "tag": "io-dropdown",
+   "x": 979,
+   "w": 68,
+   "h": 32,
+   "right": 1047
+  }
+ ],
+ "itemCount": 24,
+ "itemRows": 1,
+ "itemRowTops": [
+  76
+ ],
+ "itemsTotalWidth": "809 (+ 23 gaps)",
+ "firstRowItems": 24,
+ "lastItemRight": 857,
+ "items": [
+  {
+   "label": "正文",
+   "x": 48,
+   "top": 76,
+   "w": 60
+  },
+  {
+   "label": "",
+   "x": 108,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 134,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 160,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 186,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "默认字号",
+   "x": 212,
+   "top": 76,
+   "w": 80
+  },
+  {
+   "label": "",
+   "x": 292,
+   "top": 76,
+   "w": 40
+  },
+  {
+   "label": "",
+   "x": 332,
+   "top": 76,
+   "w": 40
+  },
+  {
+   "label": "",
+   "x": 372,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 398,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 424,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 450,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 476,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "plain text",
+   "x": 502,
+   "top": 76,
+   "w": 95
+  },
+  {
+   "label": "",
+   "x": 597,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 623,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 649,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 675,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 701,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 727,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 753,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 779,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 805,
+   "top": 76,
+   "w": 26
+  },
+  {
+   "label": "",
+   "x": 831,
+   "top": 76,
+   "w": 26
+  }
+ ]
+}

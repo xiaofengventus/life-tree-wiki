@@ -1,0 +1,330 @@
+{
+  "hash": "477e123f",
+  "configHash": "3d2e7cfd",
+  "lockfileHash": "a1e5a76a",
+  "browserHash": "b2f0c113",
+  "optimized": {
+    "@wangeditor/editor-for-vue": {
+      "src": "../../../node_modules/@wangeditor/editor-for-vue/dist/index.esm.js",
+      "file": "@wangeditor_editor-for-vue.js",
+      "fileHash": "7d53cf61",
+      "needsInterop": false
+    },
+    "@wangeditor/editor": {
+      "src": "../../../node_modules/@wangeditor/editor/dist/index.esm.js",
+      "file": "@wangeditor_editor.js",
+      "fileHash": "7af148ff",
+      "needsInterop": false
+    },
+    "cropperjs": {
+      "src": "../../../node_modules/cropperjs/dist/cropper.esm.raw.js",
+      "file": "cropperjs.js",
+      "fileHash": "be5b5edd",
+      "needsInterop": false
+    },
+    "jszip": {
+      "src": "../../../node_modules/jszip/dist/jszip.min.js",
+      "file": "jszip.js",
+      "fileHash": "470857af",
+      "needsInterop": true
+    },
+    "katex": {
+      "src": "../../../node_modules/katex/dist/katex.mjs",
+      "file": "katex.js",
+      "fileHash": "29bd6e5c",
+      "needsInterop": false
+    },
+    "mammoth": {
+      "src": "../../../node_modules/mammoth/lib/index.js",
+      "file": "mammoth.js",
+      "fileHash": "4bc9e430",
+      "needsInterop": true
+    },
+    "micromark-extension-gfm": {
+      "src": "../../../node_modules/micromark-extension-gfm/index.js",
+      "file": "micromark-extension-gfm.js",
+      "fileHash": "a98cf8c2",
+      "needsInterop": false
+    },
+    "micromark-extension-math": {
+      "src": "../../../node_modules/micromark-extension-math/dev/index.js",
+      "file": "micromark-extension-math.js",
+      "fileHash": "d67bc68b",
+      "needsInterop": false
+    },
+    "micromark": {
+      "src": "../../../node_modules/micromark/dev/index.js",
+      "file": "micromark.js",
+      "fileHash": "0c47baba",
+      "needsInterop": false
+    },
+    "pdf-lib": {
+      "src": "../../../node_modules/pdf-lib/es/index.js",
+      "file": "pdf-lib.js",
+      "fileHash": "b1a9cc24",
+      "needsInterop": false
+    },
+    "pinia": {
+      "src": "../../../node_modules/pinia/dist/pinia.mjs",
+      "file": "pinia.js",
+      "fileHash": "22cdccce",
+      "needsInterop": false
+    },
+    "prismjs": {
+      "src": "../../../node_modules/prismjs/prism.js",
+      "file": "prismjs.js",
+      "fileHash": "9256d1e4",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-bash.js": {
+      "src": "../../../node_modules/prismjs/components/prism-bash.js",
+      "file": "prismjs_components_prism-bash__js.js",
+      "fileHash": "b914b737",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-c.js": {
+      "src": "../../../node_modules/prismjs/components/prism-c.js",
+      "file": "prismjs_components_prism-c__js.js",
+      "fileHash": "f003bdf0",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-cpp.js": {
+      "src": "../../../node_modules/prismjs/components/prism-cpp.js",
+      "file": "prismjs_components_prism-cpp__js.js",
+      "fileHash": "4b16400f",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-csharp.js": {
+      "src": "../../../node_modules/prismjs/components/prism-csharp.js",
+      "file": "prismjs_components_prism-csharp__js.js",
+      "fileHash": "3f21cce4",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-go.js": {
+      "src": "../../../node_modules/prismjs/components/prism-go.js",
+      "file": "prismjs_components_prism-go__js.js",
+      "fileHash": "0782bfa4",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-groovy.js": {
+      "src": "../../../node_modules/prismjs/components/prism-groovy.js",
+      "file": "prismjs_components_prism-groovy__js.js",
+      "fileHash": "1c26b841",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-java.js": {
+      "src": "../../../node_modules/prismjs/components/prism-java.js",
+      "file": "prismjs_components_prism-java__js.js",
+      "fileHash": "23371a05",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-json.js": {
+      "src": "../../../node_modules/prismjs/components/prism-json.js",
+      "file": "prismjs_components_prism-json__js.js",
+      "fileHash": "e226cd98",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-jsx.js": {
+      "src": "../../../node_modules/prismjs/components/prism-jsx.js",
+      "file": "prismjs_components_prism-jsx__js.js",
+      "fileHash": "4338b7b1",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-kotlin.js": {
+      "src": "../../../node_modules/prismjs/components/prism-kotlin.js",
+      "file": "prismjs_components_prism-kotlin__js.js",
+      "fileHash": "368d9518",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-lua.js": {
+      "src": "../../../node_modules/prismjs/components/prism-lua.js",
+      "file": "prismjs_components_prism-lua__js.js",
+      "fileHash": "18dafb6d",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-markdown.js": {
+      "src": "../../../node_modules/prismjs/components/prism-markdown.js",
+      "file": "prismjs_components_prism-markdown__js.js",
+      "fileHash": "c16113bc",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-markup-templating.js": {
+      "src": "../../../node_modules/prismjs/components/prism-markup-templating.js",
+      "file": "prismjs_components_prism-markup-templating__js.js",
+      "fileHash": "0fe5c429",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-php.js": {
+      "src": "../../../node_modules/prismjs/components/prism-php.js",
+      "file": "prismjs_components_prism-php__js.js",
+      "fileHash": "e01b616f",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-python.js": {
+      "src": "../../../node_modules/prismjs/components/prism-python.js",
+      "file": "prismjs_components_prism-python__js.js",
+      "fileHash": "2bc2fecb",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-r.js": {
+      "src": "../../../node_modules/prismjs/components/prism-r.js",
+      "file": "prismjs_components_prism-r__js.js",
+      "fileHash": "54b5c8bc",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-ruby.js": {
+      "src": "../../../node_modules/prismjs/components/prism-ruby.js",
+      "file": "prismjs_components_prism-ruby__js.js",
+      "fileHash": "e0e11041",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-rust.js": {
+      "src": "../../../node_modules/prismjs/components/prism-rust.js",
+      "file": "prismjs_components_prism-rust__js.js",
+      "fileHash": "fd5e021e",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-sql.js": {
+      "src": "../../../node_modules/prismjs/components/prism-sql.js",
+      "file": "prismjs_components_prism-sql__js.js",
+      "fileHash": "abac5cc5",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-swift.js": {
+      "src": "../../../node_modules/prismjs/components/prism-swift.js",
+      "file": "prismjs_components_prism-swift__js.js",
+      "fileHash": "a1578ad1",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-typescript.js": {
+      "src": "../../../node_modules/prismjs/components/prism-typescript.js",
+      "file": "prismjs_components_prism-typescript__js.js",
+      "fileHash": "d73d73ac",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-visual-basic.js": {
+      "src": "../../../node_modules/prismjs/components/prism-visual-basic.js",
+      "file": "prismjs_components_prism-visual-basic__js.js",
+      "fileHash": "3b42eb23",
+      "needsInterop": true
+    },
+    "prismjs/components/prism-yaml.js": {
+      "src": "../../../node_modules/prismjs/components/prism-yaml.js",
+      "file": "prismjs_components_prism-yaml__js.js",
+      "fileHash": "70338c19",
+      "needsInterop": true
+    },
+    "simple-mind-map": {
+      "src": "../../../node_modules/simple-mind-map/index.js",
+      "file": "simple-mind-map.js",
+      "fileHash": "8edde942",
+      "needsInterop": false
+    },
+    "simple-mind-map/src/plugins/AssociativeLine.js": {
+      "src": "../../../node_modules/simple-mind-map/src/plugins/AssociativeLine.js",
+      "file": "simple-mind-map_src_plugins_AssociativeLine__js.js",
+      "fileHash": "a1591111",
+      "needsInterop": false
+    },
+    "simple-mind-map/src/plugins/Drag.js": {
+      "src": "../../../node_modules/simple-mind-map/src/plugins/Drag.js",
+      "file": "simple-mind-map_src_plugins_Drag__js.js",
+      "fileHash": "f4d311aa",
+      "needsInterop": false
+    },
+    "simple-mind-map/src/plugins/Export.js": {
+      "src": "../../../node_modules/simple-mind-map/src/plugins/Export.js",
+      "file": "simple-mind-map_src_plugins_Export__js.js",
+      "fileHash": "e2bfa58a",
+      "needsInterop": false
+    },
+    "simple-mind-map/src/plugins/KeyboardNavigation.js": {
+      "src": "../../../node_modules/simple-mind-map/src/plugins/KeyboardNavigation.js",
+      "file": "simple-mind-map_src_plugins_KeyboardNavigation__js.js",
+      "fileHash": "546c730d",
+      "needsInterop": false
+    },
+    "simple-mind-map/src/plugins/Select.js": {
+      "src": "../../../node_modules/simple-mind-map/src/plugins/Select.js",
+      "file": "simple-mind-map_src_plugins_Select__js.js",
+      "fileHash": "92d612dc",
+      "needsInterop": false
+    },
+    "simple-mind-map/src/plugins/TouchEvent.js": {
+      "src": "../../../node_modules/simple-mind-map/src/plugins/TouchEvent.js",
+      "file": "simple-mind-map_src_plugins_TouchEvent__js.js",
+      "fileHash": "23beac88",
+      "needsInterop": false
+    },
+    "snabbdom": {
+      "src": "../../../node_modules/snabbdom/build/index.js",
+      "file": "snabbdom.js",
+      "fileHash": "3f4a02b3",
+      "needsInterop": false
+    },
+    "three": {
+      "src": "../../../node_modules/three/build/three.module.js",
+      "file": "three.js",
+      "fileHash": "fd0c168c",
+      "needsInterop": false
+    },
+    "three/examples/jsm/controls/OrbitControls.js": {
+      "src": "../../../node_modules/three/examples/jsm/controls/OrbitControls.js",
+      "file": "three_examples_jsm_controls_OrbitControls__js.js",
+      "fileHash": "5f7da087",
+      "needsInterop": false
+    },
+    "turndown": {
+      "src": "../../../node_modules/turndown/lib/turndown.browser.es.js",
+      "file": "turndown.js",
+      "fileHash": "c0dd2cf5",
+      "needsInterop": false
+    },
+    "vue-router": {
+      "src": "../../../node_modules/vue-router/dist/vue-router.mjs",
+      "file": "vue-router.js",
+      "fileHash": "ff3650d1",
+      "needsInterop": false
+    },
+    "vue": {
+      "src": "../../../node_modules/vue/dist/vue.runtime.esm-bundler.js",
+      "file": "vue.js",
+      "fileHash": "36352051",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "AutoMove-CBoxW4Rg": {
+      "file": "AutoMove-CBoxW4Rg.js",
+      "isDynamicEntry": false
+    },
+    "Base-CBNqdkYU": {
+      "file": "Base-CBNqdkYU.js",
+      "isDynamicEntry": false
+    },
+    "blank-line-CUN1gS5u": {
+      "file": "blank-line-CUN1gS5u.js",
+      "isDynamicEntry": false
+    },
+    "dev-Zw4g8Z-R": {
+      "file": "dev-Zw4g8Z-R.js",
+      "isDynamicEntry": false
+    },
+    "rolldown-runtime-D1cXj70v": {
+      "file": "rolldown-runtime-D1cXj70v.js",
+      "isDynamicEntry": false
+    },
+    "three.module-hMGRbWHz": {
+      "file": "three.module-hMGRbWHz.js",
+      "isDynamicEntry": false
+    },
+    "utils-DKbIT76G": {
+      "file": "utils-DKbIT76G.js",
+      "isDynamicEntry": false
+    },
+    "vue.runtime.esm-bundler-J3hhHSON": {
+      "file": "vue.runtime.esm-bundler-J3hhHSON.js",
+      "isDynamicEntry": false
+    }
+  }
+}

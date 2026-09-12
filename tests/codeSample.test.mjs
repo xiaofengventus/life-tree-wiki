@@ -56,8 +56,28 @@ test("内容里的 HTML 会被转义", () => {
   assert.ok(!html.includes("<b>"));
 });
 
-test("空的一侧显示占位符", () => {
+test("输出为空时只渲染输入一栏", () => {
   const html = codeSampleHtml("a\n---\n", 0);
+  assert.match(html, /is-single/);
+  assert.match(html, /life-code-sample-pane is-input/);
+  assert.ok(!html.includes("is-output"));
+  assert.ok(!html.includes("（空）"));
+});
+
+test("输入为空时只渲染输出一栏", () => {
+  const html = codeSampleHtml("\n---\nb", 0);
+  assert.match(html, /is-single/);
+  assert.match(html, /life-code-sample-pane is-output/);
+  assert.match(html, /输出<em>#0<\/em>/);
+  assert.ok(!html.includes("is-input"));
+  assert.ok(!html.includes("（空）"));
+});
+
+test("两侧都为空时保留输入占位栏", () => {
+  const html = codeSampleHtml("---", 0);
+  assert.match(html, /is-single/);
+  assert.match(html, /life-code-sample-pane is-input/);
+  assert.ok(!html.includes("is-output"));
   assert.match(html, /（空）/);
 });
 

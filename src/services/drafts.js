@@ -144,6 +144,29 @@ export async function deleteDraft(id) {
   return true;
 }
 
+/**
+ * 清空指定归属的草稿。`ownerKeys` 为空数组时清空整库。
+ * 只删命中归属的条目，同一浏览器里其他账号的草稿不受影响。
+ */
+export async function clearDrafts({ ownerKeys = [] } = {}) {
+  const allowedOwners = new Set(ownerKeys.map(String));
+  const database = await openDraftDatabase();
+  const readTransaction = database.transaction(DRAFT_STORE, "readonly");
+  const all = await requestResult(
+    readTransaction.objectStore(DRAFT_STORE).getAll(),
+  );
+  await transactionDone(readTransaction);
+  const targets = (all || []).filter(
+    (draft) => !allowedOwners.size || allowedOwners.has(draft.ownerKey),
+  );
+  if (!targets.length) return 0;
+  const writeTransaction = database.transaction(DRAFT_STORE, "readwrite");
+  const store = writeTransaction.objectStore(DRAFT_STORE);
+  for (const draft of targets) store.delete(draft.id);
+  await transactionDone(writeTransaction);
+  return targets.length;
+}
+
 export async function duplicateDraft(id, ownerKey) {
   const source = await getDraft(id);
   if (!source) throw new Error("草稿不存在或已被删除");
