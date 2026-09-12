@@ -373,7 +373,7 @@ export function buildTheme(themeInput) {
     variables: { ...vars },
     componentDefaults: defaults,
     // 自定义主题才允许写 overrides
-    overrides: preset.id === "custom" ? { ...(preset.overrides || {}) } : undefined,
+    overrides: preset.id === "custom" ? { ...preset.overrides } : undefined,
   };
 }
 

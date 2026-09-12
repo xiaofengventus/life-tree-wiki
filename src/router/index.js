@@ -21,6 +21,7 @@ const officialTrees = () => import("@/views/official_tree_admin.vue");
 const lifeTree = () => import("@/views/LifeTree.vue");
 const treeContributions = () => import("@/views/tree_contributions.vue");
 const columns = () => import("@/views/Columns.vue");
+const collectionDetail = () => import("@/views/collection_detail.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,6 +34,7 @@ const router = createRouter({
     { path: "/platform-trees", name: "platform-trees", component: platformTrees },
     { path: "/life-tree/:id?", name: "life-tree", component: lifeTree },
     { path: "/columns", name: "columns", component: columns },
+    { path: "/collections/:id", name: "collection-detail", component: collectionDetail },
     { path: "/create-post", name: "create-post", component: createPost },
     { path: "/view-post/:id", name: "view-post", component: viewPost },
     { path: "/evolution-tree", name: "create-tree", component: createTree },

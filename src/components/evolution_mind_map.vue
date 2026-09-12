@@ -29,7 +29,11 @@
       {{ toolbarCollapsed ? "▾" : "▴" }}
     </button>
 
-    <header v-show="!readOnly && !toolbarCollapsed" class="command-bar floating">
+    <header
+      v-show="!readOnly && !toolbarCollapsed"
+      class="command-bar floating"
+      :class="{ 'menu-open': layoutMenuOpen || moreMenuOpen }"
+    >
       <div class="command-group">
         <button type="button" title="撤销 Ctrl+Z" @click="run('BACK')">↩ 撤销</button>
         <button type="button" title="重做 Ctrl+Y" @click="run('FORWARD')">↪ 重做</button>
@@ -434,8 +438,6 @@
         <span class="quick-divider" aria-hidden="true"></span>
         <button type="button" class="danger" title="删除 Delete" @click="removeNodes">删除</button>
       </div>
-
-    </section>
 
     <footer class="status-bar">
       <span class="status-dot" aria-hidden="true"></span>
@@ -2251,31 +2253,42 @@ defineExpose({
   position: relative;
 }
 
+/*
+ * 工具栏本身是滚动容器（overflow:auto），会把绝对定位的浮层裁掉，
+ * 导致菜单「点了没反应」。菜单展开期间临时解除裁剪。
+ */
+.command-bar.floating.menu-open {
+  overflow: visible;
+}
+
 .io-dropdown-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-/* 下拉菜单改为向上弹出浮层（工具栏在顶部，向下展开会盖住画布操作区） */
+/* 下拉菜单向下弹出（工具栏贴着工作区顶部，向上没有空间可放） */
 .io-dropdown-menu {
   position: absolute;
   z-index: 20;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 8px);
+  bottom: auto;
   left: 0;
   display: grid;
   min-width: 218px;
+  max-height: min(60vh, 420px);
   gap: 2px;
   padding: 6px;
+  overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  box-shadow: 0 -6px 36px rgba(31, 59, 43, 0.18);
-  animation: popup-rise 0.16s ease;
+  box-shadow: 0 10px 36px rgba(31, 59, 43, 0.18);
+  animation: popup-drop 0.16s ease;
 }
 
-@keyframes popup-rise {
-  from { opacity: 0; transform: translateY(6px); }
+@keyframes popup-drop {
+  from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 

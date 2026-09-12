@@ -62,7 +62,7 @@ function defaultPageOptions(overrides = {}) {
     type: overrides.type || "content",
     pageSize: { name: sizeName, width: size.width, height: size.height },
     orientation: overrides.orientation || "portrait",
-    margin: { top: 18, right: 16, bottom: 18, left: 16, ...(overrides.margin || {}) },
+    margin: { top: 18, right: 16, bottom: 18, left: 16, ...overrides.margin },
     background: overrides.background || { type: "solid", value: "#FFFFFF" },
     header: overrides.header || { enabled: true, content: "" },
     footer: overrides.footer || {
@@ -309,14 +309,14 @@ export function moveComponent(doc, fromPageId, fromRegion, fromIndex, toPageId, 
 export function updateComponentContent(doc, componentId, newContent) {
   const comp = doc.components[componentId];
   if (!comp) return false;
-  comp.content = { ...(comp.content || {}), ...newContent };
+  comp.content = { ...comp.content, ...newContent };
   return true;
 }
 
 export function updateComponentStyle(doc, componentId, stylePatch) {
   const comp = doc.components[componentId];
   if (!comp) return false;
-  comp.style = { ...(comp.style || {}), ...stylePatch };
+  comp.style = { ...comp.style, ...stylePatch };
   comp.styleOverridden = true;
   return true;
 }
@@ -363,7 +363,7 @@ export function normalizeDocument(input) {
     meta: {
       title: "", author: "", subject: "", language: "zh-CN", revision: "",
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      ...(source.meta || {}),
+      ...source.meta,
     },
     theme: {
       id: source.theme?.id || DEFAULT_THEME_ID,

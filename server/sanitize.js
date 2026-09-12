@@ -151,6 +151,20 @@ export async function sanitizePostHtml(rawHtml) {
           return;
         }
 
+        // 代码块语言：客户端 sanitizeHtml 会保留，这里必须同样保留，
+        // 否则重新编辑时代码语言丢失、阅读页 Prism 也无法高亮。
+        if (tag === "code") {
+          const classLanguage = String(original.class || "")
+            .match(/(?:^|\s)language-([a-z0-9_+#-]{1,32})(?:\s|$)/i)?.[1];
+          const language = String(original["data-code-language"] || classLanguage || "")
+            .trim()
+            .toLowerCase();
+          if (/^[a-z0-9_+#-]{1,32}$/.test(language)) {
+            element.setAttribute("class", `language-${language}`);
+            element.setAttribute("data-code-language", language);
+          }
+        }
+
         if (STYLE_TAGS.has(tag)) {
           const style = safeInlineStyle(original.style);
           if (style) element.setAttribute("style", style);

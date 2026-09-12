@@ -1376,7 +1376,12 @@ import {
   registerInsertContentMenu,
 } from "@/utils/wangEditorInsertMenu";
 import { registerEditorUxModule } from "@/utils/wangEditorUx";
+import {
+  CODE_SAMPLE_MENU_KEY,
+  registerCodeSampleModule,
+} from "@/utils/wangEditorCodeSample";
 import { normalizeLegacyImageCaptionHtml } from "@/utils/imageCaptionHtml";
+import { isEditorOwnedPaste, normalizePastedHtml } from "@/utils/pasteClean";
 import {
   countCitationMarkers,
   normalizeCitationLinks,
@@ -1396,6 +1401,7 @@ registerPostCardModule();
 registerFormulaModule();
 registerInsertContentMenu();
 registerEditorUxModule();
+registerCodeSampleModule();
 
 const emit = defineEmits(["submit"]);
 const props = defineProps({
@@ -1698,6 +1704,7 @@ const toolbarConfig = {
     "blockquote",
     "codeBlock",
     "codeSelectLang",
+    CODE_SAMPLE_MENU_KEY,
     "insertLink",
     "uploadImage",
     CITATION_MENU_KEY,
@@ -1723,6 +1730,7 @@ const toolbarTooltipDefinitions = {
   blockquote: { label: "引用" },
   codeBlock: { label: "代码块" },
   codeSelectLang: { label: "代码语言" },
+  [CODE_SAMPLE_MENU_KEY]: { label: "代码块案例（输入 / 输出对照）" },
   insertLink: { label: "插入链接" },
   uploadImage: { label: "上传图片" },
   [INSERT_MENU_KEY]: { label: "插入内容", shortcut: "mod+Shift+I" },
@@ -1734,6 +1742,27 @@ const toolbarTooltipDefinitions = {
 
 const editorConfig = {
   placeholder: "请输入文章内容，可以选择文字后设置颜色……",
+  /**
+   * 粘贴归一化：外部富文本带来的字号 / 字体 / 行高 / 缩进统一剥掉，
+   * 一律按正文大小落进编辑器；编辑器自身的节点与图片保持默认行为。
+   */
+  customPaste(editor, event) {
+    const data = event?.clipboardData;
+    if (!data) return true;
+    const html = data.getData("text/html");
+    if (!html || !html.trim()) return true;
+    // 编辑器内部复制（公式、卡片等自定义节点）：走默认，避免被改写
+    if (isEditorOwnedPaste(html)) return true;
+    // 含图片时走默认，避免绕过图片粘贴流程
+    if (/<img[\s>]/i.test(html)) return true;
+
+    const cleaned = normalizePastedHtml(html);
+    if (!cleaned || cleaned === html) return true;
+    if (typeof editor.dangerouslyInsertHtml !== "function") return true;
+
+    editor.dangerouslyInsertHtml(cleaned);
+    return false;
+  },
   hoverbarKeys: {
     // 选中文字悬浮栏：按「结构 → 行内样式 → 清除 → 块级」分组排列
     text: {
@@ -4135,6 +4164,21 @@ onBeforeUnmount(() => {
 .editor-wrapper :deep(.w-e-text-container [data-slate-editor] pre) {
   max-width: 100%;
   overflow-x: auto;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid #ccd8e4;
+  border-radius: 9px;
+  background: #edf1f7;
+  color: #24292f;
+  font: 0.9em/1.65 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  tab-size: 2;
+}
+
+.editor-wrapper :deep(.w-e-text-container [data-slate-editor] pre code) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 
 .editor-wrapper

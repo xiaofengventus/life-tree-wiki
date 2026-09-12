@@ -81,17 +81,53 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* 语言标签移到左上，右上留给「复制」按钮 */
 .post-content pre[data-code-language]::before,
 .markdown-preview pre[data-code-language]::before,
 .article-content pre[data-code-language]::before {
   position: absolute;
-  top: 0.55rem;
-  right: 0.75rem;
+  top: 0.6rem;
+  left: 1rem;
   color: #7b8794;
   content: attr(data-code-language);
   font: 700 0.68rem/1.2 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* 代码块「复制」按钮 */
+.code-copy-button {
+  position: absolute;
+  z-index: 1;
+  top: 0.45rem;
+  right: 0.55rem;
+  padding: 3px 9px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  color: #57606a;
+  font: 600 0.72rem/1.5 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.code-copy-button:hover {
+  border-color: #afb8c1;
+  background: #f3f4f6;
+  color: #24292f;
+}
+.code-copy-button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 1px;
+}
+.code-copy-button[data-copy-state="copied"] {
+  border-color: #1a7f37;
+  background: #eaf7ee;
+  color: #1a7f37;
+}
+.code-copy-button[data-copy-state="failed"] {
+  border-color: #f2b8b5;
+  background: #fdf3f2;
+  color: #b42318;
 }
 
 .post-content pre code,
@@ -353,4 +389,146 @@
     border-radius: 7px;
     font-size: 0.82em;
   }
+
+  .life-code-sample-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 代码块案例：语言标记为 sample 的代码块渲染成的 输入 / 输出 对照卡片 */
+.life-code-sample {
+  margin: 1.6em 0;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid #d8e1e8;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.life-code-sample-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.life-code-sample-bar {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: #185fa5;
+}
+
+.life-code-sample-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.life-code-sample-title-en {
+  color: #7b8794;
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.life-code-sample-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.life-code-sample-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.life-code-sample-pane {
+  position: relative;
+  padding: 12px;
+  border: 1px solid #d8e1e8;
+  border-radius: 8px;
+}
+
+.life-code-sample-pane.is-input {
+  border-color: #b5d4f4;
+}
+
+.life-code-sample-pane.is-output {
+  border-color: #c0dd97;
+}
+
+.life-code-sample-pane-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  /* 右上角留给「复制」按钮 */
+  padding-right: 56px;
+  margin-bottom: 10px;
+}
+
+.life-code-sample-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.95em;
+  font-weight: 700;
+}
+
+.life-code-sample-label em {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.82em;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.life-code-sample-sub {
+  font-size: 0.78em;
+  font-style: italic;
+}
+
+.life-code-sample-pane.is-input .life-code-sample-label {
+  color: #0c447c;
+}
+
+.life-code-sample-pane.is-input .life-code-sample-label em {
+  color: #378add;
+}
+
+.life-code-sample-pane.is-input .life-code-sample-sub {
+  color: #185fa5;
+}
+
+.life-code-sample-pane.is-output .life-code-sample-label {
+  color: #27500a;
+}
+
+.life-code-sample-pane.is-output .life-code-sample-label em {
+  color: #639922;
+}
+
+.life-code-sample-pane.is-output .life-code-sample-sub {
+  color: #3b6d11;
+}
+
+/* 卡片内的内容框：压掉通用 pre 样式，并让复制按钮锚到卡片上而非 pre 上 */
+.life-code-sample .life-code-sample-body {
+  position: static;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #f4f8fd;
+  font-size: 0.84em;
+  line-height: 1.7;
+}
+
+.life-code-sample .life-code-sample-pane.is-output .life-code-sample-body {
+  background: #f5f9ef;
+}
+
+.life-code-sample .life-code-sample-body code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #24292f;
+  font-size: 1em;
+  white-space: pre;
 }

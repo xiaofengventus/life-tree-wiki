@@ -381,25 +381,53 @@
                   从 Markdown 导入正文
                 </summary>
                 <p>
-                  数学公式支持行内 <code>$...$</code> 和独立公式块
-                  <code>$$...$$</code>。
+                  数学公式支持行内 <code>$...$</code>、<code>\(...\)</code>，
+                  以及独立公式块 <code>$$...$$</code>、<code>\[...\]</code>；
+                  中文语境下裸写的 LaTeX（如
+                  <code>\vec{r}=x(t)\vec{i}</code>）也会自动识别。
                 </p>
                 <p>
                   支持标题、列表、引用、代码、链接和图片。原始 HTML
                   不会执行，危险链接会被移除。
                 </p>
+                <div class="markdown-tabs" role="tablist">
+                  <button
+                    type="button"
+                    class="markdown-tab"
+                    :class="{ active: markdownTab === 'code' }"
+                    role="tab"
+                    @click="markdownTab = 'code'"
+                  >
+                    代码
+                  </button>
+                  <button
+                    type="button"
+                    class="markdown-tab"
+                    :class="{ active: markdownTab === 'preview' }"
+                    role="tab"
+                    @click="switchMarkdownTab('preview')"
+                  >
+                    预览
+                  </button>
+                </div>
                 <textarea
+                  v-if="markdownTab === 'code'"
                   v-model="markdownSource"
                   rows="10"
                   maxlength="500000"
-                  placeholder="在这里粘贴 Markdown……"
+                  placeholder="在这里粘贴或编写 Markdown / LaTeX……"
                 ></textarea>
+                <article
+                  v-else
+                  class="markdown-preview markdown-preview-live"
+                  v-html="markdownPreview"
+                ></article>
                 <div class="markdown-actions">
                   <button
                     type="button"
                     class="secondary-button"
                     :disabled="!markdownSource.trim()"
-                    @click="previewMarkdown"
+                    @click="switchMarkdownTab('preview')"
                   >
                     预览
                   </button>
@@ -415,11 +443,6 @@
                 <p v-if="markdownMessage" class="markdown-message">
                   {{ markdownMessage }}
                 </p>
-                <article
-                  v-if="markdownPreview"
-                  class="markdown-preview"
-                  v-html="markdownPreview"
-                ></article>
               </details>
             </section>
 
@@ -689,11 +712,38 @@
         >
           <div class="editor-toolbar-fixed">
             <Toolbar
+              v-if="editMode === 'rich'"
               :editor="editorRef"
               :default-config="toolbarConfig"
               mode="default"
             />
+            <div v-else class="markdown-mode-toolbar-hint">
+              <span class="markdown-mode-badge">Markdown 模式</span>
+              <span class="markdown-mode-tip"
+                >直接编写 Markdown 与 LaTeX 公式，预览所见即所得</span
+              >
+            </div>
             <div class="editor-toolbar-extras">
+              <div class="edit-mode-switch">
+                <button
+                  type="button"
+                  class="edit-mode-btn"
+                  :class="{ active: editMode === 'rich' }"
+                  :aria-pressed="editMode === 'rich'"
+                  @click="switchToRichMode"
+                >
+                  富文本
+                </button>
+                <button
+                  type="button"
+                  class="edit-mode-btn"
+                  :class="{ active: editMode === 'markdown' }"
+                  :aria-pressed="editMode === 'markdown'"
+                  @click="switchToMarkdownMode"
+                >
+                  Markdown
+                </button>
+              </div>
               <div class="insert-card-actions">
                 <button
                   type="button"
@@ -782,12 +832,48 @@
             </div>
           </div>
           <Editor
+            v-if="editMode === 'rich'"
             v-model="content"
             :default-config="editorConfig"
             mode="default"
             class="post-editor"
             @on-created="handleCreated"
           />
+          <!-- Markdown 编辑模式：代码 / 预览 -->
+          <div v-else class="markdown-editor">
+            <div class="markdown-editor-tabs" role="tablist">
+              <button
+                type="button"
+                class="markdown-editor-tab"
+                :class="{ active: markdownEditorTab === 'code' }"
+                role="tab"
+                @click="switchMarkdownEditorTab('code')"
+              >
+                代码
+              </button>
+              <button
+                type="button"
+                class="markdown-editor-tab"
+                :class="{ active: markdownEditorTab === 'preview' }"
+                role="tab"
+                @click="switchMarkdownEditorTab('preview')"
+              >
+                预览
+              </button>
+            </div>
+            <textarea
+              v-if="markdownEditorTab === 'code'"
+              v-model="markdownEditorSource"
+              class="markdown-editor-textarea"
+              placeholder="在这里编写 Markdown / LaTeX……&#10;&#10;行内公式：$x^2$ 或 \(x^2\)&#10;块级公式：$$...$$ 或 \[...\]&#10;中文语境下裸写 \vec{r}=x(t)\vec{i} 也能自动识别"
+              spellcheck="false"
+            ></textarea>
+            <article
+              v-else
+              class="markdown-editor-preview"
+              v-html="markdownEditorPreview"
+            ></article>
+          </div>
         </div>
       </div>
       <p v-if="imageMessage" class="image-message" aria-live="polite">
@@ -1466,7 +1552,10 @@ import { importDocx } from "@/utils/importExport/docxImport";
 import { importMarkdown } from "@/utils/importExport/markdownImport";
 import { importHtml } from "@/utils/importExport/htmlImport";
 import { exportDocx } from "@/utils/importExport/docxExport";
-import { exportMarkdown } from "@/utils/importExport/markdownExport";
+import {
+  exportMarkdown,
+  htmlToMarkdownString,
+} from "@/utils/importExport/markdownExport";
 import { exportHtml } from "@/utils/importExport/htmlExport";
 import { pickFile } from "@/utils/importExport";
 import { TAXONOMY_RANK_MAP } from "../../shared/taxonomyRanks.js";
@@ -1641,6 +1730,12 @@ const editorRef = shallowRef();
 const title = ref("");
 const author = ref("");
 const content = ref("");
+// Markdown 编辑模式
+const editMode = ref("rich"); // 'rich' | 'markdown'
+const markdownEditorSource = ref("");
+const markdownEditorTab = ref("code"); // 'code' | 'preview'
+const markdownEditorPreview = ref("");
+let markdownSyncTimer = null;
 const tagInput = ref("");
 const tags = ref([]);
 const license = ref("支持闭源");
@@ -1666,6 +1761,8 @@ const pendingCoverHash = ref("");
 const markdownSource = ref("");
 const markdownPreview = ref("");
 const markdownMessage = ref("");
+const markdownTab = ref("code");
+let markdownPreviewTimer = null;
 const mediaPickerOpen = ref(false);
 const mediaPickerTarget = ref("");
 const mediaPickerCardId = ref("");
@@ -2610,17 +2707,34 @@ watch(
   { deep: true },
 );
 
-function previewMarkdown() {
+function renderMarkdownPreview() {
   try {
     markdownPreview.value = decorateRichHtml(
       renderFormulaNodes(markdownToSafeHtml(markdownSource.value)),
     );
-    markdownMessage.value = "预览已按文章安全规则生成。";
+    markdownMessage.value = "";
   } catch (error) {
     markdownPreview.value = "";
     markdownMessage.value = error.message || "Markdown 解析失败";
   }
 }
+
+function previewMarkdown() {
+  renderMarkdownPreview();
+  markdownMessage.value = "预览已按文章安全规则生成。";
+}
+
+function switchMarkdownTab(tab) {
+  markdownTab.value = tab;
+  if (tab === "preview") renderMarkdownPreview();
+}
+
+// 切到预览标签时实时渲染（防抖），代码标签下不做无效计算
+watch(markdownSource, () => {
+  if (markdownTab.value !== "preview") return;
+  if (markdownPreviewTimer) clearTimeout(markdownPreviewTimer);
+  markdownPreviewTimer = setTimeout(renderMarkdownPreview, 200);
+});
 
 function insertMarkdown() {
   let html;
@@ -2639,6 +2753,63 @@ function insertMarkdown() {
   markdownPreview.value = decorateRichHtml(renderFormulaNodes(html));
   closeInsertPanel();
 }
+
+// ============ Markdown 编辑模式 ============
+
+function renderMarkdownEditorPreview() {
+  try {
+    markdownEditorPreview.value = decorateRichHtml(
+      renderFormulaNodes(markdownToSafeHtml(markdownEditorSource.value)),
+    );
+  } catch (error) {
+    markdownEditorPreview.value = `<p style="color:#dc2626">${error.message || "Markdown 解析失败"}</p>`;
+  }
+}
+
+function syncMarkdownToHtml() {
+  if (markdownSyncTimer) clearTimeout(markdownSyncTimer);
+  markdownSyncTimer = setTimeout(() => {
+    try {
+      content.value = markdownToSafeHtml(markdownEditorSource.value);
+    } catch {
+      /* 忽略，预览区会显示错误 */
+    }
+  }, 300);
+}
+
+async function switchToMarkdownMode() {
+  try {
+    markdownEditorSource.value = await htmlToMarkdownString(content.value);
+  } catch {
+    markdownEditorSource.value = "";
+  }
+  markdownEditorTab.value = "code";
+  editMode.value = "markdown";
+  nextTick(() => renderMarkdownEditorPreview());
+}
+
+function switchToRichMode() {
+  if (markdownSyncTimer) clearTimeout(markdownSyncTimer);
+  try {
+    content.value = markdownToSafeHtml(markdownEditorSource.value);
+  } catch {
+    /* 保留已有 content */
+  }
+  editMode.value = "rich";
+  nextTick(() => {
+    if (editorRef.value) editorRef.value.setHtml(content.value);
+  });
+}
+
+function switchMarkdownEditorTab(tab) {
+  markdownEditorTab.value = tab;
+  if (tab === "preview") renderMarkdownEditorPreview();
+}
+
+watch(markdownEditorSource, () => {
+  syncMarkdownToHtml();
+  if (markdownEditorTab.value === "preview") renderMarkdownEditorPreview();
+});
 
 async function openMediaPicker(target, card = null) {
   await userStore.initialize();
@@ -3175,6 +3346,7 @@ function cardPreviewRows(card) {
 const uiPdfPrintHtml = computed(() => {
   const html = decorateRichHtml(
     renderFormulaNodes(normalizeCitationLinks(content.value, citations.value)),
+    { codeCopy: false },
   );
   if (typeof DOMParser === "undefined") return html;
   const parsed = new DOMParser().parseFromString(
@@ -3324,6 +3496,16 @@ async function loadResearchTrees() {
 
 async function submitPost(targetVisibility = "PUBLIC") {
   errorMessage.value = "";
+  // 若处于 Markdown 模式，先把最新源码同步到 HTML
+  if (editMode.value === "markdown") {
+    if (markdownSyncTimer) clearTimeout(markdownSyncTimer);
+    try {
+      content.value = markdownToSafeHtml(markdownEditorSource.value);
+    } catch (error) {
+      errorMessage.value = error.message || "Markdown 解析失败，请检查公式语法";
+      return;
+    }
+  }
   const savingPrivate = targetVisibility === "PRIVATE";
 
   await userStore.initialize();
@@ -4478,6 +4660,117 @@ onBeforeUnmount(() => {
   min-height: 360px;
 }
 
+/* ===== Markdown 编辑模式 ===== */
+.markdown-mode-toolbar-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f0f7ff;
+  border-bottom: 1px solid #d0e1f5;
+}
+.markdown-mode-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.markdown-mode-tip {
+  color: #475569;
+  font-size: 0.82rem;
+}
+.edit-mode-switch {
+  display: inline-flex;
+  border: 1px solid #c8d3df;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.edit-mode-btn {
+  padding: 5px 14px;
+  border: none;
+  background: #fff;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.edit-mode-btn.active {
+  background: #1d4ed8;
+  color: #fff;
+}
+.markdown-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+  border: 1px solid #d7dee6;
+  border-top: none;
+  background: #fff;
+}
+.markdown-editor-tabs {
+  display: flex;
+  border-bottom: 1px solid #d7dee6;
+  background: #f8fafc;
+}
+.markdown-editor-tab {
+  padding: 8px 22px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.markdown-editor-tab.active {
+  border-bottom-color: #1d4ed8;
+  color: #1d4ed8;
+  background: #fff;
+}
+.markdown-editor-textarea {
+  flex: 1;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 360px;
+  padding: 14px 18px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #1e293b;
+  background: #fff;
+}
+.markdown-editor-preview {
+  flex: 1;
+  min-height: 360px;
+  padding: 16px 20px;
+  overflow: auto;
+  color: #25313b;
+  line-height: 1.75;
+}
+.markdown-editor-preview :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.markdown-editor-preview :deep(figure) {
+  width: fit-content;
+  max-width: 100%;
+  margin: 1.5em auto;
+  text-align: center;
+}
+.markdown-editor-preview :deep(figcaption) {
+  margin-top: 8px;
+  color: #8795a4;
+  font-size: 0.88rem;
+}
+
 .editor-wrapper :deep(.w-e-text-container [data-slate-editor]) {
   box-sizing: border-box;
   min-height: 360px;
@@ -4763,6 +5056,34 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.markdown-tabs {
+  display: flex;
+  gap: 0;
+  margin: 6px 0 8px;
+  border-bottom: 1px solid #c8d3df;
+}
+.markdown-tab {
+  padding: 7px 18px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 7px 7px 0 0;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.markdown-tab.active {
+  border-color: #c8d3df;
+  background: #fff;
+  color: #1d4ed8;
+}
+.markdown-preview-live {
+  margin-top: 0;
+  min-height: 220px;
+  max-height: 360px;
 }
 .markdown-actions {
   display: flex;

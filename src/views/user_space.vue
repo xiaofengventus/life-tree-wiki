@@ -14,6 +14,7 @@ import ImageCropperDialog from "@/components/ImageCropperDialog.vue";
 import { useUserStore } from "@/stores/user";
 import { fetchUserSpace } from "@/services/users";
 import { fetchConnections, fetchFavorites, setFollowing } from "@/services/social";
+import { createCollection, fetchCollections } from "@/services/collections";
 import { deletePost } from "@/services/posts";
 import { deleteTree } from "@/services/trees";
 import { uploadPreparedImage } from "@/utils/mediaImages";
@@ -42,8 +43,12 @@ const sections = reactive({
   timeline: { open: false, loaded: false, loading: false, items: [] },
   privateWorks: { open: false, loaded: false, loading: false, items: [], used: 0, limit: 5 },
   favorites: { open: false, loaded: false, loading: false, posts: [], trees: [] },
+  collections: { open: false, loaded: false, loading: false, items: [], creating: false },
   connections: { open: false, loaded: false, loading: false, followers: [], following: [], count: 0 },
 });
+
+const collectionForm = reactive({ title: "", visibility: "PUBLIC" });
+const collectionMessage = ref("");
 
 const requestedUid = computed(() => String(route.params.uid || userStore.user?.uid || ""));
 const isOwner = computed(() => Boolean(profile.value?.uid && profile.value.uid === userStore.user?.uid));
@@ -173,6 +178,11 @@ async function loadSection(name) {
         section.trees = payload.trees || [];
       }
       section.loaded = true;
+    } else if (name === "collections") {
+      // 公开合集访客也能看到；私密合集只有作者本人能拿到
+      const payload = await fetchCollections(uid).catch(() => ({ collections: [] }));
+      section.items = payload.collections || [];
+      section.loaded = true;
     } else if (name === "connections") {
       const payload = await fetchConnections(uid).catch(() => ({ followers: [], following: [] }));
       section.followers = payload.followers || [];
@@ -184,6 +194,28 @@ async function loadSection(name) {
     editMessage.value = error.message || "内容加载失败";
   } finally {
     section.loading = false;
+  }
+}
+
+async function submitCollection() {
+  if (!isOwner.value || sections.collections.creating) return;
+  const title = collectionForm.title.trim();
+  if (!title) return;
+  sections.collections.creating = true;
+  collectionMessage.value = "";
+  try {
+    const payload = await createCollection({
+      title,
+      description: "",
+      visibility: collectionForm.visibility,
+    });
+    sections.collections.items = [payload.collection, ...sections.collections.items];
+    collectionForm.title = "";
+    collectionMessage.value = "合集已创建：点进去把作品加进来。";
+  } catch (error) {
+    collectionMessage.value = error.message || "创建合集失败";
+  } finally {
+    sections.collections.creating = false;
   }
 }
 
@@ -504,6 +536,60 @@ watch(requestedUid, loadProfile, { immediate: true });
             </article>
           </template>
           <p v-else class="fold-state">还没有私密作品：在文章或进化树编辑器中选择“保存为仅自己可见”。</p>
+        </div>
+      </section>
+
+      <!-- 合集：折叠 + 懒加载（公开合集访客可见，本人可新建） -->
+      <section class="fold-section">
+        <button type="button" class="fold-head" @click="toggleSection('collections')">
+          <svg class="fold-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M4 5h6l1.7 2H20v12H4V5Zm2 4v8h12V9H6Z" fill="currentColor" />
+          </svg>
+          <strong>{{ isOwner ? "我的合集" : "合集" }}</strong>
+          <small>把同一主题的作品归到一起</small>
+          <i class="fold-arrow" :class="{ open: sections.collections.open }" aria-hidden="true">﹀</i>
+        </button>
+        <div v-if="sections.collections.open" class="fold-body">
+          <p v-if="sections.collections.loading" class="fold-state">正在从服务器加载合集……</p>
+          <template v-else-if="sections.collections.items.length">
+            <article
+              v-for="item in sections.collections.items"
+              :key="`collection-${item.id}`"
+              class="line-item"
+            >
+              <div class="line-copy">
+                <small class="line-kind">
+                  {{ item.isPrivate ? "仅自己可见" : "公开合集" }} · {{ item.itemCount }} 个作品
+                </small>
+                <RouterLink class="line-title" :to="`/collections/${item.id}`">
+                  {{ item.title }}
+                </RouterLink>
+                <p v-if="item.description">{{ item.description }}</p>
+              </div>
+            </article>
+          </template>
+          <p v-else class="fold-state">
+            {{ isOwner
+              ? "还没有合集：把同一主题的文章和进化树归到一起，别人也能按主题浏览。"
+              : "这位作者还没有公开合集。" }}
+          </p>
+          <form v-if="isOwner" class="collection-create" @submit.prevent="submitCollection">
+            <input
+              v-model="collectionForm.title"
+              type="text"
+              maxlength="80"
+              placeholder="新合集名称，例如「算法题解」"
+              required
+            />
+            <select v-model="collectionForm.visibility">
+              <option value="PUBLIC">公开</option>
+              <option value="PRIVATE">仅自己可见</option>
+            </select>
+            <button type="submit" :disabled="sections.collections.creating">
+              {{ sections.collections.creating ? "创建中…" : "新建合集" }}
+            </button>
+          </form>
+          <p v-if="collectionMessage" class="fold-state">{{ collectionMessage }}</p>
         </div>
       </section>
 
@@ -879,6 +965,44 @@ watch(requestedUid, loadProfile, { immediate: true });
 }
 
 .line-actions button { border-color: #dcb9b6; color: #a33d37; }
+
+/* 新建合集：内联表单 */
+.collection-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e7ece9;
+}
+
+.collection-create input,
+.collection-create select {
+  padding: 7px 10px;
+  border: 1px solid #cfe0d7;
+  border-radius: 7px;
+  background: #fff;
+  color: #29473d;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.collection-create input { flex: 1 1 200px; min-width: 0; }
+
+.collection-create button {
+  padding: 7px 16px;
+  border: 1px solid #2f8870;
+  border-radius: 999px;
+  background: #2f8870;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collection-create button:disabled { opacity: 0.55; cursor: default; }
 
 /* 编辑资料表单 */
 .editor-panel { padding: 16px 4px 20px; }

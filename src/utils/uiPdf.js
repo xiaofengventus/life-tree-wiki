@@ -666,7 +666,7 @@ export function parseUiPdfSource(sourceText) {
         return;
       }
     }
-    if (/^```/.test(line)) {
+    if (line.startsWith('```')) {
       flushParagraph();
       fence = { type: "code", language: line.slice(3).trim(), body: [] };
       return;
