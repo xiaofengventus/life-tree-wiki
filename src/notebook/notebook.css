@@ -1,0 +1,355 @@
+/* laup Notebook（站内版）—— Jupyter 经典界面。
+   全部规则收在 #notebook-page 下：既不污染站点全局样式，
+   也屏蔽站点级 body/h1 等默认样式对 Notebook 的渗入。 */
+#notebook-page {
+  --sel-blue: #4b9fe1;
+  --border: #e3e3e3;
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: #fff;
+  color: #333;
+  font-family: "Helvetica Neue", Helvetica, Arial, "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  text-align: left;
+}
+#notebook-page *, #notebook-page *::before, #notebook-page *::after { box-sizing: border-box; }
+
+/* ---------- 菜单栏 ---------- */
+#notebook-page #menubar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 20;
+}
+#notebook-page #menubar .brand { font-weight: bold; color: #e25303; font-size: 15px; }
+#notebook-page #menubar .brand-sub { color: #888; margin-right: 14px; font-size: 14px; }
+#notebook-page #menubar button {
+  border: 1px solid #ccc;
+  background: #f7f7f7;
+  border-radius: 3px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: #333;
+}
+#notebook-page #menubar button:hover { background: #ececec; }
+#notebook-page #menubar .saved { margin-left: auto; color: #999; font-size: 12px; }
+
+/* ---------- Notebook ---------- */
+#notebook-page #notebook { max-width: 1000px; margin: 0 auto; padding: 10px 0 220px; }
+
+#notebook-page .cell { display: flex; margin: 2px 0; }
+
+#notebook-page .prompt {
+  flex: 0 0 92px;
+  text-align: right;
+  font-family: Consolas, Menlo, "Courier New", monospace;
+  font-size: 13px;
+  padding: 7px 12px 0 0;
+  color: #333;
+  user-select: none;
+  cursor: pointer;
+  white-space: pre;
+}
+
+#notebook-page .body { flex: 1; min-width: 0; }
+
+/* ---------- 单元格壳：工具栏的锚点 ----------
+   工具栏原来挂在 .input-area 里。「原地」档下不编辑时编辑区会被结果替换掉，
+   工具栏就会跟着消失（删格 / 上移就点不到了），所以挂到壳子上 —— 三种档位都在。 */
+#notebook-page .cell-shell { position: relative; }
+
+/* 编辑区被结果顶掉时的选中圈：画在壳子上，且用 outline（不占位、不挤动排版）。
+   编辑区在场时仍旧由下面那条 .input-area 的规则画，两者不会同时出现。 */
+#notebook-page .cell.src-hidden.selected .cell-shell {
+  outline: 1px solid var(--sel-blue);
+  outline-offset: 0;
+  border-radius: 2px;
+}
+
+/* ---------- 「原地」档：结果就是本格本体 ---------- */
+/* 给个最小高度 —— 没有这一条，渲染为空的格子会塌成 0 高，连点都点不到 */
+#notebook-page .cell.inplace .output { min-height: 24px; }
+
+/* ---------- 「折叠源码」档：源码收成一行摘要条，在结果**之上** ----------
+   位置不能挪到结果下面：点开它长出来的是编辑区，而编辑区在结果之前 ——
+   摘条在下面的话，点开的瞬间那一行会从下跳到上。 */
+#notebook-page .source-fold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+  padding: 3px 8px;
+  border: 1px dashed #dcdcdc;
+  border-radius: 2px;
+  background: #fafafa;
+  cursor: pointer;
+  font-size: 12px;
+  color: #8a8a8a;
+  overflow: hidden;
+}
+#notebook-page .source-fold:hover { border-color: var(--sel-blue); color: #555; }
+#notebook-page .source-fold-type {
+  flex: none;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 11px;
+  color: #2b6cb0;
+  border: 1px solid #d7e7f5;
+  background: #f2f7fc;
+  border-radius: 3px;
+  padding: 0 5px;
+}
+#notebook-page .source-fold-text {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+#notebook-page .source-fold-meta { flex: none; margin-left: auto; color: #b8b8b8; }
+
+#notebook-page .input-area {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: #fff;
+}
+#notebook-page .cell.selected .input-area {
+  border-color: var(--sel-blue);
+  box-shadow: 0 0 0 1px rgba(75, 159, 225, 0.3);
+}
+
+/* ---------- 右上角工具栏（悬停浮现） ---------- */
+#notebook-page .toolbar {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  display: flex;
+  gap: 1px;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.12s;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 3px;
+  padding: 1px;
+}
+#notebook-page .cell:hover .toolbar, #notebook-page .cell.selected .toolbar { opacity: 1; }
+#notebook-page .toolbar button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+#notebook-page .toolbar button:hover { background: #e8e8e8; color: #111; }
+#notebook-page .toolbar .type-badge {
+  width: auto;
+  padding: 0 7px;
+  font-size: 11px;
+  font-family: Consolas, Menlo, monospace;
+  color: #2b6cb0;
+}
+
+/* ---------- 输出区 ---------- */
+#notebook-page .output { padding: 8px 10px; text-align: left; }
+#notebook-page .output:empty { display: none; }
+
+#notebook-page .output h1 { font-size: 26px; margin: 14px 0 8px; }
+#notebook-page .output h2 { font-size: 21px; margin: 12px 0 7px; }
+#notebook-page .output h3 { font-size: 17px; margin: 10px 0 6px; }
+#notebook-page .output h4, #notebook-page .output h5, #notebook-page .output h6 { font-size: 15px; margin: 8px 0 5px; }
+#notebook-page .output p { margin: 6px 0; line-height: 1.6; }
+#notebook-page .output ul, #notebook-page .output ol { margin: 6px 0; padding-left: 26px; }
+#notebook-page .output li { margin: 2px 0; line-height: 1.55; }
+
+#notebook-page .output pre {
+  background: #f7f7f7;
+  border: 1px solid #e5e5e5;
+  border-radius: 2px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-size: 12.8px;
+  margin: 6px 0;
+}
+#notebook-page .output code {
+  font-family: Consolas, Menlo, monospace;
+  background: #f4f4f4;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 92%;
+}
+#notebook-page .output pre code { background: none; padding: 0; font-size: 100%; }
+
+#notebook-page .output table { border-collapse: collapse; margin: 8px 0; }
+#notebook-page .output th, #notebook-page .output td { border: 1px solid #d5d5d5; padding: 4px 12px; font-size: 13px; }
+#notebook-page .output th { background: #f2f2f2; }
+
+#notebook-page .output blockquote {
+  border-left: 3px solid #ddd;
+  color: #777;
+  margin: 6px 0;
+  padding: 2px 12px;
+}
+#notebook-page .output img { max-width: 100%; }
+#notebook-page .output figure { margin: 10px 0; }
+#notebook-page .output figcaption { color: #777; font-size: 12.5px; margin-top: 4px; }
+#notebook-page .output hr { border: none; border-top: 1px solid #ddd; margin: 12px 0; }
+#notebook-page .output a { color: #0645ad; }
+
+/* 代码格：还没写首行类型声明时的提示（把所有可用类型摆出来） */
+#notebook-page .code-decl-hint {
+  margin: 6px 0;
+  padding: 5px 10px;
+  border: 1px dashed #d5d5d5;
+  border-radius: 3px;
+  background: #fafafa;
+  color: #7b8794;
+  font-size: 12px;
+}
+#notebook-page .code-decl-hint code {
+  font-family: Consolas, Menlo, monospace;
+  background: none;
+  padding: 0;
+  color: #2b6cb0;
+}
+
+/* 已并入上一格对照卡的输出格：本身不渲染内容，只留一句说明 */
+#notebook-page .code-pane-merged {
+  color: #9aa4ad;
+  font-size: 12px;
+  padding: 2px 0 6px;
+}
+
+/* 对照卡栏内出现独占一行的分隔符：服务端会切错位置，提前告诉作者 */
+#notebook-page .code-pane-warn {
+  margin: 6px 10px 0;
+  padding: 4px 8px;
+  border: 1px solid #faebcc;
+  border-radius: 3px;
+  background: #fcf8e3;
+  color: #8a6d3b;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* var 格变量卡片 */
+#notebook-page .var-chip {
+  display: inline-block;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 12px;
+  background: #f2f7fc;
+  border: 1px solid #d7e7f5;
+  border-radius: 3px;
+  padding: 1px 8px;
+  margin: 2px 6px 2px 0;
+  color: #2b6cb0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* 编译告警 / 错误 */
+#notebook-page .laup-warn {
+  color: #8a6d3b;
+  background: #fcf8e3;
+  border: 1px solid #faebcc;
+  border-radius: 2px;
+  font-size: 12px;
+  padding: 3px 8px;
+  margin-top: 4px;
+}
+#notebook-page .error-out { color: #c00; background: #fdf3f3; border: 1px solid #eec7c7; }
+
+/* ---------- 末尾新建格 ---------- */
+#notebook-page .ghost-add {
+  max-width: 900px;
+  margin: 4px 0 0 92px;
+  border: 1px dashed #d5d5d5;
+  border-radius: 3px;
+  color: #aaa;
+  text-align: center;
+  padding: 6px 0;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+#notebook-page .ghost-add:hover { color: #666; border-color: var(--sel-blue); }
+
+/* ---------- 代码高亮（Prism 宿主层，src/utils/codeLang.js 驱动） ---------- */
+/* sample 卡 body：notebook 页没有 .doc 父级，这里补齐排版
+   （特异性 1 id + 2 class，需压过上面的 #notebook-page .output pre） */
+#notebook-page .output .life-code-sample-body {
+  margin: 0; padding: 10px 14px; background: transparent; border: 0; border-radius: 0;
+  font-family: Consolas, Menlo, monospace; font-size: 13px; line-height: 1.65;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+/* 语言徽标：与 App 端 jupyter.css 同款（右上角大写） */
+#notebook-page .output pre[data-code-language] {
+  position: relative;
+  padding-top: 20px;
+}
+#notebook-page .output pre[data-code-language]::before {
+  content: attr(data-code-language);
+  position: absolute;
+  top: 3px;
+  right: 10px;
+  font: 700 10px/1.2 "Inter", "Segoe UI", sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7b8794;
+  user-select: none;
+}
+
+/* token 配色：与 rich-content.css 同色值（GitHub Light 系） */
+#notebook-page .token.comment,
+#notebook-page .token.prolog,
+#notebook-page .token.doctype,
+#notebook-page .token.cdata { color: #6e7781; }
+
+#notebook-page .token.punctuation { color: #57606a; }
+
+#notebook-page .token.property,
+#notebook-page .token.tag,
+#notebook-page .token.boolean,
+#notebook-page .token.number,
+#notebook-page .token.constant,
+#notebook-page .token.symbol { color: #0550ae; }
+
+#notebook-page .token.selector,
+#notebook-page .token.attr-name,
+#notebook-page .token.string,
+#notebook-page .token.char,
+#notebook-page .token.builtin,
+#notebook-page .token.inserted { color: #0a7b45; }
+
+#notebook-page .token.operator,
+#notebook-page .token.entity,
+#notebook-page .token.url,
+#notebook-page .language-css .token.string,
+#notebook-page .style .token.string { color: #953800; }
+
+#notebook-page .token.atrule,
+#notebook-page .token.attr-value,
+#notebook-page .token.keyword { color: #cf222e; }
+
+#notebook-page .token.function,
+#notebook-page .token.class-name { color: #8250df; }
+
+#notebook-page .token.regex,
+#notebook-page .token.important,
+#notebook-page .token.variable { color: #116329; }

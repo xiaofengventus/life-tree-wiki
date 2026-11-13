@@ -6,11 +6,16 @@ export async function fetchPostList(cursor = null) {
   return apiRequest(`/api/posts?${parameters}`);
 }
 
-// 分页拉取专栏文章（每页默认 8 条；type: "news" 新闻 / "science" 科普 / "" 未分类）
-export async function fetchPostPage({ limit = 8, cursor = null, type } = {}) {
+// 分页拉取专栏文章（每页默认 8 条）
+// type: "news" 新闻 / "science" 科普 / "" 未分类（文章自身属性）
+// folder: 文件夹 id / "none" 未入夹散文章（组织层，与 type 互不干涉）
+// q: 标题模糊搜索（文件夹选文用）
+export async function fetchPostPage({ limit = 8, cursor = null, type, folder, q } = {}) {
   const parameters = new URLSearchParams({ limit: String(limit) });
   if (cursor) parameters.set("cursor", cursor);
   if (type !== undefined) parameters.set("type", type);
+  if (folder !== undefined && folder !== null) parameters.set("folder", folder);
+  if (q) parameters.set("q", q);
   const payload = await apiRequest(`/api/posts?${parameters}`);
   return { posts: payload.posts || [], nextCursor: payload.nextCursor || null };
 }
@@ -47,4 +52,21 @@ export async function deletePost(id) {
     method: "DELETE",
   });
   return payload.post;
+}
+
+// 只切可见性（作者本人）：已发表的文章可改为仅自己可见，私密的也可转公开
+export async function updatePostVisibility(id, visibility) {
+  const payload = await apiRequest(
+    `/api/posts/${encodeURIComponent(id)}/visibility`,
+    { method: "PUT", body: { visibility } },
+  );
+  return payload.post;
+}
+
+// 取某一历史版本的快照（历史对比 / 回滚用）
+export async function fetchPostRevision(id, revisionCount) {
+  const payload = await apiRequest(
+    `/api/posts/${encodeURIComponent(id)}?revision=${encodeURIComponent(revisionCount)}`,
+  );
+  return payload.revision;
 }

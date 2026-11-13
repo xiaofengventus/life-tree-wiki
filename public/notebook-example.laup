@@ -1,0 +1,49 @@
+import "laup"
+
+# laup Notebook 示例
+
+这是一个 **laup**（Markdown 超集）文档，覆盖 Notebook 的全部核心语法。菜单栏「载入示例」可随时恢复本页。
+
+## 1. 变量（宿主层）
+
+var title = "laup × Notebook"
+var year = 2026
+
+标题来源：{{title}}，年份 {{year}}。var 格自上而下求值，「运行全部」时作用域重置。
+
+## 2. 行内扩展
+
+\textcolor{#e25303}{橙色文字}、\colorbox{#fff3cd}{高亮背景}、\underline{下划线}、\sout{删除线}，行内公式 $E = mc^2$。
+
+## 3. 图片（src 来自 var 插值）
+
+var img = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='340' height='88'><rect width='340' height='88' rx='8' fill='%23eef4fa' stroke='%23d7e7f5'/><text x='170' y='53' text-anchor='middle' font-size='17' fill='%23555' font-family='monospace'>image（var 注入）</text></svg>"
+
+\image=[
+    src="{{img}}"
+    alt="示例图"
+    caption="图 1  src 来自 var img，经 {{}} 插值注入"
+]
+
+## 4. 表格（管道语法）
+
+| 球员 | 球队 | 年薪 |
+|---|---|---|
+| Stephen Curry | Golden State Warriors | $51,915,615 |
+| LeBron James | Los Angeles Lakers | $48,724,414 |
+
+## 5. 代码（sample 围栏 = 输入/输出对照）
+
+```sample
+import pandas as pd
+df = pd.read_csv("ABN.csv")
+print(df.head())
+---
+      姓名  年龄  城市
+0  Alice  24  北京
+1    Bob  31  上海
+```
+
+## 6. 粘贴图片
+
+在任意 laup 格里 **Ctrl+V** 粘贴剪贴板图片，会自动存为格附件并插入 `![图片](attachment:xxx.png)`，渲染时内联显示。

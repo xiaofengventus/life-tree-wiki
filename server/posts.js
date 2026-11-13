@@ -20,6 +20,15 @@ export function normalizePostType(value) {
   return POST_TYPES.has(candidate) ? candidate : "";
 }
 
+// 正文体裁：html = 富文本编辑器（既有文章）；laup = Laup 源码（服务端重渲）。
+export const CONTENT_FORMATS = new Set(["html", "laup"]);
+
+export function normalizeContentFormat(value, fallback = "html") {
+  const candidate = String(value || "").trim().toLowerCase();
+  if (candidate === "laup") return "laup";
+  return CONTENT_FORMATS.has(candidate) ? candidate : fallback;
+}
+
 export async function ensurePublicPostTitleAvailable(DB, title, excludeId = "") {
   const existing = await DB.prepare(
     `SELECT 1 FROM posts
@@ -58,16 +67,28 @@ export function postSummary(row) {
 }
 
 export function postDetail(row, revisionRows = []) {
+  // content_laup 有值 = 这篇是 Laup 正文（源码是真相）；没有 = 富文本正文。
+  const contentType = row.content_laup ? "laup" : "html";
   return {
     ...postSummary({ ...row, excerpt: row.content_text }),
+    // 阅读页用的**永远是渲染后的 HTML** —— Laup 正文也已经在服务端重渲过了，
+    // 这里不会把源码塞给阅读页。
     content: row.content_html,
-    contentType: "html",
+    contentType,
+    // 只有 Laup 正文才带源码：编辑器靠它回填（Html→Laup 没有反解，不存源码就再也编不回来）。
+    contentSource: contentType === "laup" ? row.content_laup : "",
     citations: parseCitations(row.citations_json),
     history: revisionRows.map((revision) => ({
       revisionCount: revision.revision_number,
       submittedAt: revision.created_at,
       title: revision.title,
       note: revision.change_note,
+      // 谁改的：贡献者栏与历史列表靠它展示（协作痕迹的核心字段）
+      editor: revision.editor_name || "",
+      editorUid: revision.editor_public_id
+        ? formatPublicId("user", revision.editor_public_id)
+        : "",
+      editorAvatarUrl: revision.editor_avatar_hash ? mediaUrl(revision.editor_avatar_hash) : "",
     })),
   };
 }
@@ -92,8 +113,11 @@ export async function loadPost(
     .first();
   if (!row) return null;
   const revisions = await DB.prepare(
-    `SELECT revision_number, title, change_note, created_at
-       FROM post_revisions WHERE post_id = ? ORDER BY revision_number ASC`,
+    `SELECT r.revision_number, r.title, r.change_note, r.created_at,
+            u.display_name AS editor_name, u.public_id AS editor_public_id,
+            u.avatar_media_hash AS editor_avatar_hash
+       FROM post_revisions r LEFT JOIN users u ON u.id = r.created_by
+      WHERE r.post_id = ? ORDER BY r.revision_number ASC`,
   )
     .bind(row.id)
     .all();

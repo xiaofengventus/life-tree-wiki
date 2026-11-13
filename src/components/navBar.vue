@@ -14,6 +14,18 @@ const links = computed(() => [
   { label: "首页", to: "/" },
   { label: "专栏", to: "/columns" },
   { label: "生命树", to: "/life-tree" },
+  // LS 工程：网页版协作视图（src/views/LSWorkspace.vue），消费 /api/ls/* 协作接口
+  // （上传模型、签出子树、编辑锁、提交合并）。不带 id 打开时自动跳转主树。
+  { label: "LifeSequence", to: "/ls" },
+  // Laup 写作：已是**站内 Vue 路由**（编辑器内核 src/laup/，页面 src/views/laup_editor.vue），
+  // 走 RouterLink 客户端跳转，不再是 public/laup/ 那个整页跳转的静态副本。
+  { label: "Laup 写作", to: "/laup" },
+  // laup Notebook：Jupyter 式多格编辑器（src/notebook/），与旧版 Laup 写作并存；
+  // 提交文章走同一条发布管道，文章用 wiki-detail 样式展示。
+  { label: "Notebook", to: "/notebook" },
+  // 计算机网络图解三部曲：public/computer-network/ 下的纯静态页（不入 Vue 路由），
+  // 用 external 整页跳转；站内互链全是相对路径，必须保持同目录。
+  { label: "计算机网络", to: "/computer-network/", external: true },
   { label: "创建专栏", to: "/create-post" },
   { label: "创建树", to: "/evolution-tree" },
   { label: "个人空间", to: spaceTarget.value },
@@ -37,14 +49,18 @@ onMounted(() => userStore.initialize());
         生命时序
       </RouterLink>
       <div class="wiki-links">
-        <RouterLink
-          v-for="link in links"
-          :key="link.label"
-          :to="link.to"
-          :class="{ active: isActive(link.to) }"
-        >
-          {{ link.label }}
-        </RouterLink>
+        <!-- external 的那几条是整页跳转（<a>），其余走 RouterLink。
+             两种都用 <a> 渲染，所以下面 .wiki-links a 那套样式对两者一视同仁。 -->
+        <template v-for="link in links" :key="link.label">
+          <a v-if="link.external" :href="link.to">{{ link.label }}</a>
+          <RouterLink
+            v-else
+            :to="link.to"
+            :class="{ active: isActive(link.to) }"
+          >
+            {{ link.label }}
+          </RouterLink>
+        </template>
       </div>
     </nav>
   </header>

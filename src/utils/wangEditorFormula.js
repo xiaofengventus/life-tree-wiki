@@ -132,6 +132,31 @@ class FormulaMenu {
   }
 }
 
+/**
+ * 行内公式必须带上 `data-w-e-type` 才解析得出来。
+ *
+ * wangEditor core 的元素分发（`parseElemHtml` 上游）是这样判的：
+ *
+ *     tag === "span" ? (有 data-w-e-type ? 元素分支 : 行内文本分支) : ...
+ *
+ * **`<span>` 一旦没有 `data-w-e-type`，就直接走「行内文本」分支**，
+ * 该分支只取 `textContent` —— 我们注册在 `parseElemsHtml` 里的
+ * `span[data-life-math="inline"]` 规则**根本不会被查询**。
+ *
+ * 后果就是行内公式被拍扁成裸文本：`<span data-latex="E=mc^2">` → `E=mc^2`。
+ * 块级公式是 `<div>`，天然走元素分支，所以一直正常 ——
+ * 这就是「块级能渲染、行内丢公式」这种不对称现象的根因。
+ *
+ * 这里在解析前补上该属性，把它带回元素分支；属性只在内存里加，
+ * 序列化仍由 formulaToHtml 产出，**存储格式不变**。
+ */
+function tagInlineFormulaForParse(element) {
+  if (element?.getAttribute && !element.getAttribute("data-w-e-type")) {
+    element.setAttribute("data-w-e-type", FORMULA_INLINE_TYPE);
+  }
+  return element;
+}
+
 const formulaModule = {
   renderElems: [
     { type: FORMULA_INLINE_TYPE, renderElem: renderFormula },
@@ -140,6 +165,12 @@ const formulaModule = {
   elemsToHtml: [
     { type: FORMULA_INLINE_TYPE, elemToHtml: formulaToHtml },
     { type: FORMULA_BLOCK_TYPE, elemToHtml: formulaToHtml },
+  ],
+  preParseHtml: [
+    {
+      selector: 'span[data-life-math="inline"]',
+      preParseHtml: tagInlineFormulaForParse,
+    },
   ],
   parseElemsHtml: [
     {

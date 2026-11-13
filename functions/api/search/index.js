@@ -1,3 +1,4 @@
+import { getCurrentUser } from "../../../server/auth.js";
 import { json, withApi } from "../../../server/http.js";
 import { formatPublicId } from "../../../server/publicIds.js";
 
@@ -40,6 +41,11 @@ export const onRequestGet = withApi(async ({ request, env }) => {
     return json({ success: true, keyword, posts: [], trees: [], nodes: [] });
   }
   const pattern = `%${escapeLike(keyword)}%`;
+  // 登录者能搜到自己的私密作品（带 isPrivate 标记）；未登录/他人视角与原先一致。
+  const viewer = await getCurrentUser(env.DB, request).catch(() => null);
+  const ownerClause = "AND (posts.visibility = 'PUBLIC' OR posts.creator_id = ?)";
+  const treeOwnerClause =
+    "AND (published_trees.visibility = 'PUBLIC' OR published_trees.creator_id = ?)";
 
   // 各类查询互不拖累：单类失败时返回空列表而不是整个搜索报错
   const safeQuery = async (statement, ...bindings) => {
@@ -55,13 +61,15 @@ export const onRequestGet = withApi(async ({ request, env }) => {
   const postResult = await safeQuery(
     env.DB.prepare(
       `SELECT posts.id, posts.public_id, posts.title, posts.type, posts.tags_json,
+            posts.visibility,
             substr(posts.content_text, 1, 160) AS excerpt,
             users.display_name AS creator_name
        FROM posts JOIN users ON users.id = posts.creator_id
-      WHERE posts.deleted_at IS NULL AND posts.visibility = 'PUBLIC'
+      WHERE posts.deleted_at IS NULL ${ownerClause}
         AND (posts.title LIKE ? ESCAPE '\\' OR posts.tags_json LIKE ? ESCAPE '\\')
       ORDER BY posts.updated_at DESC, posts.id DESC LIMIT ?`,
     ),
+    viewer?.id || "",
     pattern,
     pattern,
     limit,
@@ -71,13 +79,15 @@ export const onRequestGet = withApi(async ({ request, env }) => {
     env.DB.prepare(
       `SELECT published_trees.id, published_trees.public_id, published_trees.title,
             published_trees.description, published_trees.node_count,
-            published_trees.tags_json, users.display_name AS creator_name
+            published_trees.tags_json, published_trees.visibility,
+            users.display_name AS creator_name
        FROM published_trees JOIN users ON users.id = published_trees.creator_id
       WHERE published_trees.deleted_at IS NULL
-        AND published_trees.visibility = 'PUBLIC'
+        ${treeOwnerClause}
         AND (published_trees.title LIKE ? ESCAPE '\\' OR published_trees.tags_json LIKE ? ESCAPE '\\')
       ORDER BY published_trees.updated_at DESC, published_trees.id DESC LIMIT ?`,
     ),
+    viewer?.id || "",
     pattern,
     pattern,
     limit,
@@ -91,10 +101,11 @@ export const onRequestGet = withApi(async ({ request, env }) => {
             published_trees.document_json
        FROM published_trees
       WHERE published_trees.deleted_at IS NULL
-        AND published_trees.visibility = 'PUBLIC'
+        ${treeOwnerClause}
         AND published_trees.document_json LIKE ? ESCAPE '\\'
       ORDER BY published_trees.updated_at DESC, published_trees.id DESC LIMIT 24`,
     ),
+    viewer?.id || "",
     pattern,
   );
 
@@ -135,6 +146,7 @@ export const onRequestGet = withApi(async ({ request, env }) => {
         excerpt: row.excerpt || "",
         tags: parseTags(row.tags_json),
         creator: row.creator_name,
+        isPrivate: row.visibility === "PRIVATE",
       })),
       trees: (treeResult || []).map((row) => ({
         id: row.id,
@@ -144,6 +156,7 @@ export const onRequestGet = withApi(async ({ request, env }) => {
         nodeCount: Number(row.node_count || 0),
         tags: parseTags(row.tags_json),
         creator: row.creator_name,
+        isPrivate: row.visibility === "PRIVATE",
       })),
       nodes: nodeMatches,
     },

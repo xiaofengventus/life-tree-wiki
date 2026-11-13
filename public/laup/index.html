@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laup 编辑器</title>
+<!-- 本目录整体由 scripts/sync-laup.mjs 生成，勿手改：改 Laup 仓库后重跑 npm run laup:sync -->
+<link rel="stylesheet" href="./vendor/katex/katex.min.css">
+<script defer src="./vendor/katex/katex.min.js"></script>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #6a737d;
+  --line: #e4e7eb;
+  --soft: #f6f7f9;
+  --amber: #854f0b;
+  --amber-bg: #fdf7e9;
+  --amber-line: #e8d5a8;
+  --danger: #a32d2d;
+  --danger-bg: #fcebeb;
+  --link: #185fa5;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+
+  --laup-chrome-h: 104px;            /* 顶栏+工具栏的实测高度，由 editor.js 写回（首帧兜底值） */
+
+  /* ── 块的形态（都可调：改这里就行，或者在页面上用右下角的调参面板实时拖）
+     形态定的是「方案 A · 安静线条」：常态什么都不画，只有悬停/光标所在块显形。
+     想换成「方案 B · 常显淡线」，把 --laup-blk-boundary 设成 1px dashed #eef0f2 即可。 */
+  --laup-hover-bg: #ffffff;          /* 悬停底色（纯白 = 从浅灰页面里"浮"起来） */
+  --laup-hover-bar: #378ADD;         /* 悬停左侧色条：标明这一块从哪里开始 */
+  --laup-blk-boundary: 0 none;       /* 块之间的常显分隔线，方案 A 下是关的 */
+  --laup-gutter-w: 26px;             /* 左侧图标栏里按钮的宽度 */
+  --laup-gutter-gap: 38px;           /* 图标栏盒子的总宽（盒子右边缘必须贴住块，见 .laup-rail 注释） */
+  --laup-rail-pad: 8px;              /* 按钮往左让出的空隙：留给块左边缘那条色条，不然它会被按钮盖住 */
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 顶栏与工具栏包在一起粘住，两块就不会因为各自 sticky 而错位。
+   ⚠️ z-index 必须**高于**浮动工具栏（.fbar 是 24）：`.chrome` 自己是一个层叠上下文，
+   里面的下拉/取色器都出不了这个盒子 —— 一旦低于 .fbar，
+   选区靠近文稿顶部时浮动工具栏正好压在取色器下拉上，色块就点不到了。
+   （这是真鼠标探针发现的，合成事件测不出来。） */
+.chrome {
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(255,255,255,.94);
+  backdrop-filter: saturate(180%) blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.bar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 22px;
+  font-size: 13px;
+}
+/* 工具栏：所有可视化操作的入口。
+   ⚠️ 点它时不能抢走 textarea 的焦点与选区 —— 见 editor.js 的 onToolbarDown。 */
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 0 22px 9px;
+}
+.tb-group { display: flex; align-items: center; gap: 3px; }
+.tb-group + .tb-group { margin-left: 3px; padding-left: 9px; border-left: 1px solid var(--line); }
+.tb-right { margin-left: auto; }
+.tb-btn {
+  font: inherit; font-size: 13px; line-height: 1;
+  min-width: 30px; height: 27px; padding: 0 8px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--fg); border-radius: 6px; cursor: pointer;
+}
+.tb-btn:hover { background: var(--soft); border-color: var(--line); }
+.tb-btn.is-on { background: var(--soft); border-color: var(--line); }
+.tb-btn:disabled { opacity: .32; cursor: default; }
+.tb-btn:disabled:hover { background: transparent; border-color: transparent; }
+.tb-tip { color: var(--muted); font-size: 12px; }
+.tb-tip[hidden] { display: none; }
+
+/* ── 固定工具栏里的格式组与它的弹出层
+   格式组的按钮与色板弹出层**与浮动工具栏是同一个组件**（editor/formatUi.js），
+   所以样式也用同一套 `.fbar-*`；这里只补两件事：
+     ① 弹出层的定位上下文（弹出层要挂在按钮下面）；
+     ② 往下弹 —— 工具栏贴在页面顶部，往上弹会顶出屏幕（见 .fbar-pop.is-down）。
+
+   ⚠️ 弹出层要能被 onDocMousedown 放行（见 editor.js）：它里面有 <input type="color">，
+   在 mousedown 阶段 preventDefault 会把系统取色器直接掐掉、打不开。 */
+.tb-fmt-wrap { position: relative; display: flex; }
+.tb-fmt-wrap .fbar-pop { z-index: 5; }
+
+/* ── 浮动工具栏（选中文字后出现；不是跟着光标跑的那种）
+   形态照 life-tree-wiki 编辑器那套：一排图标 + 分隔线分组，
+   颜色复用同一份 70 色板。DOM 由 editor/fbar.js 建，这里只管样子。
+
+   ⚠️ `position: fixed`：渲染态下选区可能在任意滚动位置，
+   用 absolute 就得换算文档坐标、还得跟着滚动重算。
+
+   ⚠️ 圆角/阴影刻意比吸顶工具栏更"浮"一点 —— 它是临时出现的，
+   要一眼看出"这是跟我的选区绑在一起的"，而不是又一条常驻工具栏。 */
+.fbar {
+  position: fixed; z-index: 24;
+  display: flex; align-items: center; gap: 1px;
+  padding: 4px; border: 1px solid var(--line); border-radius: 9px;
+  background: #fff; box-shadow: 0 8px 24px rgba(16,24,40,.16);
+}
+.fbar[hidden] { display: none; }
+.fbar-btn {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 5px; background: transparent;
+  color: #3d444d; font: inherit; font-size: 12px; cursor: pointer;
+}
+.fbar-btn svg { width: 15px; height: 15px; }
+.fbar-btn:hover { background: var(--soft); color: var(--fg); }
+.fbar-btn.is-on { background: #e8f0fe; color: var(--link); }
+.fbar-sep { width: 1px; height: 16px; margin: 0 3px; background: var(--line); }
+
+/* 弹出层挂在工具栏自己身上（.fbar 是 fixed，就是它的定位上下文），
+   默认往**上**弹 —— 工具栏原本就在选区上方，往下弹会盖住刚选中的字。 */
+.fbar-pop {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 1;
+  padding: 9px; border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; box-shadow: 0 10px 30px rgba(16,24,40,.16);
+}
+.fbar-pop[hidden] { display: none; }
+/* 上方放不下时翻到工具栏下面（见 fbar.js：工具栏被吸顶栏顶住时会出现这种情形） */
+.fbar-pop.is-below { top: calc(100% + 6px); bottom: auto; }
+/* `.is-down` = **默认往下弹**（固定工具栏那一份：它贴在页面顶部，上方没地方）。
+   在它身上 `.is-below` 的含义正好反过来 —— 表示"空间不够时翻回上方"。
+   同一个类名在两处是镜像的，改之前先看清是哪一个工具栏的弹出层。 */
+.fbar-pop.is-down { top: calc(100% + 6px); bottom: auto; }
+.fbar-pop.is-down.is-below { top: auto; bottom: calc(100% + 6px); }
+.fbar-pop-fg, .fbar-pop-bg { width: 250px; }
+.fbar-pop-foot {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--muted);
+}
+.fbar-pop-foot input[type="color"] {
+  width: 40px; height: 23px; padding: 1px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 5px; background: #fff;
+}
+.fbar-pop-hint { margin-left: auto; }
+
+/* 弹出层第一格：「默认颜色」/「清除背景色」。
+   语义是**只去掉这一种样式**（对应原项目 wangEditor 色板里 `data-value="0"` 那一格），
+   所以它不该长得像一块色块 —— 用整行"图标 + 文字"的按钮，一眼能读出"这是清除"。
+   文案照 wangEditor 的 zh-CN locale 抄（color.default / color.clear）。 */
+.fbar-clear {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  margin-bottom: 7px; padding: 5px 8px;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: #fff; color: var(--muted); font: inherit; font-size: 12px;
+  text-align: left; cursor: pointer;
+}
+.fbar-clear:hover { background: var(--soft); color: var(--fg); border-color: #c9ced6; }
+.fbar-clear svg { width: 14px; height: 14px; flex: none; }
+
+/* 命名色：一排（自动折行），比 70 色格子更小，当"常用色"用 */
+.fbar-named { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 7px; }
+.fbar-swatch {
+  width: 100%; aspect-ratio: 1; padding: 0; cursor: pointer;
+  border: 1px solid rgba(16,24,40,.16); border-radius: 4px; background: transparent;
+}
+.fbar-swatch:hover { outline: 2px solid var(--link); outline-offset: 1px; }
+.fbar-swatch-named { width: 18px; aspect-ratio: auto; height: 14px; }
+/* antd 70 色：10 个一行，正好是这套色板自己的行结构（灰阶/主色/浅色/深色） */
+.fbar-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+
+.fbar-heads { display: flex; gap: 3px; }
+.fbar-head-btn {
+  font: inherit; font-size: 12px; padding: 4px 9px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--fg);
+}
+.fbar-head-btn:hover { background: var(--soft); }
+
+.brand { font-weight: 600; letter-spacing: .05em; }
+.hint { color: var(--muted); }
+.stats { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.btn {
+  font: inherit; padding: 5px 12px; border: 1px solid var(--line);
+  background: #fff; color: var(--fg); border-radius: 6px; cursor: pointer;
+}
+.btn:hover { border-color: #c9ced6; background: var(--soft); }
+
+.doc { max-width: 780px; margin: 0 auto; padding: 34px 30px 120px; }
+.doc > *:first-child { margin-top: 0; }
+
+/* ── 站内锚点跳转要给吸顶的 .chrome 让位
+   不让位的话，标题会正好停在视口顶端**被顶栏盖住** —— 内容其实跳对了，
+   但用户看到的是一条不相干的段落停在最上面，于是判断"跳错地方了/没跳"。
+   （`--laup-chrome-h` 由 editor.js 实测写回：窄屏工具栏会换行变高，写死会错。）
+
+   浮层里的顶栏**不吸顶**（它跟着内容滚走），所以那边只需要一点点呼吸。 */
+#doc [id] { scroll-margin-top: calc(var(--laup-chrome-h) + 14px); }
+#overlay-doc [id] { scroll-margin-top: 14px; }
+
+/* ── 渲染态（与阅读端同一套输出，所以样式也是同一套口径）
+   ⚠️ 块的边界用 `::before` 画在块的**外侧**（left:-4px），不用 border ——
+   用 border 会把正文整体挤右 3px，编辑器与发布页就出现系统性错位，
+   而"同视角"正是这个项目存在的理由。 */
+.laup-blk {
+  position: relative;
+  border-radius: 8px;
+  /* ⚠️ 别删。没有它，**空块的高度是 0px** —— 实测结论，不是推测：
+     空的 `<h1></h1>` / `<p></p>` 量出来 0px，几个 0 高度的块会**叠在同一个 y 上**，
+     只有最上面那个能被点到，其余既看不见也点不中；而且盲测会假通过
+     （点中的其实是叠在那儿的别的元素）。
+     以前的解法是"骨架每块都必须塞一个字"——那是绕开症状。
+     有了这一行，空块照样占一行、点得中，骨架才能是空白的（见 editor/starter.js）。 */
+  min-height: 1.35em;
+}
+/* 空块的提示：整页一片空白时，人得知道往哪儿点。
+   ⚠️ 三条约束，缺一条就变成打扰：
+     ① **纯 CSS**（`content`）—— 不进源码、不入库、不参与编译，产物里绝对没有它；
+     ② `:empty` 一打字就自动消失，不需要任何 JS 去清；
+     ③ 只在**没在编辑**的那一块显示（编辑中的块换成 textarea 了，
+        原内容还在 DOM 里，不排除的话提示会从输入框背后透出来）。 */
+.laup-blk:not(.is-editing) > :empty::before {
+  content: '点这里开始写';
+  color: var(--muted); opacity: .55;
+  font-size: 14px; font-weight: 400; font-style: normal;
+  pointer-events: none;
+}
+.doc > .laup-blk + .laup-blk { border-top: var(--laup-blk-boundary); }   /* 方案 B 用，默认关 */
+.laup-blk::before {
+  content: ''; position: absolute; left: -4px; top: 0; bottom: 0;
+  width: 3px; border-radius: 2px; background: transparent;
+}
+.laup-blk:hover { background: var(--laup-hover-bg); }
+.laup-blk:hover::before { background: var(--laup-hover-bar); }
+
+/* 悬停标记的三种画法（右下角调参面板可实时切，记住在上次选的那个）：
+     bar     —— 左侧一条色条（默认，最省视觉噪音，但边界只在左边）
+     outline —— 整块一圈色框（你问的"边框就有颜色"；用 box-shadow 不用 border，
+                 所以**零布局位移** —— border 会把正文挤右，两边视角就错开了）
+     none    —— 只留白底，什么都不画 */
+body[data-hover-mark="outline"] .laup-blk:hover::before { background: transparent; }
+body[data-hover-mark="outline"] .laup-blk:hover {
+  box-shadow: 0 0 0 1.5px var(--laup-hover-bar);
+}
+body[data-hover-mark="none"] .laup-blk:hover::before { background: transparent; }
+
+/* 正在编辑的那一块自己不参与悬停表现 —— 它已经有琥珀色边框与底色了 */
+.laup-blk.is-editing, .laup-blk.is-editing:hover {
+  background: transparent; box-shadow: none;
+}
+.laup-blk.is-editing::before, .laup-blk.is-editing:hover::before { background: transparent; }
+
+/* 块级操作图标栏：在块**外部**的左侧留白里，悬停才出现。
+   放进块内部会让正文变窄；放进留白则正文一个像素都不动。
+
+   ⚠️ 宽度必须**贴着块的边缘**（left:-gap + width:gap，按钮靠右对齐），中间不能留缝。
+   留缝的话，鼠标从块里往左移会先经过一条既不属于块、也不属于它的空隙 →
+   `.laup-blk:hover` 立刻失效 → 栏变回 pointer-events:none → 从此点不到它。
+   这个坑是 CDP 真鼠标探测才暴露的，合成事件（dispatchEvent）测不出来。
+
+   ⚠️ 按钮还要再往左让出 --laup-rail-pad：块左边缘 3px 处是悬停色条（::before），
+   按钮直接顶到边缘的话会**把色条整个盖住**（截图上才看得出来）。
+   让位用 padding 而不是缩窄盒子 —— padding 也算盒子的命中区，
+   所以"块 → 右端空隙 → 按钮"这一路上 hover 链始终不断，鼠标不会掉出去。 */
+.laup-rail {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  left: calc(-1 * var(--laup-gutter-gap)); width: var(--laup-gutter-gap);
+  padding-right: var(--laup-rail-pad);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  opacity: 0; pointer-events: none; transition: opacity .12s;
+}
+.laup-blk:hover > .laup-rail { opacity: 1; pointer-events: auto; }
+body[data-gutter="right"] .laup-rail {
+  left: auto; right: calc(-1 * var(--laup-gutter-gap)); align-items: flex-start;
+  padding-right: 0; padding-left: var(--laup-rail-pad);
+}
+/* 窄屏：文档左右留白被压到很薄，图标栏再往外让就出屏了。
+   退回紧凑布局 —— 代价是窄屏下色条重新被按钮盖住，那时改用「整块边框」即可。 */
+@media (max-width: 840px) {
+  :root { --laup-gutter-gap: 30px; }
+  .laup-rail { padding-right: 0; }
+  body[data-gutter="right"] .laup-rail { padding-left: 0; }
+}
+.laup-rail-btn {
+  font: inherit; font-size: 11px; line-height: 1; height: 20px; padding: 0;
+  width: var(--laup-gutter-w);
+  display: grid; place-items: center;
+  border: 0.5px solid var(--line); background: #fff; color: var(--muted);
+  border-radius: 4px; cursor: pointer;
+}
+.laup-rail-btn:hover { background: var(--soft); color: var(--fg); border-color: #c9ced6; }
+.laup-rail-btn:disabled { opacity: .3; cursor: default; }
+
+/* ── 块外观调参面板（右下角，悬浮；这里是"由前端调整"的落点）
+   只改 CSS 变量与 body 属性，不碰文档内容 —— 所以调它绝不会弄脏你的稿子。
+   选择存在 localStorage，下次打开还是你调好的样子。 */
+.tune-fab {
+  position: fixed; right: 18px; bottom: 18px; z-index: 30;
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line); background: #fff; color: var(--muted);
+  font-size: 17px; line-height: 1; cursor: pointer;
+  box-shadow: 0 2px 10px rgba(16,24,40,.10);
+}
+.tune-fab:hover { color: var(--fg); border-color: #c9ced6; }
+.tune-panel {
+  position: fixed; right: 18px; bottom: 68px; z-index: 30;
+  width: 264px; padding: 14px 16px 12px;
+  border: 1px solid var(--line); border-radius: 12px; background: #fff;
+  box-shadow: 0 10px 30px rgba(16,24,40,.14);
+  font-size: 12.5px;
+}
+.tune-panel[hidden] { display: none; }
+.tune-title { font-weight: 600; font-size: 13px; margin-bottom: 10px; }
+.tune-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 5px 0; color: #4a5158;
+}
+.tune-row select, .tune-row input[type="color"] {
+  font: inherit; border: 1px solid var(--line); border-radius: 6px;
+  background: #fff; color: var(--fg); cursor: pointer;
+}
+.tune-row select { padding: 3px 6px; }
+.tune-row input[type="color"] { width: 40px; height: 24px; padding: 1px; }
+.tune-foot {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
+}
+.tune-btn {
+  font: inherit; font-size: 12px; padding: 4px 10px;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: #fff; color: var(--fg); cursor: pointer;
+}
+.tune-btn:hover { background: var(--soft); }
+.tune-note { color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 8px; }
+.doc h1 { font-size: 27px; line-height: 1.35; margin: 34px 0 14px; font-weight: 600; }
+.doc h2 { font-size: 21px; line-height: 1.4; margin: 30px 0 12px; font-weight: 600; }
+.doc h3 { font-size: 17px; line-height: 1.45; margin: 24px 0 10px; font-weight: 600; }
+.doc h4 { font-size: 15px; line-height: 1.5; margin: 20px 0 8px; font-weight: 600; }
+.doc h5, .doc h6 { font-size: 14px; margin: 18px 0 6px; font-weight: 600; color: #3d444d; }
+.doc p { margin: 12px 0; }
+.doc a { color: var(--link); }
+.doc ul, .doc ol { margin: 12px 0; padding-left: 26px; }
+.doc li { margin: 4px 0; }
+.doc blockquote {
+  margin: 16px 0; padding: 2px 0 2px 16px;
+  border-left: 3px solid #d8dde3; color: #4a5158;
+}
+.doc blockquote > *:first-child { margin-top: 0; }
+.doc blockquote > *:last-child { margin-bottom: 0; }
+.doc hr { border: 0; border-top: 1px solid var(--line); margin: 30px 0; }
+.doc pre {
+  margin: 16px 0; padding: 14px 16px; border-radius: 8px;
+  background: var(--soft); border: 1px solid var(--line); overflow: auto;
+}
+.doc pre code { font-family: var(--mono); font-size: 13px; line-height: 1.65; }
+.doc p code, .doc li code {
+  font-family: var(--mono); font-size: .9em;
+  background: var(--soft); border: 1px solid var(--line);
+  border-radius: 4px; padding: 1px 5px;
+}
+.doc table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+.doc th, .doc td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; }
+.doc th { background: var(--soft); font-weight: 600; }
+.doc caption { caption-side: top; text-align: left; color: var(--muted); font-size: 13px; padding-bottom: 6px; }
+.doc figure { margin: 22px 0; text-align: center; }
+.doc figure img { max-width: 100%; border-radius: 6px; }
+.doc figcaption { margin-top: 9px; color: var(--muted); font-size: 13px; }
+.doc u { text-decoration: underline; text-underline-offset: 2px; }
+.laup-center { text-align: center; }
+.laup-toc {
+  margin: 20px 0; padding: 14px 18px; border-radius: 8px;
+  background: var(--soft); border: 1px solid var(--line); font-size: 14px;
+}
+.laup-toc-title { font-weight: 600; margin-bottom: 6px; }
+.laup-toc ul { list-style: none; margin: 0; padding: 0; }
+.laup-toc li { margin: 3px 0; }
+.laup-toc-l1 { padding-left: 0; } .laup-toc-l2 { padding-left: 14px; }
+.laup-toc-l3 { padding-left: 28px; } .laup-toc-l4 { padding-left: 42px; }
+.laup-toc-l5 { padding-left: 56px; } .laup-toc-l6 { padding-left: 70px; }
+.laup-equation { display: flex; align-items: center; gap: 14px; margin: 20px 0; }
+.laup-equation .laup-math-display { flex: 1; margin: 0; }
+.laup-eq-no { color: var(--muted); font-size: 14px; }
+.laup-eqref { text-decoration: none; }
+.laup-eqref-bad { color: var(--danger); }
+.laup-math-display { display: block; margin: 18px 0; overflow-x: auto; }
+.laup-math, .laup-math-display {
+  font-family: var(--mono); font-size: 13px; color: #4a5158;
+  background: #fbfbfc; border-radius: 4px; padding: 1px 4px;
+}
+.laup-math-display { padding: 10px 14px; text-align: center; }
+.laup-task { list-style: none; margin-left: -20px; }
+.laup-footnotes-host { margin-top: 40px; font-size: 14px; color: #4a5158; }
+.laup-footnotes-host hr { margin: 20px 0 14px; }
+.laup-fn-ref { font-size: .75em; color: var(--link); }
+
+/* ── 生命时序专属元素（专题 docs/life-elements-spec.md §1–§3）
+   编辑器里的渲染态要与发布后**完全一致** —— 这三类元素尤其重要，
+   因为「同视角」的价值就体现在"写的时候就知道它会长什么样"。 */
+.life-code-sample {
+  margin: 20px 0; border: 1px solid var(--line); border-radius: 10px;
+  overflow: hidden; background: #fbfcfd;
+}
+.life-code-sample-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--soft);
+  font-size: 12px; font-weight: 600; color: #4a5158;
+}
+.life-code-sample-bar { width: 3px; height: 13px; border-radius: 2px; background: #7d8b99; }
+.life-code-sample-title-en { margin-left: auto; color: var(--muted); font-weight: 500; letter-spacing: .06em; }
+.life-code-sample-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.life-code-sample-grid.is-single { grid-template-columns: 1fr; }
+.life-code-sample-pane + .life-code-sample-pane { border-left: 1px solid var(--line); }
+.life-code-sample-pane-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px; font-size: 11px; color: var(--muted);
+  border-bottom: 1px dashed var(--line);
+}
+.life-code-sample-label em { font-style: normal; opacity: .6; margin-left: 4px; }
+.doc .life-code-sample-body {
+  margin: 0; padding: 10px 14px; background: transparent; border: 0; border-radius: 0;
+  font-family: var(--mono); font-size: 13px; line-height: 1.65;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.life-code-sample-body code { font-family: inherit; font-size: inherit; background: none; border: 0; padding: 0; }
+
+.research-tree-embed {
+  margin: 22px 0; border: 1px solid #cfd9d3; border-radius: 10px;
+  overflow: hidden; background: #fafcfb;
+}
+.research-tree-embed header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 10px 14px; border-bottom: 1px solid #dfe7e2; background: #f1f6f3;
+}
+.research-tree-embed header div { display: grid; gap: 2px; }
+.research-tree-embed header span { color: #6b8577; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.research-tree-embed header strong { font-size: 14px; }
+.research-tree-embed header a { font-size: 12px; }
+.research-tree-embed .embed-canvas {
+  display: grid; place-items: center; background: #fff;
+  color: var(--muted); font-size: 13px;
+}
+.research-tree-embed .embed-canvas p { margin: 0; }
+.research-tree-embed figcaption { margin: 0; padding: 8px 14px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 12px; }
+
+.doc .content-sources {
+  margin: 22px 0; padding: 16px 18px; border-radius: 10px;
+  background: var(--soft); border: 1px solid var(--line);
+}
+.doc .content-sources h2 { margin: 0 0 10px; font-size: 16px; }
+.doc .content-sources ol {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;
+}
+.doc .content-sources li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 9px;
+  padding: 8px 11px; border-left: 3px solid #9dbdd0; background: #f7fbfe;
+  font-size: 13.5px; line-height: 1.7;
+}
+.reference-number { color: var(--link); font-weight: 700; }
+.inline-citation-link { text-decoration: none; color: var(--link); }
+.laup-cite { font-size: .75em; }
+.laup-cite-bad { color: var(--danger); }
+
+/* ── 源码态：被编辑的那一块 */
+.laup-src {
+  display: block; width: 100%; resize: none; overflow: hidden;
+  font-family: var(--mono); font-size: 13px; line-height: 1.7;
+  color: #412402; background: var(--amber-bg);
+  border: 1px solid var(--amber-line); border-left: 3px solid var(--amber);
+  border-radius: 8px; padding: 12px 14px; outline: none;
+  tab-size: 4; white-space: pre; overflow-wrap: normal;
+}
+
+/* ── 写了一半的语法：原样显示 + 标红，不打断打字 */
+.laup-broken {
+  margin: 14px 0; padding: 10px 14px; border-radius: 8px;
+  background: var(--danger-bg); border-left: 3px solid var(--danger);
+  font-family: var(--mono); font-size: 13px; line-height: 1.7;
+  color: #501313; white-space: pre-wrap;
+}
+
+.warnings { max-width: 780px; margin: 0 auto 70px; padding: 0 30px; font-size: 13px; }
+.warn-title { color: var(--muted); margin-bottom: 6px; }
+.warn-item {
+  display: flex; gap: 10px; padding: 6px 0;
+  border-top: 1px solid var(--line); color: #4a5158;
+}
+.warn-line {
+  flex: none; min-width: 34px; text-align: right; color: var(--muted);
+  font-family: var(--mono); font-size: 12px;
+}
+
+.overlay {
+  position: fixed; inset: 0; z-index: 40; overflow: auto;
+  background: var(--bg);
+}
+.overlay[hidden] { display: none; }
+
+/* ── 宿主功能（草稿箱 / 发布）。只在 detectHost() 探到 /api/* 时才露出来。 */
+.host-status { color: var(--muted); white-space: nowrap; font-size: .86rem; }
+.btn-go { border-color: #2f6b4f; background: #2f6b4f; color: #fff; }
+.btn-go:hover { border-color: #255840; background: #255840; }
+.btn-go:disabled { opacity: .5; cursor: not-allowed; }
+.host-body { max-width: 780px; margin: 0 auto; padding: 26px 30px 80px; }
+.host-note { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .9rem; }
+.host-form { display: grid; gap: 12px; margin-top: 14px; }
+.host-row { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 12px; }
+.host-row > span { color: var(--muted); font-size: .9rem; }
+.host-row input, .host-row select {
+  font: inherit; padding: 8px 10px; width: 100%; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--fg);
+}
+.host-check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .9rem; }
+.host-error { margin: 0; padding: 10px 12px; border-radius: 6px; background: #fdeceb; color: #a1433c; font-size: .9rem; white-space: pre-wrap; }
+.host-ok { margin: 0; padding: 10px 12px; border-radius: 6px; background: #eaf5ef; color: #25634f; font-size: .9rem; }
+.host-ok a { color: #1f6b4f; font-weight: 600; }
+.host-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.host-list { display: grid; gap: 10px; margin-top: 14px; }
+.host-item {
+  display: grid; gap: 6px; padding: 14px 16px; text-align: left;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer;
+  font: inherit; color: var(--fg);
+}
+.host-item:hover { border-color: #c9ced6; background: var(--soft); }
+.host-item .hi-title { font-weight: 600; }
+.host-item .hi-meta { display: flex; gap: 12px; color: var(--muted); font-size: .82rem; }
+.host-item .hi-del { justify-self: start; color: #a1433c; font-size: .82rem; cursor: pointer; }
+.host-empty { margin-top: 18px; color: var(--muted); }
+/* 弹层顶栏没有 .stats 撑开，关闭按钮会紧贴提示文字 —— 单独把它推到右边 */
+.overlay .bar > .btn:last-child { margin-left: auto; }
+
+/* 由 scripts/sync-laup.mjs 注入：整页打开时没有站点导航栏，给一条回头路。 */
+/* ⚠️ 这里**不能**写 margin-left: auto —— Laup 的 .stats 已经占了这个 auto，
+   两个 auto 会平分空白，把「统计 + 看整篇渲染结果」挤到页头正中。
+   靠最右是靠插入位置（排在渲染按钮之后）拿到的，不是靠 auto。 */
+.back-home {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); font-size: 12px; text-decoration: none; white-space: nowrap;
+}
+.back-home:hover { border-color: var(--fg); color: var(--fg); }
+</style>
+<body data-gutter="left">
+<div class="chrome">
+  <header class="bar">
+    <span class="brand">Laup</span>
+    <span class="hint">点任意一块开始改；光标离开那块时，它变回渲染结果</span>
+    <span class="stats" id="stats"></span>
+    <button class="btn" id="btn-render" type="button">看整篇渲染结果</button>
+    <a class="back-home" href="/" title="回到生命时序">← 生命时序</a>
+    <!-- 下面三个是宿主功能（草稿箱 / 发布）。没有宿主时（Laup 自己的服务器）
+         它们一直 hidden —— detectHost() 探到 /api/* 才显示。 -->
+    <span class="host-status" id="host-status" hidden></span>
+    <button class="btn" id="btn-drafts" type="button" hidden>草稿</button>
+    <button class="btn btn-go" id="btn-publish" type="button" hidden>发布</button>
+  </header>
+  <div class="toolbar" id="toolbar">
+    <!-- 格式组（标题级别 / 粗 斜 下划线 删除线 / 字号 / 文字色 / 背景色 / 清除格式 /
+         无序 有序 待办 引用 / 行内码 行间码 链接 换行）由 editor.js 按
+         editor/formatSpec.js 的 FIXED_ROWS 建出来，插到这个锚点之前，
+         建完就把锚点删掉 —— 留着它会打断 `.tb-group + .tb-group` 的相邻选择器。
+
+         ⚠️ 刻意**不**在 HTML 里手写这些按钮：图标与色板必须与浮动工具栏共用同一份
+         （见 editor/formatUi.js），手写两份必然漂 —— 这次就是用户发现"浮动里有、
+         固定里没有"才改的。顺序照 生命时序-wiki 的 EditorToolbar.vue 迁。 -->
+    <span id="tb-fmt-anchor"></span>
+    <div class="tb-group">
+      <button class="tb-btn" data-ins="table" title="插入表格骨架">表格</button>
+      <button class="tb-btn" data-ins="image" title="插入图片骨架">图片</button>
+      <button class="tb-btn" data-ins="tree" title="插入进化树引用">进化树</button>
+      <button class="tb-btn" data-ins="sample" title="插入代码案例">案例</button>
+      <button class="tb-btn" data-ins="references" title="插入参考文献列表">文献</button>
+      <button class="tb-btn" data-ins="cite" title="插入正文引用锚点 —— \cite{…}">文内引用</button>
+    </div>
+    <div class="tb-group tb-right">
+      <button class="tb-btn" data-act="undo" id="btn-undo" title="撤销（Ctrl+Z）">↶</button>
+      <button class="tb-btn" data-act="redo" id="btn-redo" title="重做（Ctrl+Shift+Z / Ctrl+Y）">↷</button>
+    </div>
+    <span class="tb-tip" id="tb-tip" hidden>先把光标放到某一块里，再用工具栏</span>
+  </div>
+</div>
+<main class="doc" id="doc"></main>
+<footer class="warnings" id="warnings"></footer>
+
+<div class="overlay" id="overlay" hidden>
+  <header class="bar">
+    <span class="brand">整篇渲染结果</span>
+    <span class="hint">这是最终发布出来的样子，与编辑器用的是同一个渲染函数</span>
+    <button class="btn" id="btn-close" type="button">关闭</button>
+  </header>
+  <div class="doc" id="overlay-doc"></div>
+</div>
+
+<!-- 宿主 · 草稿箱 -->
+<div class="overlay" id="drafts-overlay" hidden>
+  <header class="bar">
+    <span class="brand">Laup 草稿</span>
+    <span class="hint">存在这台浏览器里，与站点「草稿箱」是同一张表</span>
+    <button class="btn" id="btn-drafts-close" type="button">关闭</button>
+  </header>
+  <div class="host-body">
+    <p class="host-note">
+      <button class="btn btn-go" id="btn-draft-new" type="button">新建一篇</button>
+      点一条草稿会整页跳过去打开（编辑器状态要整个重建，就地换源码不干净）。
+    </p>
+    <div class="host-list" id="drafts-list"></div>
+  </div>
+</div>
+
+<!-- 宿主 · 发布 -->
+<div class="overlay" id="publish-overlay" hidden>
+  <header class="bar">
+    <span class="brand" id="publish-title">发布 Laup 文章</span>
+    <span class="hint">发出去的是源码，HTML 由服务端用 Laup 自己的渲染器重渲</span>
+    <button class="btn" id="btn-publish-close" type="button">关闭</button>
+  </header>
+  <div class="host-body">
+    <form id="publish-form" class="host-form" autocomplete="off">
+      <label class="host-row"><span>标题</span>
+        <input id="pf-title" type="text" maxlength="150" required placeholder="必填">
+      </label>
+      <label class="host-row"><span>作者</span>
+        <input id="pf-author" type="text" maxlength="120">
+      </label>
+      <label class="host-row"><span>专栏类型</span>
+        <select id="pf-type">
+          <option value="">未分类</option>
+          <option value="news">新闻</option>
+          <option value="science">科普</option>
+        </select>
+      </label>
+      <label class="host-row"><span>标签</span>
+        <input id="pf-tags" type="text" placeholder="逗号或空格分隔，最多 10 个">
+      </label>
+      <label class="host-row"><span>许可协议</span>
+        <select id="pf-license">
+          <option value="支持闭源">支持闭源</option>
+          <option value="CC BY-NC-SA 4.0">CC BY-NC-SA 4.0</option>
+          <option value="CC BY 4.0">CC BY 4.0</option>
+        </select>
+      </label>
+      <label class="host-row"><span>可见性</span>
+        <select id="pf-visibility">
+          <option value="PUBLIC">公开</option>
+          <option value="PRIVATE">仅自己可见</option>
+        </select>
+      </label>
+      <label class="host-row"><span>提交说明</span>
+        <input id="pf-note" type="text" maxlength="300">
+      </label>
+      <label class="host-check" id="pf-minor-wrap" hidden>
+        <input id="pf-minor" type="checkbox"> 小改动（不新增版本）
+      </label>
+      <p class="host-error" id="pf-error" hidden></p>
+      <p class="host-ok" id="pf-ok" hidden></p>
+      <div class="host-foot">
+        <button class="btn" type="button" id="btn-publish-cancel">取消</button>
+        <button class="btn btn-go" type="submit" id="btn-publish-go">发布</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 块外观调参面板：只调"块长什么样"，不动文档内容 -->
+<button class="tune-fab" id="tune-fab" type="button" title="块外观调参">◐</button>
+<div class="tune-panel" id="tune-panel" hidden>
+  <div class="tune-title">块外观</div>
+
+  <div class="tune-row">
+    <label for="tune-mark">悬停标记</label>
+    <select id="tune-mark">
+      <option value="bar">左侧色条</option>
+      <option value="outline">整块边框</option>
+      <option value="none">不画</option>
+    </select>
+  </div>
+  <div class="tune-row">
+    <label for="tune-bar">标记颜色</label>
+    <input type="color" id="tune-bar">
+  </div>
+  <div class="tune-row">
+    <label for="tune-bg">悬停底色</label>
+    <input type="color" id="tune-bg">
+  </div>
+  <div class="tune-row">
+    <label for="tune-boundary">块间分隔线</label>
+    <select id="tune-boundary">
+      <option value="0 none">无（安静）</option>
+      <option value="1px dashed #eef0f2">淡虚线</option>
+      <option value="1px solid #e4e7eb">实线</option>
+    </select>
+  </div>
+  <div class="tune-row">
+    <label for="tune-gutter">图标栏位置</label>
+    <select id="tune-gutter">
+      <option value="left">左侧留白</option>
+      <option value="right">右侧留白</option>
+    </select>
+  </div>
+
+  <div class="tune-foot">
+    <button class="tune-btn" id="tune-copy" type="button">复制为 CSS</button>
+    <button class="tune-btn" id="tune-reset" type="button">还原</button>
+  </div>
+  <div class="tune-note">只改这几条 CSS 变量；文档内容一个字都不动。</div>
+</div>
+
+<script type="module" src="./editor.js"></script>
+</body>
+</html>

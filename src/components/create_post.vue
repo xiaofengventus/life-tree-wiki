@@ -645,6 +645,7 @@
             mode="default"
             class="post-editor"
             @on-created="handleCreated"
+            @customPaste="handleCustomPaste"
           />
         </div>
       </div>
@@ -841,7 +842,7 @@
         </button>
       </div>
       <small v-if="!isEditing || isPrivateWork" class="private-save-hint">
-        私密文章保存在服务器，可跨设备继续编辑；文章和进化树合计最多 5 个。
+        私密文章保存在服务器，可跨设备继续编辑；数量不限。
       </small>
     </form>
 
@@ -1295,6 +1296,9 @@ import {
   registerToolbarMenus,
 } from "@/utils/wangEditorToolbarMenus";
 import { registerCodeSampleModule } from "@/utils/wangEditorCodeSample";
+import { registerMarkdownCellModule } from "@/utils/wangEditorMarkdownCell";
+import { registerInlineHoistModule } from "@/utils/wangEditorInlineHoist";
+import { createMarkdownCellView } from "@/utils/markdownCellView";
 import { formatToolbarShortcut } from "@/utils/toolbarTooltips";
 import { normalizeLegacyImageCaptionHtml } from "@/utils/imageCaptionHtml";
 import { isEditorOwnedPaste, normalizePastedHtml } from "@/utils/pasteClean";
@@ -1318,6 +1322,9 @@ registerFormulaModule();
 registerInsertContentMenu();
 registerEditorUxModule();
 registerCodeSampleModule();
+registerMarkdownCellModule();
+// 必须最后注册也无妨：它是 preParseHtml 补丁，解析时才生效
+registerInlineHoistModule();
 registerToolbarMenus();
 
 const emit = defineEmits(["submit"]);
@@ -1608,26 +1615,21 @@ const draftStatusText = computed(() => {
 const editorConfig = {
   placeholder: "请输入文章内容，可以选择文字后设置颜色……",
   /**
-   * 粘贴归一化：外部富文本带来的字号 / 字体 / 行高 / 缩进统一剥掉，
-   * 一律按正文大小落进编辑器；编辑器自身的节点与图片保持默认行为。
+   * ⚠️ 粘贴归一化**不能**写在这里。
+   *
+   * @wangeditor/editor-for-vue 会用 `__spreadValues({}, props.defaultConfig)`
+   * 再把自己的包装函数**覆盖**上去，覆盖的钩子有 onCreated / onChange /
+   * onDestroyed / onMaxLength / onFocus / onBlur / customAlert / customPaste。
+   * 每个包装函数开头都有一句守卫：只要发现 `props.defaultConfig` 里也有同名键，
+   * 就直接 `throw new Error("请使用 '@customPaste' 事件，不要放在 props 中")`。
+   *
+   * 后果有两层：
+   *   1. 每粘贴一次就抛一次未捕获错误（core 的 paste 处理器被异常打断）；
+   *   2. 它**永远走不到** `context.emit("customPaste", ...)`，所以清洗逻辑
+   *      `normalizePastedHtml()` 一次都没执行过 —— 等于白写。
+   *
+   * 正解：挂在组件事件上，见模板里 `@customPaste="handleCustomPaste"`。
    */
-  customPaste(editor, event) {
-    const data = event?.clipboardData;
-    if (!data) return true;
-    const html = data.getData("text/html");
-    if (!html || !html.trim()) return true;
-    // 编辑器内部复制（公式、卡片等自定义节点）：走默认，避免被改写
-    if (isEditorOwnedPaste(html)) return true;
-    // 含图片时走默认，避免绕过图片粘贴流程
-    if (/<img[\s>]/i.test(html)) return true;
-
-    const cleaned = normalizePastedHtml(html);
-    if (!cleaned || cleaned === html) return true;
-    if (typeof editor.dangerouslyInsertHtml !== "function") return true;
-
-    editor.dangerouslyInsertHtml(cleaned);
-    return false;
-  },
   hoverbarKeys: {
     // 选中文字悬浮栏：按「结构 → 行内样式 → 清除 → 块级」分组排列
     text: {
@@ -1844,9 +1846,59 @@ function openInsertToolSection(section) {
   insertPanelOpen.value = true;
 }
 
+/**
+ * Markdown 单元格的编辑器内预览层。
+ *
+ * 挂在 `.editor-wrapper` 上而不是编辑器内部：wangEditor 的 DOM 归 slate 管，
+ * 往里塞元素会被重渲染冲掉，也会把选区搞乱（详见 utils/markdownCellView.js 的说明）。
+ */
+let markdownCellView = null;
+
+function mountMarkdownCellView() {
+  const editor = editorRef.value;
+  const wrapper = editorWrapperRef.value;
+  if (!editor || !wrapper) return;
+  markdownCellView?.destroy();
+  markdownCellView = createMarkdownCellView({ editor, wrapper });
+}
+
+/**
+ * 粘贴归一化。
+ *
+ * 必须挂在模板的 `@customPaste` 事件上，**不能**放进 editorConfig ——
+ * 原因见 editorConfig 上方那段注释（放进去会被库的包装函数覆盖并抛错）。
+ *
+ * 外部富文本带来的字号 / 字体 / 行高 / 缩进统一剥掉，一律按正文大小落进编辑器；
+ * 编辑器自身的节点（公式、卡片）与含图片的粘贴保持默认行为。
+ *
+ * ⚠️ 返回值语义靠**第三个参数回调**传递，不能直接 `return false`：
+ * editor-for-vue 的实现是 `context.emit("customPaste", editor, event, cb)`，
+ * 而 `context.emit` 不会把处理函数的返回值带回去，只有 `cb(val)` 才会被 core 读到。
+ *   - `callback(false)` → core 的 `!1 === customPaste(editor, event)` 成立 → 阻止默认粘贴
+ *   - 不调用          → core 拿到 undefined → 照常走默认粘贴
+ */
+function handleCustomPaste(editor, event, callback) {
+  const data = event?.clipboardData;
+  if (!data) return;
+  const html = data.getData("text/html");
+  if (!html || !html.trim()) return;
+  // 编辑器内部复制（公式、卡片等自定义节点）：走默认，避免被改写
+  if (isEditorOwnedPaste(html)) return;
+  // 含图片时走默认，避免绕过图片粘贴流程
+  if (/<img[\s>]/i.test(html)) return;
+
+  const cleaned = normalizePastedHtml(html);
+  if (!cleaned || cleaned === html) return;
+  if (typeof editor?.dangerouslyInsertHtml !== "function") return;
+
+  editor.dangerouslyInsertHtml(cleaned);
+  if (typeof callback === "function") callback(false);
+}
+
 async function handleCreated(editor) {
   editorRef.value = editor;
   await nextTick();
+  mountMarkdownCellView();
   if (content.value) {
     editor.setHtml(
       normalizeCitationLinks(
@@ -3066,6 +3118,8 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleEditorShortcut);
   window.removeEventListener("resize", handleEditorSelectionChange);
   window.removeEventListener("scroll", handleEditorSelectionChange, true);
+  markdownCellView?.destroy();
+  markdownCellView = null;
   editorRef.value?.destroy();
 });
 </script>
@@ -5334,4 +5388,94 @@ onBeforeUnmount(() => {
     margin-bottom: 12px;
   }
 }
+
+/* ---------- Markdown 单元格（编辑器内预览层，见 utils/markdownCellView.js）---------- */
+
+/* 浮层容器只管定位，本身不吃鼠标事件；可点的只有标签条和预览面板 */
+.editor-wrapper :deep(.life-md-cell-layer) {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* 「代码 / 预览」标签条，压在单元格右上角 */
+.editor-wrapper :deep(.life-md-cell-bar) {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #cbd8e6;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  /* 必须压在预览面板之上：面板后挂进 DOM，不设层级会把标签条盖住，就点不回代码了 */
+  z-index: 2;
+  pointer-events: auto;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.editor-wrapper :deep(.life-md-cell-bar:hover),
+.editor-wrapper :deep(.life-md-cell-bar[data-state="preview"]) {
+  opacity: 1;
+}
+
+.editor-wrapper :deep(.life-md-cell-bar button) {
+  height: 22px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #52627a;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.editor-wrapper :deep(.life-md-cell-bar button:hover) {
+  background: #e8eff8;
+}
+
+.editor-wrapper :deep(.life-md-cell-bar button.is-active) {
+  background: #d9e6f8;
+  color: #1d4ed8;
+  font-weight: 500;
+}
+
+/* 预览面板：与单元格等高覆盖，内容超出时自己滚动，不侵占下方正文 */
+.editor-wrapper :deep(.life-md-cell-panel) {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 34px 20px 18px;
+  border: 1px solid #ccd8e4;
+  border-radius: 9px;
+  background: #ffffff;
+  cursor: default;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+/* 预览内容复用阅读页的 .post-content 样式，这里只收掉首尾外边距 */
+.editor-wrapper :deep(.life-md-cell-panel-body > :first-child) {
+  margin-top: 0;
+}
+
+.editor-wrapper :deep(.life-md-cell-panel-body > :last-child) {
+  margin-bottom: 0;
+}
+
+.editor-wrapper :deep(.life-md-cell-empty) {
+  margin: 0;
+  color: #8a97a8;
+  font-size: 14px;
+}
+
+.editor-wrapper :deep(.life-md-cell-error) {
+  margin: 0;
+  color: #b42318;
+  font-size: 14px;
+}
+
 </style>

@@ -59,7 +59,7 @@ const currentDraftOwnerKey = ref("");
 const publishPanelOpen = ref(false);
 const draftPanelOpen = ref(false);
 // 顶部固定工具栏收起状态（由画布组件内的把手控制）
-const toolbarCollapsed = ref(false);
+const toolbarCollapsed = ref(true); // 顶部悬浮工具栏默认屏蔽，(^) 把手可展开
 
 function openPublishPanel() {
   publishPanelOpen.value = true;
@@ -699,7 +699,7 @@ watch(
             <RouterLink v-if="publishedTreeId && !isPrivateWork" :to="`/life-tree/${publishedTreeId}`">查看已发布版本</RouterLink>
           </footer>
           <small v-if="mode !== 'CONTRIBUTION' && (!publishedTreeId || isPrivateWork)" class="private-save-hint">
-            私密进化树保存在服务器，可跨设备继续编辑；文章和进化树合计最多 5 个。
+            私密进化树保存在服务器，可跨设备继续编辑；数量不限。
           </small>
         </div>
       </aside>

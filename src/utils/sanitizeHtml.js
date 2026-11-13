@@ -1,9 +1,15 @@
 const ALLOWED_TAGS = new Set([
   "P", "BR", "H1", "H2", "H3", "H4", "STRONG", "B", "EM", "I", "U", "S", "DEL",
   "UL", "OL", "LI", "BLOCKQUOTE", "CODE", "PRE", "A", "IMG", "SPAN", "SUP", "HR",
-  "FIGURE", "FIGCAPTION", "DIV", "INPUT",
+  "FIGURE", "FIGCAPTION", "DIV", "INPUT", "SECTION",
   "TABLE", "THEAD", "TBODY", "TR", "TH", "TD",
 ]);
+
+// Laup 文章的引用锚点（Notebook 提交的 contentFormat:'laup' 正文）：
+//   行内引用 <sup class="laup-cite"><a href="#laup-citation-1">1</a></sup>
+//   文末列表 <li id="laup-citation-1">（外层 <section class="content-sources">）
+// 全部按**精确模式**放行 —— 不是给 Laup 开后门，只是把这几个固定形状的标记加进白名单。
+const LAUP_CITE_ID_RE = /^laup-citation-(?:[1-9]\d{0,3})$/;
 const DROP_WITH_CONTENT = new Set([
   "SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "SVG", "MATH", "LINK", "META",
   "BASE", "FORM", "BUTTON", "TEXTAREA", "SELECT", "OPTION", "CANVAS",
@@ -85,7 +91,8 @@ function safeUrl(value, image = false) {
     !image &&
     (
       /^#post-citation-(?:[1-9]\d{0,3})$/.test(candidate) ||
-      /^#post-card-[A-Za-z0-9_-]{1,80}$/.test(candidate)
+      /^#post-card-[A-Za-z0-9_-]{1,80}$/.test(candidate) ||
+      /^#laup-citation-(?:[1-9]\d{0,3})$/.test(candidate)
     )
   ) return candidate;
   if (candidate.startsWith("/") && !candidate.startsWith("//")) return candidate;
@@ -166,13 +173,28 @@ export function sanitizeHtml(rawHtml) {
         element.setAttribute("data-code-language", language);
       }
     }
+    if (element.tagName === "SECTION") {
+      // Laup 的参考文献节：只认这一个固定 class，其余 SECTION 的 class 一律剥掉
+      if ((original.class || "").trim() === "content-sources") {
+        element.setAttribute("class", "content-sources");
+      }
+    }
+    if (element.tagName === "LI" && LAUP_CITE_ID_RE.test(original.id || "")) {
+      // Laup 文末文献条目的锚点目标（页内引用上标跳过来）
+      element.setAttribute("id", original.id);
+      element.setAttribute("tabindex", "-1");
+    }
+    if (element.tagName === "SUP" && (original.class || "").trim() === "laup-cite") {
+      element.setAttribute("class", "laup-cite");
+    }
     if (element.tagName === "A") {
       const href = safeUrl(original.href);
       if (href) element.setAttribute("href", href);
       if (original.title) element.setAttribute("title", original.title.slice(0, 200));
       if (
         !href.startsWith("#post-citation-") &&
-        !href.startsWith("#post-card-")
+        !href.startsWith("#post-card-") &&
+        !href.startsWith("#laup-citation-")
       ) {
         element.setAttribute("target", "_blank");
         element.setAttribute("rel", "noopener noreferrer nofollow");

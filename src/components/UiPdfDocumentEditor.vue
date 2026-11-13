@@ -1094,7 +1094,7 @@
         v-if="!isUiPdfMode && (!isEditing || isPrivateWork)"
         class="private-save-hint"
       >
-        私密文章保存在服务器，可跨设备继续编辑；文章和进化树合计最多 5 个。
+        私密文章保存在服务器，可跨设备继续编辑；数量不限。
       </small>
     </form>
 

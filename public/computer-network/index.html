@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>计算机网络图解 · 三部曲</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; background:#f4f6fa; min-height:100vh;
+         display:flex; align-items:center; justify-content:center; padding:40px 20px; color:#1e2530; }
+  .wrap { max-width:900px; width:100%; }
+  h1 { text-align:center; font-size:30px; letter-spacing:2px; }
+  p.lead { text-align:center; color:#5b6676; margin:12px 0 36px; font-size:14.5px; line-height:1.8; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px; }
+  a.card { display:block; background:#fff; border:1px solid #dde3ec; border-radius:14px; padding:24px 22px;
+           text-decoration:none; color:#1e2530; transition:transform .15s, box-shadow .15s; }
+  a.card:hover { transform:translateY(-3px); box-shadow:0 10px 24px rgba(30,40,60,.12); }
+  .card .no { font-size:13px; font-weight:800; letter-spacing:1px; }
+  .card h2 { font-size:18px; margin:8px 0 10px; }
+  .card p { font-size:13px; color:#5b6676; line-height:1.75; }
+  .card .go { display:inline-block; margin-top:12px; font-size:13px; font-weight:700; }
+  .c1 .no, .c1 .go { color:#2563eb; } .c1 { border-top:5px solid #2563eb; }
+  .c2 .no, .c2 .go { color:#7c3aed; } .c2 { border-top:5px solid #7c3aed; }
+  .c3 .no, .c3 .go { color:#dc2626; } .c3 { border-top:5px solid #dc2626; }
+  footer { text-align:center; color:#9aa5b5; font-size:12.5px; margin-top:34px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>计算机网络图解 · 三部曲</h1>
+  <p class="lead">五层模型总览 → 协议流程与设备原理 → 考研/竞赛详解<br>按顺序食用：先建框架，再精读细节，最后扫图复习</p>
+  <div class="cards">
+    <a class="card c1" href="计算机网络-五层模型.html">
+      <span class="no">① 入门</span>
+      <h2>五层模型总览</h2>
+      <p>各层数据类型 / 协议 / 设备，发送方封装与接收方解封装画在两侧，带逐步播放动画。</p>
+      <span class="go">开始 →</span>
+    </a>
+    <a class="card c2" href="计算机网络-协议流程与设备原理.html">
+      <span class="no">② 进阶</span>
+      <h2>协议流程与设备原理</h2>
+      <p>思维图 + 时序图 + 流程图 + 拓扑图：TCP 握手、DHCP、ARP、DNS、OSPF、STP、交换机/路由器转发。</p>
+      <span class="go">开始 →</span>
+    </a>
+    <a class="card c3" href="计算机网络-考研详解版.html">
+      <span class="no">③ 深水区</span>
+      <h2>考研 / 竞赛详解版</h2>
+      <p>报文逐字段、CRC 与子网划分例题、拥塞控制曲线、ACL / AAA、WLAN —— 24 节硬核内容。</p>
+      <span class="go">开始 →</span>
+    </a>
+  </div>
+  <footer>内容依据《HCIA-Datacom V2.0 考试大纲》与考研教材体系整理 · 纯静态页面，无需联网加载依赖</footer>
+</div>
+</body>
+</html>

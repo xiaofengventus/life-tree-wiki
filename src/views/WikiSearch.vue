@@ -171,6 +171,7 @@ onBeforeUnmount(() => window.clearTimeout(suggestTimer));
         <h1>文章 <small>{{ results.posts.length }}</small></h1>
         <article v-for="post in results.posts" :key="post.id" class="result-row">
           <RouterLink :to="{ name: 'wiki-post', params: { title: post.title } }">{{ post.title || "未命名文章" }}</RouterLink>
+          <span v-if="post.isPrivate" class="badge private small">仅自己可见</span>
           <p>{{ post.excerpt || "暂无摘要" }}</p>
           <small v-if="post.tags?.length">{{ post.tags.map((tag) => `#${tag}`).join(" ") }}</small>
         </article>
@@ -181,6 +182,7 @@ onBeforeUnmount(() => window.clearTimeout(suggestTimer));
         <h1>树 <small>{{ results.trees.length }}</small></h1>
         <article v-for="tree in results.trees" :key="tree.id" class="result-row">
           <RouterLink :to="`/life-tree/${tree.uid || tree.id}`">{{ tree.title || "未命名树" }}</RouterLink>
+          <span v-if="tree.isPrivate" class="badge private small">仅自己可见</span>
           <p>{{ tree.description || "暂无说明" }}</p>
           <small v-if="tree.tags?.length">{{ tree.tags.map((tag) => `#${tag}`).join(" ") }}</small>
         </article>
@@ -207,6 +209,7 @@ onBeforeUnmount(() => window.clearTimeout(suggestTimer));
 </template>
 
 <style scoped>
+.badge.private { flex: none; border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; background: #fdeaea; color: #a13f39; }
 .search-page { width: min(100% - 48px, 920px); min-height: calc(100vh - 65px); margin: 0 auto; padding: 42px 0 80px; background: #fff; }
 .search-area { position: relative; margin-bottom: 42px; }
 .search-form input { box-sizing: border-box; width: 100%; height: 50px; padding: 0 16px; border: 1px solid #cfd4dc; border-radius: 4px; outline: 0; color: #111827; font: inherit; }

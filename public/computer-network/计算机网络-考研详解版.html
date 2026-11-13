@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="RDSc4gwX0CjEDhIZF3XI1f">
+<head data-page-node-id="qNU3fGSFrvFx5RM3Z0TOsy">
+<meta charset="UTF-8" data-page-node-id="vJlJZq0VD5oRd6AuX1S6hy">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="3W3qXQMMinAI0L3quaMMig">
+<title>计算机网络 · 考研/竞赛详解版 — 协议逐字段与计算题全解</title>
+<style>
+  :root {
+    --bg:#f4f6fa; --card:#fff; --ink:#1e2530; --muted:#5b6676; --line:#dde3ec;
+    --app:#2563eb; --app-bg:#eff4ff;
+    --tra:#0d9488; --tra-bg:#ecfdf8;
+    --net:#d97706; --net-bg:#fff8ec;
+    --lnk:#7c3aed; --lnk-bg:#f5f0ff;
+    --phy:#64748b; --phy-bg:#f1f4f8;
+    --red:#dc2626; --green:#059669; --dark:#1e2530;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; background:var(--bg); color:var(--ink); padding:0 16px 80px; }
+  .page { max-width:1100px; margin:0 auto; }
+  header.top { text-align:center; padding:34px 0 8px; }
+  header.top h1 { font-size:25px; letter-spacing:1px; }
+  header.top p.sub { color:var(--muted); margin-top:8px; font-size:14px; line-height:1.7; }
+  header.top a.back { display:inline-block; margin:10px 6px 0; font-size:13px; color:var(--app); text-decoration:none; border:1px solid var(--line); background:#fff; padding:5px 14px; border-radius:20px; }
+  header.top a.back:hover { background:var(--app-bg); }
+
+  nav.chips { position:sticky; top:0; z-index:9; background:rgba(244,246,250,.95); backdrop-filter:blur(6px);
+    display:flex; gap:7px; flex-wrap:wrap; justify-content:center; padding:11px 0 13px; border-bottom:1px solid var(--line); margin-bottom:26px; }
+  nav.chips a { font-size:12.5px; color:#334; text-decoration:none; background:#fff; border:1px solid var(--line); padding:4px 11px; border-radius:20px; }
+  nav.chips a:hover { background:var(--app-bg); border-color:var(--app); color:var(--app); }
+
+  section { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:26px 28px; margin-bottom:30px; }
+  section h2 { font-size:20px; display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  section h2 .no { color:var(--app); font-size:15px; font-weight:800; }
+  section h3 { font-size:15.5px; margin:20px 0 8px; padding-left:10px; border-left:4px solid var(--app); }
+  section p, section li { font-size:14px; line-height:1.85; color:#2c3442; }
+  section p.intro { color:var(--muted); margin-bottom:14px; }
+  section ul, section ol { padding-left:24px; margin:8px 0; }
+  li { margin:4px 0; }
+  b.k { color:var(--ink); background:#eef3fa; padding:1px 6px; border-radius:5px; font-weight:700; }
+  .fig { text-align:center; margin:14px 0; }
+  .fig svg { max-width:100%; height:auto; background:#fbfcfe; border:1px solid #eef1f6; border-radius:10px; }
+  .fig figcaption { color:#8b95a5; font-size:12.5px; margin-top:8px; }
+  .note { background:#f6f8fb; border-left:4px solid var(--app); border-radius:0 8px 8px 0; padding:10px 16px; font-size:13.5px; line-height:1.8; margin:14px 0; color:#3a4354; }
+  .note.exam { border-color:var(--red); background:#fff7f7; }
+  .note.exam::before { content:"考点 "; font-weight:800; color:var(--red); }
+  .note.ok { border-color:var(--green); }
+
+  table.cmp { width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0; }
+  table.cmp th, table.cmp td { border:1px solid var(--line); padding:7px 11px; text-align:left; line-height:1.65; vertical-align:top; }
+  table.cmp th { background:#f1f4f8; font-weight:700; white-space:nowrap; }
+  table.cmp td b, table.cmp th b { font-family:Consolas,monospace; }
+  table.cmp .ctr { text-align:center; }
+
+  /* 报文格式块图：用表格逐字段 */
+  table.fmt { width:100%; border-collapse:collapse; font-size:12px; margin:10px 0 4px; table-layout:fixed; }
+  table.fmt th, table.fmt td { border:1.5px solid #64748b; padding:7px 4px; text-align:center; font-family:Consolas,monospace; }
+  table.fmt td { background:#f8fafd; color:#26303f; font-weight:700; }
+  table.fmt tr.cap td { border:none; background:none; color:#8b95a5; font-weight:400; font-size:11px; padding-top:3px; font-family:"Microsoft YaHei",sans-serif; }
+  table.fmt td.hl { background:var(--app-bg); border-color:var(--app); color:var(--app); }
+  table.fmt td.hla { background:var(--tra-bg); border-color:var(--tra); color:var(--tra); }
+  table.fmt td.hln { background:var(--net-bg); border-color:var(--net); color:var(--net); }
+  table.fmt td.hll { background:var(--lnk-bg); border-color:var(--lnk); color:var(--lnk); }
+
+  pre.calc { background:#0f1720; color:#dbe6f5; font-family:Consolas,monospace; font-size:13.5px; line-height:1.7; padding:16px 20px; border-radius:10px; overflow-x:auto; margin:12px 0; }
+  pre.calc .cm { color:#7d8ba0; }
+  pre.calc .hl { color:#7ee0c8; }
+  pre.cmd { background:#1e2530; color:#cfe3d8; font-family:Consolas,monospace; font-size:13px; line-height:1.8; padding:14px 18px; border-radius:10px; overflow-x:auto; margin:12px 0; }
+  pre.cmd .kw { color:#8fb8ff; }
+  pre.cmd .cm { color:#6f7d8f; }
+
+  svg text { font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  svg .hbox { fill:#fff; stroke:#cbd5e1; stroke-width:1.5; }
+  svg .hname { font-size:15px; font-weight:700; fill:#1e2530; }
+  svg .hsub { font-size:11px; fill:#7b8595; }
+  svg .life { stroke:#cbd5e1; stroke-width:1.5; stroke-dasharray:5 4; }
+  svg .ar { stroke:#64748b; stroke-width:2; fill:none; }
+  svg .albl { font-size:13px; fill:#26303f; }
+  svg .asub { font-size:11.5px; fill:#7b8595; }
+  svg .flowbox { fill:#fff; stroke:#94a3b8; stroke-width:1.5; }
+  svg .ftxt { font-size:13px; fill:#26303f; font-weight:600; }
+  svg .fsub { font-size:11px; fill:#7b8595; }
+  svg .ntxt { font-size:12px; fill:#5b6676; }
+</style>
+</head>
+<body data-page-node-id="hH1o7rEBhO3gRNQmdXVYYx">
+
+<svg width="0" height="0" style="position:absolute" data-page-node-id="pJbFFyAt5SF9J1nA8lyS8F"><defs data-page-node-id="mL6NVuTpIWVlvCblkPDuAm">
+  <marker id="m-gray"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="slgZH7SxgnxPJCprCxni5R"><path d="M0,0 L10,5 L0,10 z" fill="#64748b" data-page-node-id="wSGOOBztHN1JkWkKcYjdVc"/></marker>
+  <marker id="m-blue"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="lGjjfq4dJ1jWtEK7Q2wbLU"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb" data-page-node-id="3qN96XzzMqjEXJjnFk0IJb"/></marker>
+  <marker id="m-teal"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="Mm4Nyx5E9WkFxpcAogceU2"><path d="M0,0 L10,5 L0,10 z" fill="#0d9488" data-page-node-id="9A7UEakpum0KaALO8ocNzH"/></marker>
+  <marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="WwrYeWTgj2GCwAL4FVWpp9"><path d="M0,0 L10,5 L0,10 z" fill="#d97706" data-page-node-id="EU3gpG6aJlq4N9iYUrw1SZ"/></marker>
+  <marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="ANMOnLeb6iTmzPxTjwRYjq"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed" data-page-node-id="j4zehuzaPivfoGXwZEb2pz"/></marker>
+  <marker id="m-red"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="7GmS8vhi5oBXDL4DS8ylD4"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626" data-page-node-id="IsTFkHwHf4qGvstKGfDbMs"/></marker>
+  <marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="JyYyqHb6MyIdnSIorPKSJ0"><path d="M0,0 L10,5 L0,10 z" fill="#059669" data-page-node-id="DwNtFmhZAp92ohYQw7Bcs0"/></marker>
+</defs></svg>
+
+<div class="page" data-page-node-id="VO8eeJmB1X5VGtgXtBcbCw">
+
+<header class="top" data-page-node-id="IT0yPuXbgC5vHGUPC8bbmz">
+  <h1 data-page-node-id="tLF9CvcEDngSNiKmTYRWUL">计算机网络 · 考研 / 竞赛详解版</h1>
+  <p class="sub" data-page-node-id="dgdOvbJ7GbaxlxsbE7cGmH">报文逐字段解析 · 公式与计算例题 · 完整协议交互 · ACL / AAA / 子网划分 —— 按「能从零学会」的深度编写<br data-page-node-id="WAKKjE3HgtxS3e2ASIFSjo">
+  五层框架与基础流程图见前两页（总览页 / 流程图解页），本页补足教材级细节与计算题套路</p>
+  <a class="back" href="计算机网络-五层模型.html" data-page-node-id="9aUUVtiGJxSRWtCN1RKFXE">← 五层模型总览页</a>
+  <a class="back" href="计算机网络-协议流程与设备原理.html" data-page-node-id="t4m3rSFaafgbyF9qYXokcD">← 协议流程与设备原理页</a>
+</header>
+
+<nav class="chips" data-page-node-id="ZXSJpNO8cDlEKQENa7JKcj">
+  <a href="#s1" data-page-node-id="INghBv41hWPLWZq3CxBGzF">1 编码与信道容量</a>
+  <a href="#s2" data-page-node-id="264oYneRbAL9tuDFRuFd1h">2 组帧与CRC</a>
+  <a href="#s3" data-page-node-id="3gtxKZ3o17hYs17cCmBKAm">3 可靠传输 GBN/SR</a>
+  <a href="#s4" data-page-node-id="NbGf9GV1lqC6k4gENzVDOE">4 以太网CSMA/CD</a>
+  <a href="#s5" data-page-node-id="t4e4j7t2xnMaoNlFdJnoAt">5 VLAN与间路由</a>
+  <a href="#s6" data-page-node-id="bDRyArdq8vRlWZicRqxAAC">6 STP/链路聚合</a>
+  <a href="#s6b" data-page-node-id="DxjYaMPQlNROBzYhcttrZb">6B WLAN</a>
+  <a href="#s7" data-page-node-id="rHqliEadRKBaZZNbwCvtFD">7 IPv4首部与分片</a>
+  <a href="#s8" data-page-node-id="pQoxeWjURDrVDFzIjtDJnS">8 子网划分CIDR</a>
+  <a href="#s9" data-page-node-id="RnMiK4jmAADXLee7LIoD0Z">9 ICMP</a>
+  <a href="#s10" data-page-node-id="0N52jomp53rHyc5oOO3NDB">10 路由协议</a>
+  <a href="#s11" data-page-node-id="4lEH7uPe1D2Mq1qjMbs9ER">11 NAT</a>
+  <a href="#s12" data-page-node-id="9Vx1KrWC1wRKeKGkAg55K0">12 TCP/UDP首部</a>
+  <a href="#s13" data-page-node-id="OtruY3tNAMyGjhg6ib5zK8">13 可靠传输机制</a>
+  <a href="#s14" data-page-node-id="NZCk326eETqkdCDFEYVcAK">14 流量/拥塞控制</a>
+  <a href="#s15" data-page-node-id="h7pPmEE7nbWAj9V3oDEKDe">15 握手/挥手细节</a>
+  <a href="#s16" data-page-node-id="Tz5mrhuMMLAicUpFD0oeKC">16 HTTP/HTTPS</a>
+  <a href="#s17" data-page-node-id="5paBXHP0lVmUEffauPMaUI">17 FTP</a>
+  <a href="#s18" data-page-node-id="Sj3Syyna1Upf0CeF1E8Gza">18 DNS</a>
+  <a href="#s19" data-page-node-id="2jVDrm03VnWjXkBX4nXG9I">19 DHCP租约</a>
+  <a href="#s20" data-page-node-id="TGgBT2Dio3PtesaAm8Z6Z4">20 SSH与邮件</a>
+  <a href="#s21" data-page-node-id="mbPvIJCLd1NNFgVdZCCTGq">21 ACL</a>
+  <a href="#s22" data-page-node-id="8MbIt4GRxVsE17A7JwRm8P">22 AAA</a>
+  <a href="#s23" data-page-node-id="VHMoTa7V6ZR0rrahcjRMQ6">23 综合例题</a>
+</nav>
+
+<!-- ================= 1 物理层 ================= -->
+<section id="s1" data-page-node-id="c8lvXEPzl4PKNjg9pbhAXD">
+  <h2 data-page-node-id="04cp2lBy0KIFR8accUnVV7"><span class="no" data-page-node-id="dUeGUGADAufQNK4wKHY2AD">01</span>物理层：编码方式与信道容量极限</h2>
+  <p class="intro" data-page-node-id="Wd3X8zHjRJjPl8rFu8yCHt">物理层回答两个问题：比特怎么变成信号（编码），一条信道最多能跑多快（奈氏准则与香农公式）。这两块是考研物理层的全部考点。</p>
+
+  <h3 data-page-node-id="iBA6kemDXdzkximbHDDZHF">1.1 三种经典编码（以比特串 1 0 1 1 0 0 1 为例）</h3>
+  <figure class="fig" data-page-node-id="Mv0vdJPXIZ7TOTSDyFxT2u">
+    <svg viewBox="0 0 1000 330" data-page-node-id="xbum25WspxQpUgTw1zBqUr">
+      <g font-size="13" fill="#26303f" text-anchor="middle" font-weight="700" data-page-node-id="ch3idBsnhIWeqFnQ176Mrg">
+        <text x="160" y="20" data-page-node-id="cX1GuTBWY2GPRYSsNUMk8I">1</text><text x="240" y="20" data-page-node-id="ep25hDhZL5Lp9N3Bj6NlME">0</text><text x="320" y="20" data-page-node-id="9c2YyI0m1a2fU35fkvLyhc">1</text><text x="400" y="20" data-page-node-id="V1xiRGPiUrTcudqxoyEiu7">1</text>
+        <text x="480" y="20" data-page-node-id="UzifbaeJFw9GqzYSjSghZe">0</text><text x="560" y="20" data-page-node-id="5IhLLiBo1Tkb41BbxRnJsD">0</text><text x="640" y="20" data-page-node-id="4lkE5XXdEHOJXBcAziSOt7">1</text>
+      </g>
+      <g stroke="#e2e8f0" stroke-width="1" data-page-node-id="qzLHoA1JUSLtsUMXKIMIWn">
+        <line x1="120" y1="28" x2="120" y2="285" data-page-node-id="xXQW8Q11AWVjWbBLX3Zzsp"/><line x1="200" y1="28" x2="200" y2="285" data-page-node-id="AlGnmmg18qc8PZHHdUNe5t"/>
+        <line x1="280" y1="28" x2="280" y2="285" data-page-node-id="EYPq0HAOCu8az2RRpECnFr"/><line x1="360" y1="28" x2="360" y2="285" data-page-node-id="2XgtFgFKHOMQSD3RDlP1rh"/>
+        <line x1="440" y1="28" x2="440" y2="285" data-page-node-id="Qy8vRyr8zkhI3jCZcrHOjw"/><line x1="520" y1="28" x2="520" y2="285" data-page-node-id="hkTF7zBu7awedOz3KhbHtP"/>
+        <line x1="600" y1="28" x2="600" y2="285" data-page-node-id="x4z6IR8JbADxzSSDYbr0pJ"/><line x1="680" y1="28" x2="680" y2="285" data-page-node-id="aNsDm3Og1O3HGZrK6b1iTy"/>
+      </g>
+      <!-- NRZ -->
+      <text x="98" y="55" text-anchor="end" font-size="13" fill="#2563eb" font-weight="700" data-page-node-id="lT2Z9rbayRcACltgfoUMp1">NRZ</text>
+      <polyline points="120,30 200,30 200,70 280,70 280,30 440,30 440,70 600,70 600,30 680,30" fill="none" stroke="#2563eb" stroke-width="2.5" data-page-node-id="CshfAPiNrGDcdbn6YVYD9v"/>
+      <!-- 曼彻斯特 -->
+      <text x="98" y="155" text-anchor="end" font-size="13" fill="#0d9488" font-weight="700" data-page-node-id="2bXFHNoUMCHOj6Xq63vQkW">曼彻斯特</text>
+      <polyline points="120,70 160,70 160,30 200,30 240,30 240,70 280,70 320,70 320,30 360,30 400,30 400,70 440,70 480,70 480,30 520,30 560,30 560,70 600,70 640,70 640,30 680,30" fill="none" stroke="#0d9488" stroke-width="2.5" data-page-node-id="OppM1lXXkV2HahrwE2KqBb"/>
+      <!-- 差分曼彻斯特 -->
+      <text x="98" y="255" text-anchor="end" font-size="13" fill="#7c3aed" font-weight="700" data-page-node-id="Q9YwspsE9jdvqfPmMF9U1N">差分曼彻斯特</text>
+      <polyline points="120,30 160,30 160,70 200,70 200,30 240,30 240,70 280,70 320,70 320,30 360,30 400,30 400,70 440,70 440,30 480,30 480,70 520,70 520,30 560,30 560,70 600,70 640,70 640,30 680,30" fill="none" stroke="#7c3aed" stroke-width="2.5" data-page-node-id="VxBYqAzkwnCnUxGDdzO8iE"/>
+      <g font-size="12" fill="#3a4354" data-page-node-id="yxyLgRl2WJHroOaptiytxp">
+        <text x="720" y="55" data-page-node-id="EBs2CROCtTNFF9QECAGN8k"><tspan font-weight="700" fill="#2563eb" data-page-node-id="Odrno4BwvTLj7HmofH60H5">NRZ 不归零</tspan>：1=高电平，0=低电平。</text>
+        <text x="720" y="75" data-page-node-id="txNBSxbgr6b3tvcWUFoFZE">最简单，但长串 0/1 无法提取时钟（无自同步）。</text>
+        <text x="720" y="130" data-page-node-id="jFbAoyO3I43uCLUMTMmEmu"><tspan font-weight="700" fill="#0d9488" data-page-node-id="i9rolZMdIAKBVdxhwtpgvM">曼彻斯特</tspan>：每个码元中间必跳变。</text>
+        <text x="720" y="150" data-page-node-id="GsTgAAUZWui8YAXxQ2Z2de">以太网 802.3 约定：1 = 前低后高（中点升），</text>
+        <text x="720" y="170" data-page-node-id="C5NEjyFnuldCqlmLoujRdZ">0 = 前高后低。10Mbps 传统以太网使用。</text>
+        <text x="720" y="230" data-page-node-id="uIZBCek2X3NOtGCn8kV6qg"><tspan font-weight="700" fill="#7c3aed" data-page-node-id="qJyEdugt4iqCOtuUTMG2Uv">差分曼彻斯特</tspan>：看码元「开始处」——</text>
+        <text x="720" y="250" data-page-node-id="35hGssw9Oq6uqAZpqUnS0j">有跳变 = 0，无跳变 = 1；中间必跳变。</text>
+        <text x="720" y="275" data-page-node-id="Jbm5XC5iHH9QZECzXHOTwB">令牌环网曾使用。</text>
+      </g>
+      <text class="asub" x="500" y="315" text-anchor="middle" data-page-node-id="znpv1H5FOORNWP2X6QllwN">两种曼彻斯特编码每个码元中间都有跳变 → 自带时钟、自同步；代价：波特率是比特率 2 倍，编码效率仅 50%</text>
+    </svg>
+    <figcaption data-page-node-id="HVBbi5KfXTeXwmKEGHYliD">图 1 · NRZ / 曼彻斯特 / 差分曼彻斯特波形（约定不同教材可能相反，做题按题目给定约定）</figcaption>
+  </figure>
+  <div class="note exam" data-page-node-id="BmZMGbaohhLDQj04PRfl3B">码元与比特：<b data-page-node-id="AtY1utzk9mzdg4JHQnla7B">比特率 = 波特率 × log₂(每码元离散状态数 V)</b>。若 1 个码元携带 4 bit（V=16），2400 Baud 的码元速率 = 9600 bps 比特率。曼彻斯特编码 V=2 且每比特两个码元 → 效率 50%。</div>
+
+  <h3 data-page-node-id="44MTaEz6cDMVylCImoWFhQ">1.2 两个极限公式（必背 + 会算）</h3>
+  <table class="cmp" data-page-node-id="Z0UAsm9zZXwRW3tdMbVUlx">
+    <tr data-page-node-id="r7OmklW6qBR8XefPqhaIEC"><th style="width:150px" data-page-node-id="kJz46bvwf0r3DZbRlYlEBk">公式</th><th data-page-node-id="YVxao1P6Wn22NMqrjegjwB">内容</th><th data-page-node-id="MzQ6d87BR1nrgaESSeirdA">典型例题</th></tr>
+    <tr data-page-node-id="jFQ1WGdMj4BLyiF8AUuMYH"><td data-page-node-id="LwRJWGyuKRSv6dsWgTWaA6"><b data-page-node-id="OpOdkmEY9vY29Egg2SWjCX">奈氏准则</b>（无噪声）</td><td data-page-node-id="axfVSLSm4dxYBQABaGGbUC">理想低通信道极限波特率 = <b data-page-node-id="JGHO3l5m9wd1ehI0aixQCU">2W</b> Baud（W 为带宽 Hz）；极限比特率 = 2W·log₂V</td><td data-page-node-id="2XdNpCo1gpH5pQFaKFCMeq">带宽 3kHz、16 种码元：C = 2×3000×log₂16 = 2×3000×4 = <b data-page-node-id="FUkqagsQNaCZ8fQBhRmVud">24 kbps</b></td></tr>
+    <tr data-page-node-id="rwRI7ZjG0Kamg5iXrB8ziA"><td data-page-node-id="IsHZCpLtTAb2VwoD3Gunpr"><b data-page-node-id="6hZRKxr5SX5IEesZa94fhJ">香农公式</b>（有噪声）</td><td data-page-node-id="sM6MTpyxMchJnXDwxzEHtn">信道极限容量 C = <b data-page-node-id="gHi0zJGSnHPSk5TwknD9Ra">W·log₂(1 + S/N)</b>，其中 S/N 为线性信噪比</td><td data-page-node-id="XEZvAqyoogpfsMQVBNsFVz">带宽 3kHz、信噪比 30dB（=10^(30/10)=1000 倍）：C = 3000×log₂1001 ≈ <b data-page-node-id="kdli1l7FJAZ9hYHStHqARC">29.9 kbps</b></td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="9eX95zJxv24ARiJ8PiM1z8">dB 与倍数换算：<b data-page-node-id="HCaohFsyNyLIFVBLBSyj7j">dB = 10·lg(S/N)</b>。30dB→1000 倍，20dB→100 倍，10dB→10 倍。奈氏只限制波特率（决定用多高阶的调制去逼近），香农限制的是比特率上限——<b data-page-node-id="2gwBIqF5cfzYKI4H3Di3Z8">两者取小者为实际可达速率</b>。</div>
+</section>
+
+<!-- ================= 2 组帧与差错 ================= -->
+<section id="s2" data-page-node-id="AZhGdlrfhtyTOtEiHstGwt">
+  <h2 data-page-node-id="HUtu8a3fxzoPdexxOlqD9B"><span class="no" data-page-node-id="9gewYVKeCZ5AEv46PukcBI">02</span>数据链路层：组帧、差错检测（CRC 必考计算）</h2>
+  <p class="intro" data-page-node-id="TF4hfwXCUB5KIlJrR8ZCOj">链路层把比特流切成「帧」。三个问题：帧边界怎么定（组帧）、错了怎么发现（检错）、发现后怎么办（重传，见第 3 节）。</p>
+
+  <h3 data-page-node-id="AcpcTLqjDqTBx8C3ZiTvZd">2.1 四种组帧方法</h3>
+  <table class="cmp" data-page-node-id="cFsQSGYnwFLozZPJaS79mt">
+    <tr data-page-node-id="dMMCji6WuUiAPfpVBqLDzy"><th style="width:130px" data-page-node-id="1wedQoRsTuEs5RsM028jP2">方法</th><th data-page-node-id="zyCcprFzQlKNdqtx0srWIR">原理</th><th data-page-node-id="kBdyooA0GhYiKQkkNHMERD">缺陷 / 使用</th></tr>
+    <tr data-page-node-id="tu3VfBZ7HctHt9LwKVSr3y"><td data-page-node-id="WUo7BGl2c2tLRiXrgGPflr">字符计数法</td><td data-page-node-id="D95opr0EKZiPhmxUoFXH0n">帧首用一个计数字段标明帧总长度</td><td data-page-node-id="JCy0YX6jUZv7TPB9dkFiov">计数字段一旦出错，后面全错 —— <b data-page-node-id="GcipSfUZ5RtnHgEYPdH2C6">很少用</b></td></tr>
+    <tr data-page-node-id="WvZzXMcIlRFGOvBxMyxmwT"><td data-page-node-id="6tlEgSuCDXJDWUsccNGQom">字节填充法</td><td data-page-node-id="jGZWmkoj4nQD1W3hhKTnmi">用 SOH/EOT 做定界符；数据里出现同值字节前插转义字符 <b data-page-node-id="gK6v2Mt5ttKtZrxeY1H3kD">ESC</b>（PPP 异步传输）</td><td data-page-node-id="oJupjrs40zByirSYpxXUnb">接收方删除转义还原；复杂度低</td></tr>
+    <tr data-page-node-id="oFerahW54oxsL1h6S88BL2"><td data-page-node-id="fRbobAFxmLHz7L8qGSk7xe">比特填充法</td><td data-page-node-id="7y697Gu1UmBAsJAImaijJy">用 01111110 定界；发送方对数据中<b data-page-node-id="RvSloTNHFZqCUHhpPFp7mv">每 5 个连续 1 自动插一个 0</b>（HDLC；PPP 同步传输同思想）</td><td data-page-node-id="udGlZGbIEkDiZLF02IkEYH">接收方每遇 5 连 1 删后面的 0 —— 最常用</td></tr>
+    <tr data-page-node-id="ve09ZHZIeCFNzEo22oiyhF"><td data-page-node-id="urPPlG1PFCyhwzyZce7j2Q">违规编码法</td><td data-page-node-id="7k0drmLEkINQdNgEVwu37x">用编码中「不可能出现」的电平组合做边界（如曼彻斯特的「高高」「低低」）</td><td data-page-node-id="oR3VweNnsAOe96HzMcf9ZF">只适用于有冗余电平的编码</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="FtPeWcgNONgKMDlAlSoUjN">比特填充计算题：数据 <b data-page-node-id="lA2MM9sYvIzeMBVTHC68IO">011011111111000</b> → 发送方扫描，每 5 连 1 后插 0：<b data-page-node-id="S57sq6ICVz5K6BHFgVvYPT">0110111110111000</b>（第 8 位起出现 5 个 1，插 0 后剩余的 1 不再连续）。反向考法：接收方收到帧，去 0 还原。</div>
+
+  <h3 data-page-node-id="JDUorIArtbhKookyEcPmjh">2.2 CRC 循环冗余校验（计算大题套路）</h3>
+  <p data-page-node-id="nFIsvoXg4jghfaaMuVIPft"><b data-page-node-id="BJCJmQqmAJCCoamwnLwtSz">步骤</b>：① 生成多项式 P 为 r+1 位 → 在数据 M 后补 r 个 0；② 对补零后的数做<b data-page-node-id="5b0lFiVARuWzqdyyYLwn8Q">模 2 除法</b>（异或不借位）；③ 余数 R（r 位，不足左补 0）拼在 M 后发送。接收方用收到的帧再除 P，<b data-page-node-id="DE0tCnddyhcWGHAsk0JQgY">余数为 0 即认为无错</b>。</p>
+  <pre class="calc" data-page-node-id="0WOmcQYS4XQllZiFCpZHuD">例：数据 M = 101001（6 位），生成多项式 P = 1101（r = 3）→ 补 3 个 0 得 101001000
+
+  101001000 ÷ 1101 ……（模 2 除法：够除商 1，异或；不够商 0）
+
+       110101          ← 商（不用传输）
+      ─────────────
+1101 ) 101001000
+       1101
+       ────
+       01111           ← 1010⊕1101=0111，落下一位 1 → 01111
+        1101
+       ────
+        00101 0        ← 0111⊕1101? 注意对齐：01111⊕1101(对齐前4位)=0010，落下 0 → 00100? <span class="cm" data-page-node-id="epawOuv7hwiNh5pkoGfhgy">（竖式对位容易晕，直接用步骤法↓）</span>
+
+<span class="cm" data-page-node-id="ALK5oXYmMJzC2PkdaNFicV">步骤法（推荐，按 4 位窗口逐位推进）：</span>
+  窗口 1010 ≥ 1101 → 商1，1010⊕1101 = <span class="hl" data-page-node-id="TVga39tgtfMHTTzfkrJ6Zw">0111</span>，落下一位 → 1110
+  窗口 1110 ≥ 1101 → 商1，1110⊕1101 = <span class="hl" data-page-node-id="HjdNJzfAqcnotNbmWOeuJv">0011</span>，落下 1   → 0111
+  窗口 0111 &lt; 1101 → 商0，保持 0111，落下 0          → 1110
+  窗口 1110 ≥ 1101 → 商1，⊕得 <span class="hl" data-page-node-id="XWnLj04UErORXqU4AXzesG">0011</span>，落下 0          → 0110
+  窗口 0110 &lt; 1101 → 商0，保持 0110，落下 0          → 1100
+  窗口 1100 ≥ 1101 → 商1，⊕得 <span class="hl" data-page-node-id="3gtqoHm4zt4L7MtzLGl8ew">0001</span> → 除尽，余数取后 r=3 位
+
+  余数 R = <span class="hl" data-page-node-id="mkqhee2ubndzPxThrPFWc6">001</span>   →   发送帧 = M + R = <span class="hl" data-page-node-id="EEcyz10wiCE3LCrfFTaS2E">101001 001</span></pre>
+  <div class="note exam" data-page-node-id="0yZyIbqg4iXnNhh66fVvm7">① 余数位数 = r = 多项式最高次数（P 有 r+1 位）；余数不足 r 位要<b data-page-node-id="HX7aLYqOwfvsGYMhztBSeX">左补 0</b>（本例恰好 001）。② CRC 只能<b data-page-node-id="nD6ivLAktAdV210bDTTf1J">检错不能纠错</b>（海明码才能纠错）。③ 循环冗余的「循环」指：合法码字循环移位后仍是合法码字。④ 生成多项式两端必须为 1。</div>
+
+  <h3 data-page-node-id="hEzSqRDEXTM74inBjR25XN">2.3 海明码与最小海明距离</h3>
+  <ul data-page-node-id="iy4zFXlIPfWcG0gl1O3n53">
+    <li data-page-node-id="5MqaZuaCpZ2Gr8EpCaxYEE"><b data-page-node-id="9x3oM7Rwd8L2Wu8yiZyNnx">校验位个数</b>：信息 m 位需校验位 k 位，满足 <b data-page-node-id="FCiJy8bTeH1IzNGqkUz9gC">2<sup data-page-node-id="dr9qDy2eQUOLulHZ1aIgQP">k</sup> ≥ m + k + 1</b>。例：m=4 → k=3（2³=8 ≥ 4+3+1=8，恰好成立）；m=8 → k=4。</li>
+    <li data-page-node-id="d2jpSMRmzM3s4UNRXQ81T7"><b data-page-node-id="0nlmcr8AbJJ9phCBQXvE18">校验位位置</b>：放在 2 的幂次号上（1,2,4,8,…），每个校验位负责其二进制位号中含该权重的所有位（偶校验分组异或）。</li>
+    <li data-page-node-id="8apaLIQWcknE55UU4WS0In"><b data-page-node-id="EKXBEFm8tZkG3xB9mR0Ulw">最小海明距离 d</b>：任意两个合法码字的最小异或位数。
+      检错 e 位需 <b data-page-node-id="Ub5jRFu1KyJM9Ja9duNSAG">d ≥ e+1</b>；纠错 t 位需 <b data-page-node-id="Rhw4IyYLwrxcf5bloVkbxk">d ≥ 2t+1</b>。d=3 → 可检 2 位或纠 1 位；d=4 → 检 3 位或纠 1 位同时检 2 位。</li>
+  </ul>
+  <div class="note exam" data-page-node-id="5hcLzh6m376EiGL53sHbDA">CRC 与海明码分工：链路层实际用的是 <b data-page-node-id="DfeXDgIZ5Pr4WSS0kfME4T">CRC（检错 + 丢弃重传）</b>；海明码用在内存 ECC 等不能重传的场景。考试爱考「CRC 余数计算」「海明距离与检纠错能力的关系」。</div>
+</section>
+
+<!-- ================= 3 可靠传输 ================= -->
+<section id="s3" data-page-node-id="BWAibmqcdIRaAR8pyp0D3a">
+  <h2 data-page-node-id="7T3qT3ecDB7JRHUFiPlEpn"><span class="no" data-page-node-id="oBo0cEHIkw0ZZ11hE3hJe5">03</span>可靠传输：停等 / 回退 N（GBN）/ 选择重传（SR）</h2>
+  <p class="intro" data-page-node-id="rHWkUlQxdlraTByiKCqzFt">「自动重传请求 ARQ」的三个档位。考研计算核心是<b data-page-node-id="SwqHMup6Ak1h6IuP66k8OQ">窗口大小与序号比特数 n 的约束</b>；TCP 实际用的是「SR 思想 + 累计确认」的混合体。</p>
+
+  <table class="cmp" data-page-node-id="7MitYDBSAY6RcNKS4Szkdj">
+    <tr data-page-node-id="jHzALaDQfrLoxurrDRmZOo"><th style="width:120px" data-page-node-id="MeTysYur8d4M0JyYcmNU7h">对比项</th><th data-page-node-id="SNboJ5A1qBXQyJYdNB0cFu">停等协议</th><th data-page-node-id="qFoXlkCB5SyvT0vWLjNfXe">回退 N（GBN）</th><th data-page-node-id="VQ6QhXMV3Nw8vQBdeiyDlC">选择重传（SR）</th></tr>
+    <tr data-page-node-id="7YJkHQ0ViT3wMTnLG7URvi"><td data-page-node-id="XibKjVGsg3nPe47gI9swzw">发送窗口 W</td><td class="ctr" data-page-node-id="9wag7gzPUE0pSFq6QgVpwh">1</td><td data-page-node-id="6KAEhcJCT8RDDU5v5dDhbI">1 &lt; W ≤ <b data-page-node-id="GY1E2vwVrYld01NnBY7iOC">2<sup data-page-node-id="v3LmIWi5jlBk2KIn5oOJLj">n</sup> − 1</b></td><td data-page-node-id="JBw1RPjGMhxhDQ3uTJDp3A">W ≤ <b data-page-node-id="2Nl01Bl2ksAqQ1F4qqrVYc">2<sup data-page-node-id="RycMC59x1eq05grcxdaflM">n−1</sup></b>（发送=接收）</td></tr>
+    <tr data-page-node-id="dvsTvHVlBWLHxz83pXOETm"><td data-page-node-id="BHiD1lPnSpov2BbQmS7wZO">接收窗口</td><td class="ctr" data-page-node-id="3OrkxNQdQdeoVrWiu2Q5Z6">1</td><td class="ctr" data-page-node-id="lhvyFQiomTxGGSPh7euhyF">1</td><td data-page-node-id="jAUhB9zPUICHjQu5WqHAGN">&gt; 1（= 发送窗口）</td></tr>
+    <tr data-page-node-id="lJBrBd3EqK1QBkOadJpxgP"><td data-page-node-id="Y1McwVdkHlrLKQUaadaa9j">确认方式</td><td data-page-node-id="LJn3tyBZNs3mOQd08Ve17W">逐个确认</td><td data-page-node-id="4gMTFbKwqkPJK57H2eAcAY"><b data-page-node-id="ecYX70WYoKr60t6vwHEmUr">累计确认</b>：ACK n 表示「n 及之前全收到」</td><td data-page-node-id="8hRG7Q7hRsLVj2K9HNxpMD">逐个确认</td></tr>
+    <tr data-page-node-id="MQ5NtFPohEHKOEiL4YiuFv"><td data-page-node-id="edCTaC9dFBeRBGKRX9bxf0">出错处理</td><td data-page-node-id="pcdampFc6M0GsqIq6CU1ZT">超时重传该帧</td><td data-page-node-id="H90HeBoC2FNlHXfYaxh1Ai">某帧错 → 该帧及<b data-page-node-id="q9QxLC64rl04P4RXniDfeo">之后已发的全部重传</b></td><td data-page-node-id="EjP1131IbLkht5skzGJhQE">只重传<b data-page-node-id="QV9sdxFaY1dfZMRSEhNYu4">真正丢失/出错</b>的帧；接收方缓存乱序到达的正确帧</td></tr>
+    <tr data-page-node-id="We0bDSXyLsgr8b0N2sAzhZ"><td data-page-node-id="ZPhwvq8HDOzbpk42vfA9Pr">信道利用率</td><td data-page-node-id="fKH5bkAUgOTmn15sU0jYS0">最低 = T<sub data-page-node-id="IQOEXbfiejRSi1o2dZ4ER3">D</sub>/(T<sub data-page-node-id="KsiEzugL6ErOAkNOOcfMUB">D</sub>+RTT+T<sub data-page-node-id="xOTofcT4t06XfYaZvIpBw6">A</sub>)</td><td data-page-node-id="TrgHDFVZ3D1dRyrQNjw3KC">高</td><td data-page-node-id="rN1MN02CJEl2j1tsAjZCGD">高且重传代价小</td></tr>
+    <tr data-page-node-id="QkUsKH43KT2NiDrzd3brKk"><td data-page-node-id="q2fDliqGCcUvtfNzGjDWya">典型应用</td><td data-page-node-id="yVQYjIIJFqY9TGAEk95yFg">—</td><td data-page-node-id="24b6tw6or3HpvQtJp5LrYS">HDLC</td><td data-page-node-id="lpy8PfDqkzwiAYMh5VcFSK">TCP（思想）、802.11</td></tr>
+  </table>
+
+  <figure class="fig" data-page-node-id="fQJTQf9WNDzHHxc1SZd9nI">
+    <svg viewBox="0 0 1000 300" data-page-node-id="zvK72LLUlsIUSDA5RrB9fR">
+      <text x="250" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="#d97706" data-page-node-id="lxEwBBs1GqUD5xzmG928Tp">GBN：2 号帧丢失 → 2 号起全部重传</text>
+      <g font-family="Consolas,monospace" font-size="13" text-anchor="middle" data-page-node-id="hpFCjBBMqQYh2LcvTXWFps">
+        <g data-page-node-id="Vra5lkp6DGdq2wmdcdFu8g"><rect x="90"  y="46" width="52" height="34" rx="6" fill="#ecfdf8" stroke="#059669" data-page-node-id="YIH8FxgDGw8cVVGtRB6nOO"/><text x="116" y="68" fill="#059669" data-page-node-id="XPIRN5a2rCco8WtDBVQGJF">0✓</text></g>
+        <g data-page-node-id="XsApmp6KpBtDmwI8H5MDqz"><rect x="150" y="46" width="52" height="34" rx="6" fill="#ecfdf8" stroke="#059669" data-page-node-id="0MDccUPSb6F2D1jTcTuZWh"/><text x="176" y="68" fill="#059669" data-page-node-id="F0oDVJBLWl0Y53TVjkNM4q">1✓</text></g>
+        <g data-page-node-id="wa6yqe2TVN2IQDyCnAAfFo"><rect x="210" y="46" width="52" height="34" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="2" data-page-node-id="jV8FjIWZq1Df2LPcgjMRHV"/><text x="236" y="68" fill="#dc2626" data-page-node-id="FiTPDY6DwYCKM33KyjENix">2✗</text></g>
+        <g data-page-node-id="yAADRCiCeBsxZ2MUH78he9"><rect x="270" y="46" width="52" height="34" rx="6" fill="#fff8ec" stroke="#d97706" data-page-node-id="vFfR0B6HU1ugFfLSwmx5js"/><text x="296" y="68" fill="#d97706" data-page-node-id="VBCHj57a1DwJckR8N9OPZf">3?</text></g>
+        <g data-page-node-id="p0tpqXbxNGLUyOfFyEOJH7"><rect x="330" y="46" width="52" height="34" rx="6" fill="#fff8ec" stroke="#d97706" data-page-node-id="JuXQ6MwyvRZm9oQlsacdTH"/><text x="356" y="68" fill="#d97706" data-page-node-id="BAGMvC95djsKmVIVZPOhEO">4?</text></g>
+        <g data-page-node-id="iKyAFHaU0Dnvi9VXEURBWn"><rect x="390" y="46" width="52" height="34" rx="6" fill="#f1f4f8" stroke="#cbd5e1" stroke-dasharray="4 3" data-page-node-id="k2GngJGK1h6jKkRej1rDti"/><text x="416" y="68" fill="#94a3b8" data-page-node-id="vBcCuSRtUxD2hd8wIn2sbZ">5</text></g>
+      </g>
+      <text class="asub" x="270" y="104" text-anchor="middle" data-page-node-id="7QD0yWgmtjw14RASICBBCP">接收方只认「按序」：3、4 到达但 2 缺失 → 丢弃，并重复发送 ACK1</text>
+      <text class="asub" x="270" y="122" text-anchor="middle" data-page-node-id="JIUvFiJVvTstfulldkgQmp">发送方收到重复 ACK1 / 2 号超时 → 重传 2、3、4 全部</text>
+
+      <text x="750" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="#0d9488" data-page-node-id="KE1eIACUt8UBoaQxrURfjy">SR：2 号帧丢失 → 只重传 2 号</text>
+      <g font-family="Consolas,monospace" font-size="13" text-anchor="middle" data-page-node-id="0zLAKHuhJzrr7BEBpOi0p2">
+        <g data-page-node-id="eCO5JixGFavnn2GcbPOHFh"><rect x="590" y="46" width="52" height="34" rx="6" fill="#ecfdf8" stroke="#059669" data-page-node-id="V2y5CsDIOSn20HHbAbeH00"/><text x="616" y="68" fill="#059669" data-page-node-id="YcORiIENWCMDom0EaI5gEV">0✓</text></g>
+        <g data-page-node-id="TV3yAP5pNMJq9CBvcetjfl"><rect x="650" y="46" width="52" height="34" rx="6" fill="#ecfdf8" stroke="#059669" data-page-node-id="0TSvrpIHdM0gEWBUCGLJZR"/><text x="676" y="68" fill="#059669" data-page-node-id="rKINPUwmxBUDm84u22EAEu">1✓</text></g>
+        <g data-page-node-id="EDiT3dQgMa9RkorPNBc19v"><rect x="710" y="46" width="52" height="34" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="2" data-page-node-id="jbByV93nGett0BhcKkcgGo"/><text x="736" y="68" fill="#dc2626" data-page-node-id="npYnfGqBLepGutZCIgLxgd">2✗</text></g>
+        <g data-page-node-id="epZE2lXuCE5PgeHVxsMi3Y"><rect x="770" y="46" width="52" height="34" rx="6" fill="#eff4ff" stroke="#2563eb" data-page-node-id="EqxPb0IrMGy6h4evhHZRj9"/><text x="796" y="68" fill="#2563eb" data-page-node-id="xftdThe3KLfa0n1xhCcnsC">3存</text></g>
+        <g data-page-node-id="GjDhDot1yRvyQ5yKVvSx7H"><rect x="830" y="46" width="52" height="34" rx="6" fill="#eff4ff" stroke="#2563eb" data-page-node-id="wC2Bpv1mA80SDyG5FRBPHi"/><text x="856" y="68" fill="#2563eb" data-page-node-id="OnVNPMLfCczAYcHbbzKfaU">4存</text></g>
+      </g>
+      <text class="asub" x="750" y="104" text-anchor="middle" data-page-node-id="y7rlGymFTh3DoBhUFgqgeO">接收窗口 [2,6]：3、4 先到 → 缓存不交付，各自回 ACK3、ACK4</text>
+      <text class="asub" x="750" y="122" text-anchor="middle" data-page-node-id="GqQ7ZlqdaQDHKxBFz44uV4">2 号重传到达 → 2、3、4 按序一起上交，窗口滑动到 [5,…]</text>
+
+      <rect x="60" y="150" width="880" height="120" rx="10" fill="#f6f8fb" stroke="#dde3ec" data-page-node-id="ILLidALYPgOm2Vq3m1HZTi"/>
+      <text class="albl" x="90" y="180" font-weight="700" data-page-node-id="H0OsIKu1ue6Ko8N4jjD7e6">为什么窗口受序号比特数限制？（序列号回绕，防止新旧帧混淆）</text>
+      <text class="ntxt" x="90" y="206" data-page-node-id="jCP57zTcF1A1byGK9hqvEJ">· 停等：1 比特序号即可（0/1 交替）。</text>
+      <text class="ntxt" x="90" y="230" data-page-node-id="fLEBZEnrspwHNZek8s7z7Z">· GBN：接收窗口=1，最坏情况是「0~(n−1) 号全部确认 + 重复帧」——新窗口与旧序号不得重叠 → W ≤ 2ⁿ−1。</text>
+      <text class="ntxt" x="90" y="254" data-page-node-id="2YaBUI8P706VyRthdOgHZd">· SR：接收窗口与发送窗口一样大，新旧窗口各占一半才不混淆 → W ≤ 2ⁿ⁻¹。例：3 比特序号 → GBN 最多 7，SR 最多 4。</text>
+    </svg>
+    <figcaption data-page-node-id="Hm3gggSPXCW1XGYV7654MV">图 3 · GBN 与 SR 在「2 号帧丢失」时的行为对比</figcaption>
+  </figure>
+  <div class="note exam" data-page-node-id="DGQOhQ1YkNl1a78j9rFPns">停等信道利用率 = <b data-page-node-id="ye4wmduD7LlM0aV7fYQle7">T<sub data-page-node-id="RN9R4QxKlnMuPn6gH2FHbu">D</sub> / (T<sub data-page-node-id="DnoxHktE7D79hLMvyNuygw">D</sub> + RTT + T<sub data-page-node-id="PacLBqyiCSH4gGeuwXYgKT">A</sub>)</b>，连续 ARQ 利用率 ≈ min(1, W·T<sub data-page-node-id="iX82k8He0qHAnHMDa957p0">D</sub>/(T<sub data-page-node-id="epXMcZbR8J0P1R1D2LLKEb">D</sub>+RTT+T<sub data-page-node-id="9GfcNc3VjEOaopEeQb9GTe">A</sub>))。计算题先算发送时延（帧长/带宽）、再算传播时延，别漏 ACK 的发送与传播时延（题目说「忽略确认帧开销」才算 0）。</div>
+</section>
+
+<!-- ================= 4 以太网 ================= -->
+<section id="s4" data-page-node-id="4KYSn5qoqIVndTwhNC89op">
+  <h2 data-page-node-id="dgmXGVVZKi958niSSklq3P"><span class="no" data-page-node-id="YJqU96FRNpClOL6tjl8edH">04</span>以太网：帧格式与 CSMA/CD（最小帧长推导）</h2>
+  <p class="intro" data-page-node-id="usIHoygTHXKTXBuNWa7GvQ">经典共享式以太网（半双工）靠 CSMA/CD 仲裁信道；交换式全双工以太网不再冲突，但帧格式与 MAC 规则沿用至今。</p>
+
+  <h3 data-page-node-id="3n2Gr7eihWCCWtV2NtPs8Q">4.0 以太网演进与标准命名（先看懂 "10BASE-T" 这类写法）</h3>
+  <table class="cmp" data-page-node-id="BQIdfQQjDAUiO4oACZnlmL">
+    <tr data-page-node-id="eaE8eUkvxUfKTRnkt7eFoE"><th style="width:150px" data-page-node-id="ImjzESkFIIAxYneAhqH4Uk">标准</th><th style="width:130px" data-page-node-id="NbKUHe7FiIwyhtoF4CsYoo">速率</th><th data-page-node-id="ERGzwbieA84HDkHdRkzWDn">传输媒介 / 拓扑</th><th data-page-node-id="CQjyfbzNTV3tuvuP45uVOs">要点</th></tr>
+    <tr data-page-node-id="geUZKGqTNDmsm7V10zFHXG"><td data-page-node-id="fG0VnzSS0pc0O18R8oZZrb"><b data-page-node-id="CzTyVw6A9MxXGuOyqLtKOR">10BASE5</b>（粗缆）</td><td class="ctr" data-page-node-id="QTu40KxtJE2f3gsl8OjszK">10M</td><td data-page-node-id="jwZ0qyODGSYiBSFD1vr92C">粗同轴电缆 · 总线型</td><td data-page-node-id="dUxvsZXBExrhRzV1dSNwmD">首代以太网，AUI 收发器，最长 500m/段</td></tr>
+    <tr data-page-node-id="1HJUbFuzytnDdBUdoDFRwc"><td data-page-node-id="ORuUFzSHdwwWgeeSasTn2s"><b data-page-node-id="vZTaa3jMcBRR9j1TXldlyv">10BASE2</b>（细缆）</td><td class="ctr" data-page-node-id="fM9pmoGgmoCkyOFCbmRePR">10M</td><td data-page-node-id="lBw1t6fEkUBlkjCSskQx8S">细同轴电缆 · 总线型</td><td data-page-node-id="nO4F5eWh2AEjFZQ9D4rzW3">廉价易断，185m/段</td></tr>
+    <tr data-page-node-id="uRjFRthc7PIOnhwC23Whx4"><td data-page-node-id="WeMBdLhrgdbijHsfdrFhTQ"><b data-page-node-id="0HkrYLeOsA2E9KdKFbx7yQ">10BASE-T</b></td><td class="ctr" data-page-node-id="q0QeTxx6sXNixq3IFlZeGV">10M</td><td data-page-node-id="qQY6ZqHfKCaSdr2TwRZgvD">双绞线 · <b data-page-node-id="nPBPemiuf5q81fHc1L58xT">星型（Hub）</b></td><td data-page-node-id="DRKXE4BsQkKPXtxRMC2xzg">拓扑革命：总线→星型；Hub 是物理层设备，仍是同一个冲突域</td></tr>
+    <tr data-page-node-id="prGbhb2NDkOWShi8qBaMSj"><td data-page-node-id="ka6tLRFbhyK9wFfm6qm0lt"><b data-page-node-id="cwLalARqLsiuUaLieJOOhM">100BASE-TX</b></td><td class="ctr" data-page-node-id="kz0m34FGNk9le2vFolXyFj">100M</td><td data-page-node-id="RmE6nDlHHJdqgumITNgXGr">五类双绞线 · 星型（交换机）</td><td data-page-node-id="eanByRuwBCqZ7R8j8UV5IO">快速以太网；交换机普及 → 全双工 → CSMA/CD 退役</td></tr>
+    <tr data-page-node-id="JBMDRGhttJArCLRI61XTPD"><td data-page-node-id="YZfY2xV9E68mEPxi92OgjN"><b data-page-node-id="tR1vaHIG12HnnsYnpjSPqV">1000BASE-T</b></td><td class="ctr" data-page-node-id="tDd7QGWZNZ2r1pGDsF7NbE">1G</td><td data-page-node-id="xnix49fCFiScYGJIZWSgOp">超五类/六类双绞线</td><td data-page-node-id="Ta6AIzqmHijr5YwJPKHSgz">千兆下行到桌面；1000BASE-X 系列走光纤（LX 长距 / SX 短距）</td></tr>
+    <tr data-page-node-id="HqXEAsNCsOnx8XPeLCT6CR"><td data-page-node-id="7zF2RUDlVohO3kDGNgkWva"><b data-page-node-id="3O7S79wx1XGg4AYyFoL1wa">10GBASE-R / SR</b></td><td class="ctr" data-page-node-id="w9AxwHg0UnU5fAGSAfw8Re">10G</td><td data-page-node-id="Aix46nDyaLBkG3xjPCbnPg">光纤 / 双绞线(6A)</td><td data-page-node-id="1BlxczeA6aiTEVnbxQo5Yb">数据中心与汇聚层主流</td></tr>
+  </table>
+  <ul data-page-node-id="QxfFXLmO5SqTmdDCJuweIh">
+    <li data-page-node-id="4JO5vGqnR1n79CpJBWoGsM"><b data-page-node-id="vDbe68UZBoH1jVuIa6A52w">命名规则</b>：&lt;速率Mbps&gt;BASE&lt;媒介&gt; —— T=双绞线，数字=光纤（波长 nm 或百米段长），S=短距多模光纤、L=长距单模光纤。</li>
+    <li data-page-node-id="jkoM6q0lnXTi3n2iHzCjgO"><b data-page-node-id="lOXErz15lprsU98YTZtjrP">双工的演变</b>：总线/Hub 半双工必须 CSMA/CD；交换机每个口独立冲突域 + 全双工后不再需要 CSMA/CD（但为兼容半双工模式，标准仍保留该机制）。</li>
+  </ul>
+
+  <h3 data-page-node-id="65p33UCPDXCvIgal2zv53x">4.1 以太网 V2 帧格式（逐字段）</h3>
+  <table class="fmt" data-page-node-id="mXeUO9C0HsQZnGehK3XlnT">
+    <tr data-page-node-id="z3gAjZnDApfX8ZebNHpVlB">
+      <td style="width:16%" class="hll" data-page-node-id="OfeDxYN70xcF47napEaIlx">目的 MAC<br data-page-node-id="BsTzUru7VotgGgaDhBZ3NI">6 B</td>
+      <td style="width:16%" class="hll" data-page-node-id="ptfUErBPSMchDd7fAEYiSL">源 MAC<br data-page-node-id="Um4tW8oUttegAnBTEkObbq">6 B</td>
+      <td style="width:13%" class="hln" data-page-node-id="3TcnkBVz78bpb8CsQewwZ1">类型<br data-page-node-id="mEomIP9PNtt43yU8yeIFWf">2 B</td>
+      <td style="width:33%" class="hl" data-page-node-id="3CfViTonoX0GGZzFIvT4G4">数据（载荷）<br data-page-node-id="YSt3V0kwJEhdOfDxLcM4tQ">46 ~ 1500 B</td>
+      <td style="width:14%" class="hll" data-page-node-id="o4A5Bhh4v8MnfCHFKd1Skj">FCS（CRC）<br data-page-node-id="4zX0hNOAgWQTttkhxEBz6U">4 B</td>
+    </tr>
+    <tr class="cap" data-page-node-id="iDuJmWWNPwvjUMj10hcCSI">
+      <td data-page-node-id="LsXGbDWUDJnZjX361HmmCa">广播 FF-FF-FF-FF-FF-FF</td><td data-page-node-id="0hUbyq7MqGA3aShtHRZAV6">前 3 字节 OUI 厂商号</td>
+      <td data-page-node-id="jKVT9UiqvcUQCkaUdmBiBS">0800=IPv4 · 0806=ARP · 86DD=IPv6</td><td data-page-node-id="3kJ1AhoAPC4J93VKv904Oo">不足 46 B 要填充（padding）</td><td data-page-node-id="pZbK8TDrFAG57ZmZxEI0uC">校验范围 = 目的MAC 起全部字段（不含前导）</td>
+    </tr>
+  </table>
+  <ul data-page-node-id="y3u8TPedD82NVC7GweRFCo">
+    <li data-page-node-id="br9Y9SerxFB1YSVUBEPVjx"><b data-page-node-id="xiwOAFqwKWDRinvi39kTQJ">前导码 8B</b>（7B 前同步 101010… + 1B 帧开始定界符 10101011）不算入帧长、FCS 也不校验它。</li>
+    <li data-page-node-id="4nZfOhHyYu2U4UErHCbZig">帧长范围 <b data-page-node-id="tP2yJLyqV5gQgRAhun24BV">64 B ~ 1518 B</b>（6+6+2+46~1500+4）；加 VLAN 标签后上限 <b data-page-node-id="qyfRXdGr9hMD9Ano3u5jBf">1522 B</b>。</li>
+    <li data-page-node-id="M9JT64q15YiC7JGnGiRJae">类型字段 = 链路层的「多路分用」依据：交给上层哪个协议（IP / ARP / IPv6）。</li>
+  </ul>
+
+  <h3 data-page-node-id="2cjVMBpYApnMkAkXTKQa3y">4.2 CSMA/CD：边发边听，冲突即停</h3>
+  <ul data-page-node-id="LU4pQsXHIfkKeFqWtFVipV">
+    <li data-page-node-id="sVhJepOiXLeGdRv3qEEgKQ"><b data-page-node-id="ndKDVVXDjjjA9Z6hbGRWcF">多址接入 MA</b>：总线共享，大家抢；<b data-page-node-id="w1SijoZXIQeFciR16nsukN">载波侦听 CS</b>：发前先听，闲才发；<b data-page-node-id="P9vazgBbvca5QE7Aj8PdKU">冲突检测 CD</b>：<b data-page-node-id="d3aiS4Hya2zlgnQsUweCYc">边发边听</b>，检测到冲突立即停发并发出 48 bit 强化干扰信号。</li>
+    <li data-page-node-id="poBgwAUCLMQ1G1Eytuqz5y"><b data-page-node-id="cnYA1pCsgS7Z5z3eL04lG3">为什么有最小帧长</b>：发完最后 1 bit 之前必须知道有没有冲突。最坏情况：两台主机在总线两端（相距 τ），A 发出的信号快到 B 时 B 开始发 → 冲突信号再花 τ 回到 A → A 至少要持续发送 <b data-page-node-id="RbNzFOcKyocPrsgzUaclYI">2τ（争用期）</b>。</li>
+    <li data-page-node-id="X55uADbLZ6fhnVOxEkVfEq">经典以太网：τ ≤ 25.6 μs → 争用期 2τ = 51.2 μs → 10 Mbps 下最小帧长 = 10M × 51.2μs = <b data-page-node-id="FLsbt8YGZjJAt3pksByz5Y">512 bit = 64 B</b>。这正是数据字段下限 46 B 的来源。</li>
+    <li data-page-node-id="L5RLQcUxeKOc1haAOEhsmo"><b data-page-node-id="KCWwApxFFUIHL5SnGrQPoA">截断二进制指数退避</b>：第 i 次冲突后，从 {0,1,…,2<sup data-page-node-id="MIbVt6MKMhCY3v6vWJEcLg">min(i,10)</sup>−1} 随机选 k，等待 k×2τ 再试；<b data-page-node-id="TYE0qE0158ZAaxkY9w3UfD">16 次失败放弃并报错</b>。i 越大等待窗口指数越大 → 自动错开。</li>
+  </ul>
+  <div class="note exam" data-page-node-id="cuWPoe9r59LvfE46m2ZD0H">计算题模板：求 1 Gbps、争用期 512 比特时间（千兆保留 512 bit 时隙）场景下跨距 → 最大网段长度 = 传播速率(2×10⁸ m/s) × 512/10⁹ ÷ 2。核心公式只有一条：<b data-page-node-id="BLmjdZdVJ7IqMoBnA8Sr3w">最小帧长（bit）≥ 2 × 传播时延 × 数据率</b>。全双工交换式以太网没有 CSMA/CD，不受此限制。</div>
+</section>
+
+<!-- ================= 5 VLAN ================= -->
+<section id="s5" data-page-node-id="rjHSUSpwqSoHmNhZc96jRb">
+  <h2 data-page-node-id="YcejbTO0desoa1PLFfyybk"><span class="no" data-page-node-id="sEGSCtUn5dICzCyx2IVNLe">05</span>VLAN：802.1Q 帧格式、端口类型与 VLAN 间路由</h2>
+  <p class="intro" data-page-node-id="GvQBilRBq1W66idjow4CMH">VLAN 把一台交换机切成多个逻辑广播域。跨交换机的 VLAN 流量要打标签，VLAN 之间通信要靠三层——单臂路由或三层交换机。</p>
+
+  <h3 data-page-node-id="U6DHQkh1qZluYHaC4HUVpO">5.1 802.1Q 标签帧（插入在源 MAC 之后，共 4 B）</h3>
+  <table class="fmt" data-page-node-id="pDFtFAkPlVYlFgsGJEUYG8">
+    <tr data-page-node-id="KYlRSUvOfmDKyJQFtOpQAl">
+      <td style="width:15%" class="hll" data-page-node-id="plrnobCg2yENT5aLQexOBD">目的 MAC 6B</td><td style="width:15%" class="hll" data-page-node-id="sRO6WIutaAD3SEybPdl4qE">源 MAC 6B</td>
+      <td style="width:13%" class="hl" data-page-node-id="zgLRG7J7lALT449exYf4Ho">TPID 0x8100<br data-page-node-id="AkE1bFTQ6vOczNkqDmJLMJ">2B</td>
+      <td style="width:22%" class="hl" data-page-node-id="1N0srOVeBzpr7IHpVCOi5L">TCI<br data-page-node-id="uX3s6HpRJXsrt7YhEuSiNZ">2B</td>
+      <td style="width:13%" class="hln" data-page-node-id="5RS0YtNI5SPEkogKNriZ3V">类型 2B</td><td style="width:14%" data-page-node-id="Epy1d5M1nXHi5b22Z1eFt1">数据+FCS</td>
+    </tr>
+    <tr class="cap" data-page-node-id="BAlbiYbsRG3V5I1ULDnd4Q">
+      <td colspan="2" data-page-node-id="hKUskT2qpZJAK9FI4PCvZQ"></td><td data-page-node-id="UFVWiwwYtwemJXswVpMTGi">「这就是 802.1Q 帧」</td>
+      <td data-page-node-id="0i36GLPvhXRks8Um2KzALA">PRI 3bit 优先级 + CFI 1bit + <b data-page-node-id="HxBhqwETwcJ7ZuVHnNEG5r">VID 12bit（1~4094）</b></td><td colspan="2" data-page-node-id="xjpqacp42kQuvz6cmeYHYa">标签后 FCS 需重新计算；帧上限 1518→1522</td>
+    </tr>
+  </table>
+
+  <h3 data-page-node-id="FpzQoEG1roZHKXHAgTNygw">5.2 交换机端口类型（华为）收发规则</h3>
+  <table class="cmp" data-page-node-id="rCGyIXZ78lXzBmnNtiVmG5">
+    <tr data-page-node-id="ZTEQAj9SgypEHQfrDqdltr"><th style="width:110px" data-page-node-id="TpEsUZWEw1BNDHPMtk6Ukv">端口类型</th><th data-page-node-id="bpWrPLNbRlP9N5tqHPCH8D">收包</th><th data-page-node-id="WXgu2VpvrNQOhLaDvWT7qO">发包</th><th data-page-node-id="Xy5ALbbXX8robLqAafRKuk">用途</th></tr>
+    <tr data-page-node-id="rpLs2too9tJ1LJeRCIvZ8Y"><td data-page-node-id="mHjjvssZ5kdYme7ByagWJj"><b data-page-node-id="zfP2HCC2xfr3wCzkF0RNkG">Access</b></td><td data-page-node-id="UbhfxN2mpzzw9DwWchz5RX">收到无标签帧 → 打上 PVID；收到带标签帧且 VID=PVID → 收，否则丢</td><td data-page-node-id="pxGGOpqFMJ9d1VXKqdV0fb">剥掉标签再发</td><td data-page-node-id="uSBiulTeM9ULYUdpwZYmHN">连<b data-page-node-id="xV199xksubDiBVtelkxPPJ">主机</b>（主机不认识标签）</td></tr>
+    <tr data-page-node-id="HcGBldJ1IifRSEHzUyapuE"><td data-page-node-id="VV3vKRqlPikUPbqtJquFDR"><b data-page-node-id="IjJBOujqjW7SrFKeANrqjF">Trunk</b></td><td data-page-node-id="Zvr9bPDBzgmFT55Bglo2Qo">无标签帧 → PVID 放行（默认允许列表）；带标签 → VID 在允许列表才收</td><td data-page-node-id="coeizofbKjSXoCjwJglXQ4">VID=该口 PVID（默认1）则剥标签；否则<b data-page-node-id="vnNQ2V20JYRSZ7tP2m4hcD">带着标签发</b></td><td data-page-node-id="IyuXiaF51NvDqBQdEs5p5c">连<b data-page-node-id="FnoZLaZiZQedPfVejtwHiy">交换机</b>（多个 VLAN 共用一条链路）</td></tr>
+    <tr data-page-node-id="QOfgrfiVZOVPZDbzRBBZ2I"><td data-page-node-id="p7UJ3nPmjCjMnDHPXfMU5P"><b data-page-node-id="hw5f8fBpDcGq9uypazra37">Hybrid</b></td><td data-page-node-id="x1CuALkMNuXZQGthaC9JNE">同 Trunk</td><td data-page-node-id="tuy7qNsWQX0NLdCeMMlYrv">按配置决定哪些 VLAN 带标签、哪些剥离</td><td data-page-node-id="W8GRQP6Ay6GUdVISYLRf8Z">灵活场景：一端口接多 VLAN 部分剥标签</td></tr>
+  </table>
+
+  <h3 data-page-node-id="z9FVztLLZjGejphwaVA1Gw">5.3 VLAN 间路由：单臂路由 vs 三层交换</h3>
+  <figure class="fig" data-page-node-id="dgkCxh8aAAzNLYILHJjzKE">
+    <svg viewBox="0 0 1000 330" data-page-node-id="sHwXsMY8MeqSsmrWrlEmvB">
+      <rect x="420" y="18" width="220" height="88" rx="12" fill="#fff8ec" stroke="#d97706" stroke-width="2" data-page-node-id="Y2Wif82Ch4FdKhvGYDN797"/>
+      <text class="hname" x="530" y="42" text-anchor="middle" data-page-node-id="eCgkBXi6Q3PoJ5osvgCu0I">路由器 R</text>
+      <text class="hsub" x="530" y="62" text-anchor="middle" data-page-node-id="oaVgOmBihq4gOEJht8yxpV">物理口 G0/0/1（一个）</text>
+      <text class="hsub" x="530" y="80" text-anchor="middle" data-page-node-id="4Be1Ae5bJ5lDDXJA3P7dsw">子接口 G0/0/1.10 → 网关 192.168.10.1</text>
+      <text class="hsub" x="530" y="98" text-anchor="middle" data-page-node-id="vSynfwt6Em4cyi4JFcs0xH">子接口 G0/0/1.20 → 网关 192.168.20.1</text>
+      <rect x="440" y="170" width="180" height="52" rx="10" fill="#f5f0ff" stroke="#7c3aed" stroke-width="2" data-page-node-id="XG0VmlEZLIlN0AIwAeUP7W"/>
+      <text x="530" y="192" text-anchor="middle" font-size="13" font-weight="700" fill="#7c3aed" data-page-node-id="Sh1AwNBiV2xXJApAhPVa4r">交换机（Trunk 口）</text>
+      <text class="fsub" x="530" y="210" text-anchor="middle" data-page-node-id="5bBYbx5S2i4fCb4cFCz6Jq">port1 Trunk（放行 10,20）</text>
+      <line x1="530" y1="106" x2="530" y2="166" stroke="#d97706" stroke-width="2.5" data-page-node-id="9EC2mHzP4OrHg65IpRqiu8"/>
+      <text class="asub" x="545" y="140" data-page-node-id="PTRxHcrh3bW5HgSIJq7PyN">一条物理链路跑两个 VLAN 的标签帧</text>
+      <rect x="180" y="266" width="200" height="52" rx="10" fill="#eff4ff" stroke="#2563eb" stroke-width="2" data-page-node-id="G9j2tHf6oSakeVCV1AGcwi"/>
+      <text x="280" y="288" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb" data-page-node-id="2fhw9DAEluKj05vW460edQ">PC1 · VLAN 10</text>
+      <text class="fsub" x="280" y="306" text-anchor="middle" data-page-node-id="wuVrn7gx89XT0TSC7GkcEF">192.168.10.11 · Access 口 PVID=10</text>
+      <rect x="660" y="266" width="200" height="52" rx="10" fill="#eff4ff" stroke="#2563eb" stroke-width="2" data-page-node-id="pyFxzAnFJmdbME3kCCw6Jd"/>
+      <text x="760" y="288" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb" data-page-node-id="x4z24W0V8rCB2ZbfjAeyxh">PC2 · VLAN 20</text>
+      <text class="fsub" x="760" y="306" text-anchor="middle" data-page-node-id="8Dp9kbFLFjwsYiDWlnpjJA">192.168.20.22 · Access 口 PVID=20</text>
+      <line x1="470" y1="222" x2="320" y2="264" stroke="#7c3aed" stroke-width="2.5" data-page-node-id="xJQJDaMJBy32WsgUGy8VTA"/>
+      <line x1="590" y1="222" x2="740" y2="264" stroke="#7c3aed" stroke-width="2.5" data-page-node-id="ylABIR0BuGjRyQ9AGAZCro"/>
+      <text class="fsub" x="360" y="246" data-page-node-id="DsZ1bmmRlEfOh1fGoqdFNe">无标签（Access 已剥）</text>
+      <text class="fsub" x="640" y="246" data-page-node-id="omg3bT4fJnixhmPLAoCaFB">无标签</text>
+      <rect x="60" y="18" width="310" height="112" rx="10" fill="#f6f8fb" stroke="#dde3ec" data-page-node-id="652K3rDvRa4clWRxglyRXz"/>
+      <text class="albl" x="80" y="44" font-weight="700" data-page-node-id="TMFyxVZcMKc3HcOeXMyGMY">PC1 ping PC2 的完整路径：</text>
+      <text class="ntxt" x="80" y="68" data-page-node-id="2ghpc8peQEHWFLx1J9GBIW">① PC1 判断目的 192.168.20.22 不在同网段</text>
+      <text class="ntxt" x="80" y="90" data-page-node-id="YTFkB8vmyDaUYOoLbfTluX">② 帧发往网关 MAC（子接口 .10 的 MAC）</text>
+      <text class="ntxt" x="80" y="112" data-page-node-id="LJynuxX6v2XO2CpPvQOxNF">③ 交换机从 port1 带标签(VLAN10)发往路由器</text>
+      <rect x="680" y="18" width="290" height="112" rx="10" fill="#f6f8fb" stroke="#dde3ec" data-page-node-id="2ep26fNlgNcc0lvKDYUXWB"/>
+      <text class="albl" x="700" y="44" font-weight="700" data-page-node-id="GZHPEdFFEVm82oEN3NZcJj">路由器做的三件事：</text>
+      <text class="ntxt" x="700" y="68" data-page-node-id="rbKu7BHLvilkJCqyqyk3dS">① 剥掉 VLAN 标签，取出 IP 包</text>
+      <text class="ntxt" x="700" y="90" data-page-node-id="YoIwu2pB3u7cYmnhAqM8tm">② 查路由（直连网段 192.168.20.0/24）</text>
+      <text class="ntxt" x="700" y="112" data-page-node-id="L09oRAhZp5wlQB3DabEczC">③ 重新组帧，从 .20 子接口打 VLAN20 标签发出</text>
+    </svg>
+    <figcaption data-page-node-id="FemNbrdXaV0r3rld5Nh2e6">图 5 · 单臂路由：一条链路 + 子接口实现 VLAN 间通信</figcaption>
+  </figure>
+  <div class="note" data-page-node-id="U8nSokulXxutxWA9KSgv6O"><b data-page-node-id="kuYBDJKDiO5k3HjBZe2pwp">三层交换机方案</b>：为每个 VLAN 建 SVI（Vlanif10 / Vlanif20 虚接口当网关），芯片级「一次路由、多次交换」，同一台交换机内 VLAN 间流量不再绕路由器 —— 大型园区首选。<b data-page-node-id="vZ8mFflJBY6ehHIP39azRh">单臂路由缺点</b>：所有 VLAN 间流量挤一条物理链路，带宽瓶颈 + 单点故障。</div>
+  <pre class="cmd" data-page-node-id="4ddD0fSXJaefXLN7oAsaqx"><span class="cm" data-page-node-id="39ichlIylFv4PjL3v1wJdu"># 华为 VRP：单臂路由关键配置</span>
+[SW1] vlan batch 10 20
+[SW1-GigabitEthernet0/0/2] port link-type access
+[SW1-GigabitEthernet0/0/2] port default vlan 10
+[SW1-GigabitEthernet0/0/1] port link-type trunk
+[SW1-GigabitEthernet0/0/1] port trunk allow-pass vlan 10 20
+[R1] interface gigabitethernet 0/0/1.10
+[R1-GigabitEthernet0/0/1.10] dot1q termination vid 10
+[R1-GigabitEthernet0/0/1.10] ip address 192.168.10.1 24
+[R1-GigabitEthernet0/0/1.10] arp broadcast enable   <span class="cm" data-page-node-id="xAe5sDioFrFf8pa6JDcPVi"># 子接口默认不回 ARP 广播，必须开</span></pre>
+</section>
+
+<!-- ================= 6 STP ================= -->
+<section id="s6" data-page-node-id="zLHWBE8hJtBs9hBtFsrerQ">
+  <h2 data-page-node-id="FleWDHHv1K38W0b1EH5j5y"><span class="no" data-page-node-id="0ZhO2wwklAgtUJjUIVAjx0">06</span>STP 深化：BPDU、端口状态时间轴、选举规则全解 + 链路聚合</h2>
+  <p class="intro" data-page-node-id="XVVWqT2n1saoxpY2oHlpHZ">前页讲过选举大流程，这里补齐考试细节：BPDU 字段、端口五个状态的时间开销、RP/DP 的完整比较规则、STP/RSTP/MSTP 三代差异。</p>
+
+  <h3 data-page-node-id="jBVoK3MRbuTYxFvKIAVGWV">6.1 BPDU 关键字段与三个计时器</h3>
+  <table class="cmp" data-page-node-id="UMpQbjm9xMcuxREf4l5AE4">
+    <tr data-page-node-id="Sg3guipzhf9C8LS9JxIGn4"><th style="width:150px" data-page-node-id="cBFjOmCvlG6nz2WspgvOSg">字段 / 计时器</th><th data-page-node-id="zp8RNG46lhmWK6JWCWp1W0">取值与作用</th></tr>
+    <tr data-page-node-id="wnujRGvVGFrrNhxHkxHudM"><td data-page-node-id="5U6Gb3b5LaH4tOK0idyEXC"><b data-page-node-id="aRqa35A4S1EC4NXqTJtZ0P">根桥 ID</b></td><td data-page-node-id="1AajGemGxU1PhzTgyIilAR">优先级（默认 32768，步长 4096）+ MAC，越小越优先 —— 选根桥唯一依据</td></tr>
+    <tr data-page-node-id="mDwr0bACll1C2RPctDhFhC"><td data-page-node-id="X6Q1mokSkoJ8tCNZZFhZGP">根路径开销 / 发送桥 ID / 发送端口 ID</td><td data-page-node-id="Hgm2TUEtD6Viue1xspRvdq">选 RP、DP 时逐级比较的依据（见 6.2）</td></tr>
+    <tr data-page-node-id="CkyReB8vZjbZgrfwChJpKt"><td data-page-node-id="fEeTImDG1e6dKcgj0uRLAb"><b data-page-node-id="HWqbpe37uBTeQGtJBGUMQS">Hello Time = 2s</b></td><td data-page-node-id="oMo1ku86GB8cgm4llcL93g">根桥周期发 BPDU 的间隔</td></tr>
+    <tr data-page-node-id="I0v8KlKHzstDRuYuLValRR"><td data-page-node-id="AaKsaO1zXdvGzAKAioIGMu"><b data-page-node-id="HXx7JNMPWcOaDmFzTbbJmv">Max Age = 20s</b></td><td data-page-node-id="qOxpKpNZass4FFhzfmbgDL">BIDU（BPDU）存活时间；超时判定根桥失联，触发重新收敛</td></tr>
+    <tr data-page-node-id="wMvjSNzWNOg8hTHyTtsXtU"><td data-page-node-id="QR4hLU7HblfyaLQc202wfa"><b data-page-node-id="dmp3c3MslBk8GRHPVBOCbL">Forward Delay = 15s</b></td><td data-page-node-id="Q0s13SsbeFmciNKe82uaIv">Listening→Learning、Learning→Forwarding 各等一个 15s</td></tr>
+  </table>
+
+  <figure class="fig" data-page-node-id="JxN4TSoUKZPxrybX7Z2oRe">
+    <svg viewBox="0 0 1000 170" data-page-node-id="OjL3Arq35I0cFJ0VCDYNic">
+      <g text-anchor="middle" font-size="13" font-weight="700" data-page-node-id="br282XzUIPiZRF0HJJ83Ki">
+        <rect x="40"  y="46" width="170" height="46" rx="9" fill="#f1f4f8" stroke="#94a3b8" data-page-node-id="iQbSvzzDR8JOjsuN00FPqV"/>
+        <text x="125" y="66" fill="#475569" data-page-node-id="tvdU1AFaz3ZzWiEVQK9PIf">Blocking 阻塞</text><text class="fsub" x="125" y="83" data-page-node-id="xliqS5qUsX8b9NJ5ZS2D8h">只收 BPDU · 20s 超时</text>
+        <rect x="240" y="46" width="170" height="46" rx="9" fill="#fff8ec" stroke="#d97706" data-page-node-id="nVAwtAPanBE1VMemuxgiaE"/>
+        <text x="325" y="66" fill="#d97706" data-page-node-id="sEhzwyBH3MCGzRiRy2phpb">Listening 侦听</text><text class="fsub" x="325" y="83" data-page-node-id="Pf7SNIswqoB5IMWD9zKYyj">参与选举 · 15s</text>
+        <rect x="440" y="46" width="170" height="46" rx="9" fill="#fff8ec" stroke="#d97706" data-page-node-id="W7VQYnbgjBB5jU0ScOKYcS"/>
+        <text x="525" y="66" fill="#d97706" data-page-node-id="tGrpKZTjz8buTT6CfILbIP">Learning 学习</text><text class="fsub" x="525" y="83" data-page-node-id="Uyw5YoLywTTueot4DmnaIg">学 MAC 不转发 · 15s</text>
+        <rect x="640" y="46" width="170" height="46" rx="9" fill="#ecfdf8" stroke="#059669" data-page-node-id="62qNkL7nrzl3GgFL39aGVi"/>
+        <text x="725" y="66" fill="#059669" data-page-node-id="Ifn5HjNBYVmJZk8mTpnCDP">Forwarding 转发</text><text class="fsub" x="725" y="83" data-page-node-id="47ZSdjpqIS6DQ6DUZk7mrL">正常收发数据</text>
+        <rect x="840" y="46" width="120" height="46" rx="9" fill="#fef2f2" stroke="#dc2626" data-page-node-id="q6A8l8yDZdy9Yje2zfwFXp"/>
+        <text x="900" y="66" fill="#dc2626" data-page-node-id="MTmoDbc1HeCLeawbsoZsHe">Disabled</text><text class="fsub" x="900" y="83" data-page-node-id="tALuuOfOdnAoXkOEAtZr26">管理关闭</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="2" fill="none" data-page-node-id="XeR6ortKc2J2ZyCP00hTKq">
+        <line x1="210" y1="69" x2="236" y2="69" marker-end="url(#m-gray)" data-page-node-id="JWuhwValq13Z3HSgIVruSG"/>
+        <line x1="410" y1="69" x2="436" y2="69" marker-end="url(#m-gray)" data-page-node-id="70rmRZt1QpgsfpY70BHNYT"/>
+        <line x1="610" y1="69" x2="636" y2="69" marker-end="url(#m-gray)" data-page-node-id="p3C8CiOp3Tc4S3Fj6PxSL9"/>
+      </g>
+      <text class="asub" x="500" y="130" text-anchor="middle" data-page-node-id="XqvDmCgfGsy2XY1Y9Ibjmv">从 Blocking 到 Forwarding 最快 20+15+15 = <tspan font-weight="700" data-page-node-id="sDFNGlHBnnGeha00z4wLrD">50 秒</tspan>（这就是 STP 收敛慢的根源）；RSTP 引入 P/A（Proposal/Agreement）机制秒级收敛；MSTP（802.1s）再按实例分组、兼容 VLAN 负载分担</text>
+    </svg>
+    <figcaption data-page-node-id="AVDwSboLAgJKy7UxwxqVHm">图 6-1 · STP 端口状态迁移时间轴</figcaption>
+  </figure>
+
+  <h3 data-page-node-id="AZh1dKj4lNEhgjEZBzMoLo">6.2 RP / DP 选举的完整比较顺序（考试逐条比）</h3>
+  <ul data-page-node-id="D5LpIVJjuOrcu3batbJnWX">
+    <li data-page-node-id="406TiAyFpCep5ShEr96DB1"><b data-page-node-id="aKJGQN3DXCGrTVbX2mcMtm">根端口 RP</b>（每台非根桥一个）：依次比较 <b data-page-node-id="qH0exLvpQP0qpAEe4BBI0P">① 根路径开销最小 → ② 对端桥 ID 最小 → ③ 对端端口 ID 最小 → ④ 本端端口 ID 最小</b>。</li>
+    <li data-page-node-id="4qOLCxwDo1StPDOMa4aOns"><b data-page-node-id="vAvlA5pVoo6TPorRwidife">指定端口 DP</b>（每网段一个）：依次比较 <b data-page-node-id="KChgdz0aMQmnZmyBFIcANc">① 根路径开销 → ② 本端桥 ID → ③ 本端端口 ID</b>。根桥所有端口天然是 DP。</li>
+    <li data-page-node-id="vZVqEcO62hDo5KjdAUpHRM">开销表（华为缺省 802.1t 标准）：<b data-page-node-id="3jS8d4eFfDvCPdsoCJOXSS">10M=2000，100M=200，1G=20，10G=2</b>（开销 = 2×10¹⁵/带宽，取整）。</li>
+  </ul>
+  <div class="note exam" data-page-node-id="tML0avfAU654jakYCyfGk2">常见坑：① 优先级必须设为 4096 的倍数；② 优先级相同比 MAC，<b data-page-node-id="1lSA6y9wGhDJo0vMl5XQZg">MAC 小的当根</b>——实际组网手动把核心交换机优先级调小；③ 优先级为 0 的端口不参与 STP 选举；④ 根桥上的端口不可能被阻塞。</div>
+
+  <h3 data-page-node-id="1V5NXCGGsadDm3x5deQPWn">6.3 链路聚合（Eth-Trunk）</h3>
+  <table class="cmp" data-page-node-id="A0SpAAwOZC8UEZEPWXADEK">
+    <tr data-page-node-id="l2C4OIBWczKHCvu5npkBvo"><th style="width:150px" data-page-node-id="ryEMrxXlP4lAppCLL5tHfv">模式</th><th data-page-node-id="wg17uACBpbGD4JPCpPD7y8">机制</th><th data-page-node-id="T9YcNmtxUe5eoqONxFyqmM">特点</th></tr>
+    <tr data-page-node-id="i31qq0RsBm4frWg69RqNnn"><td data-page-node-id="0BDPy11iTcRIaAXG0F26uK"><b data-page-node-id="Vx3aQf7gXx0dsuTmzUuwcd">手工模式</b></td><td data-page-node-id="TksE1nMwZsHrGcP8zHrXzZ">人工指定成员口，不交互 LACP 报文</td><td data-page-node-id="Cw0iCqZpG4oK9lJOWc4tps">配置简单；无法感知对端异常链路</td></tr>
+    <tr data-page-node-id="LGuqF96EJL3iBW60pSxhVK"><td data-page-node-id="4GFBigJBmH8CKxGSrHr9uK"><b data-page-node-id="ntvB10IU6MhuubMdSbBkq1">LACP 模式</b></td><td data-page-node-id="Et9352ZsdgjfPLX6cvG7fr">成员口互发 LACPDU 协商：比较系统优先级+MAC 选「主动端」，主动端按端口 ID 选活动口</td><td data-page-node-id="Rvf0TkAj0b7fA8IVx3w55C">能检测链路故障/错接，支持 M:N 主备；<b data-page-node-id="LtS4RZANYAUMv76tIoDvhz">生产首选</b></td></tr>
+  </table>
+  <p data-page-node-id="yDJhiWhCjyb9H44jsv9SAI">三大收益：<b data-page-node-id="YaHuW9AFoRxnw2xGNxRStV">带宽叠加</b>、<b data-page-node-id="RYgMQbVMUdng37E98P7V5P">负载分担</b>（按源目 MAC/IP 哈希分流，单条流量不走两条链路——保证不乱序）、<b data-page-node-id="Gj2PGjwoXSQUG0rtCAa57P">可靠性</b>（单链路断流量秒切其余链路）。所有成员口必须同速率同双工同类型，聚合口在 STP 眼里是<b data-page-node-id="mwjHrUJufZMZBDL4pN59Wk">一条逻辑链路</b>。</p>
+</section>
+
+<!-- ================= 6B WLAN ================= -->
+<section id="s6b" data-page-node-id="A5EK0QwSGHU9cDdgisptQB">
+  <h2 data-page-node-id="GkR12E7xrAEazjqAwDKNdF"><span class="no" data-page-node-id="P2afAWPJtYzjxlVdTQiBkl">06B</span>WLAN 无线网络：802.11 家族、CSMA/CA 与 AC+FIT 组网</h2>
+  <p class="intro" data-page-node-id="88JjIGpDDpwPJAFvZ1Cb32">无线与有线的根本差异：无法「边发边听」，冲突只能靠「避免 + 确认」。这条主线贯穿 802.11 的全部机制。</p>
+
+  <h3 data-page-node-id="tkhcSYOC7bxb5saBx5trJH">6B.1 802.11 标准演进</h3>
+  <table class="cmp" data-page-node-id="cir4m0QqOC9Yv9kv1R0prX">
+    <tr data-page-node-id="IgKbqmwDb5Hlq6tRugtnbj"><th style="width:120px" data-page-node-id="guGr8HNvF0CSayDwAzXeNa">标准</th><th style="width:90px" data-page-node-id="Yur6SUp7KKCmFKKmSOT0eD">Wi-Fi 代号</th><th style="width:110px" data-page-node-id="eQkWJ6EusDVW1bJMH2Jktn">频段</th><th style="width:110px" data-page-node-id="nY3zUrYQPb8EejsiHBUArk">理论峰值</th><th data-page-node-id="tAQ59qcNMzECCzLFsboLIP">关键技术</th></tr>
+    <tr data-page-node-id="uB5P8TzkPEwFnyFb5GY3fT"><td data-page-node-id="5ln9LAb9G1QKIRCDIcbwhN"><b data-page-node-id="e2z0EZagMdZSRBa7KNfOg4">802.11b</b></td><td class="ctr" data-page-node-id="iPG3HyxomEP3zIdUk3vi55">—</td><td data-page-node-id="AMSAHdDgvmxYFaxmTHapNf">2.4GHz</td><td class="ctr" data-page-node-id="LHgfEeVzgvLocfE2Wl7XW4">11 Mbps</td><td data-page-node-id="gHg4LW8itSxrc4vFJE5Fam">DSSS 直序扩频</td></tr>
+    <tr data-page-node-id="2R3iNlFrMN3eA7NTGguCRj"><td data-page-node-id="yoTOEPQHhC6DkCPLqCtnUA"><b data-page-node-id="VTc1gmhxbNCDqBD38JPDcH">802.11a</b></td><td class="ctr" data-page-node-id="kQm9JrVHbmOHQ9BxKpkddh">—</td><td data-page-node-id="fQGJ15upTdQVeU1QOXHNrI">5GHz</td><td class="ctr" data-page-node-id="fiCYZQFgDRwVU1W8KaNZ0U">54 Mbps</td><td data-page-node-id="iUAhXDy65pHCwAsoVpDvlg">OFDM 正交频分复用</td></tr>
+    <tr data-page-node-id="ubr85j9jpe6FRqIYIaDXSB"><td data-page-node-id="3J1npF2BsTlwkwjbZTvOHR"><b data-page-node-id="3E5bS0E9svft5W3ucurM5B">802.11g</b></td><td class="ctr" data-page-node-id="6mRfR4eHaSZNQOgOqlEPMP">—</td><td data-page-node-id="DacnQGsAFFEjJe1NZ22ppe">2.4GHz</td><td class="ctr" data-page-node-id="WrxctJwOxPA1QQE2wPvzyA">54 Mbps</td><td data-page-node-id="IetXQ3HHivQxiinm1An7CO">OFDM（兼容 b）</td></tr>
+    <tr data-page-node-id="fPGBqT6R4OD1THsVlujiga"><td data-page-node-id="hoZlG1ZPFE16nUzIAAhIAv"><b data-page-node-id="sbVfmfmH7HyfI790mGUgWE">802.11n</b></td><td class="ctr" data-page-node-id="B43IYnYkQ8yAMI3FIFvji8">Wi-Fi 4</td><td data-page-node-id="OTVhCvY7oDmDeYtXeHnBDu">2.4/5GHz 双频</td><td class="ctr" data-page-node-id="mK6nSd2ulz59gtBOYkZaFE">600 Mbps</td><td data-page-node-id="Pbp7KStmFsHh5JJT0YyRyq"><b data-page-node-id="1P3QKuZiwcNZmZWeremNsR">MIMO 多天线</b> · 信道捆绑(40M) · 帧聚合</td></tr>
+    <tr data-page-node-id="D8AxrlORTAeamKTIr6U9HD"><td data-page-node-id="VY8hfNnMMvWcknTC17bgJI"><b data-page-node-id="EHDsmCY6w0DR8aCPDCmttR">802.11ac</b></td><td class="ctr" data-page-node-id="0QjHHoQek5Abj7OMOqYqwf">Wi-Fi 5</td><td data-page-node-id="fQWhUX64nofrROC1ZfkjWF">5GHz</td><td class="ctr" data-page-node-id="uVfG7u5A7RrHCjpOSTw0Yi">6.9 Gbps</td><td data-page-node-id="6ESHodeQlrSdDxV7Tt9F9F"><b data-page-node-id="z4gZ353BZCQ8Z5O97C70Xh">MU-MIMO</b>（下行多用户）· 160M 信道 · 256QAM</td></tr>
+    <tr data-page-node-id="NvIR1zDmoC4nfuFfYNngBc"><td data-page-node-id="Cxc0v4WL6FS2hAbNzgVyKe"><b data-page-node-id="cRzlseFOq5XqGz2DnKHPjT">802.11ax</b></td><td class="ctr" data-page-node-id="gLYuaUFqDZhAhTbaf8htAN">Wi-Fi 6</td><td data-page-node-id="ZYPzmqbjMEJQtvV7qs2ucD">2.4/5GHz</td><td class="ctr" data-page-node-id="MzziI6B3f8dUrjfcVSUoIe">9.6 Gbps</td><td data-page-node-id="qYGu8Mirqt86ce2GhXCFAf"><b data-page-node-id="Zv2EzQhlelWRsACrijUSkN">OFDMA</b>（子载波分给多用户并发）· 上行 MU-MIMO · TWT 终端唤醒省电 · BSS Coloring</td></tr>
+  </table>
+  <ul data-page-node-id="Ra5aJYiq6IuFLW7OnOsIBN">
+    <li data-page-node-id="LMoltFVnqVuimSaLaxAtjw"><b data-page-node-id="3k1Vm2fdZCN8MkvnwXYGHr">2.4GHz 共 13 个信道</b>（中国），带宽 20MHz、相邻信道重叠 —— 只有 <b data-page-node-id="7Ywi8Lc53DHWr2ZPdU1U6N">1 / 6 / 11</b> 三个互不重叠信道，密集部署按蜂窝交错布。5GHz 信道多、干扰小、还有 DFS 雷达避让机制。</li>
+    <li data-page-node-id="OkLatve0u27sfv1SrjcRWE"><b data-page-node-id="QEkMdV7yg8MMeopR9KHRyB">三个 ID</b>：SSID（网络名称，人看的）· BSSID（AP 的 MAC，机器看的）· VAP（一块物理 AP 射频虚拟出多个 SSID）。</li>
+  </ul>
+
+  <h3 data-page-node-id="7TCaAHZKbHD8I8wq7d1zZE">6B.2 为什么用 CSMA/CA 而不能用 CSMA/CD？</h3>
+  <table class="cmp" data-page-node-id="mEpMklKkAhFcmukvHWAvKA">
+    <tr data-page-node-id="IFqAGFSvvjAn0x8EtgbQ6x"><th style="width:210px" data-page-node-id="Dqqo9riEtSaqQoQjYrpBet">原因 / 对比项</th><th data-page-node-id="VjAw4dZBlR1fXqSPXKnWxE">有线 CSMA/CD</th><th data-page-node-id="InBZbVozB7H8mK2jobajrN">无线 CSMA/CA</th></tr>
+    <tr data-page-node-id="VkWlc9JIsfqkoCaaNHnziF"><td data-page-node-id="ErshNKtFAmbA4A0vzCpz9T"><b data-page-node-id="42MYrcViHBZi9THBlq5WEW">能否边发边听</b></td><td data-page-node-id="RV78bvTYZtdQbf1ySy0zI6">能（同轴/双绞线收发可分）</td><td data-page-node-id="UANlpDa2bYMaAlw3VdGFC2"><b data-page-node-id="R1G4SPlpRbf5YBW12Efal2">不能</b>：自身发射信号比接收信号强百万倍，发送时接收机被淹没，无法检测冲突</td></tr>
+    <tr data-page-node-id="HErWaTy8vvdMzWK5W5GfkX"><td data-page-node-id="C5KBylRDC2aOXjlVbHHTAN"><b data-page-node-id="Gfe6aC8wwbAipMRzosSso5">冲突发生在哪</b></td><td data-page-node-id="8wuJwMKMrF7fCL28xLuRdA">发送端立刻感知</td><td data-page-node-id="Eq1VmjyCzB6p7Y9PBWp6BI"><b data-page-node-id="WLzr5uLXKoMLToQsboaOCg">接收端</b>；发送端根本不知道（隐藏站点问题）</td></tr>
+    <tr data-page-node-id="CwlWdmKSoCd0CeIowHYWde"><td data-page-node-id="xKFUhHVAilDKpQ8AQZbjYU"><b data-page-node-id="baXm2AxLv7BTmFdvgJmahg">策略</b></td><td data-page-node-id="ADxBcJ3Qi6Dwu8YCu3IIRc">检测到冲突就停、退避重试</td><td data-page-node-id="MUfmk3PACcXM2mKYRvNUar"><b data-page-node-id="xPS1gLiEyj6KEWU2Zxx0bx">尽量避免</b>冲突 + <b data-page-node-id="38AwZd5NgHGiGfgNPsTGg5">每一帧都要 ACK 确认</b>，收不到 ACK 就当冲突处理</td></tr>
+    <tr data-page-node-id="Th55z44LmEejHbb5r0BIQC"><td data-page-node-id="bfqz0TyKkD2CEvqot7doPd"><b data-page-node-id="q1Y47PQPXblWYFbEe1gLkc">帧间间隔</b></td><td data-page-node-id="R72WqKCr8kTC9vMF9zFgMQ">—</td><td data-page-node-id="xfmOu0H3FqAh8rOaT8lAOA">SIFS（最短，用于 ACK/CTS 抢占）&lt; PIFS &lt; DIFS（数据帧前必须等）——间隔越短优先级越高</td></tr>
+  </table>
+  <ul data-page-node-id="9gmL33byXVwjYa8bYCWLDE">
+    <li data-page-node-id="9CxTeB2kbxfVB5AGjnIktF"><b data-page-node-id="lHj9A0WNX1WSZBmThqoGes">基本流程</b>：侦听信道忙 → 等 DIFS → 信道空闲 → 退避计时器递减（争用窗口内随机值）→ 计到 0 才发 → 收到 ACK → 下一帧；超时未收 ACK → 退避窗口翻倍重试。</li>
+    <li data-page-node-id="GuNGwqsTVSBRVgHVbcXOpc"><b data-page-node-id="dkzh0Y98Vf1DwpIAK60isc">RTS/CTS 机制（解决隐藏站点）</b>：发大帧前先发 RTS 申请，AP 回 CTS <b data-page-node-id="FRyZlE4grS2aSz2RwExS01">全网广播</b>——所有听到 CTS 的站点（包括听不到发送方的隐藏站点）静默 NAV 时间，之后才发数据。</li>
+  </ul>
+
+  <figure class="fig" data-page-node-id="9DCERKsPr6HgZPEYFMrSKR">
+    <svg viewBox="0 0 1000 320" data-page-node-id="2dJTEQEBaqMj3x5MrbJPV6">
+      <text x="235" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#dc2626" data-page-node-id="M8XvJdsCBZ2VTThTjgGau0">隐藏站点问题</text>
+      <circle cx="235" cy="140" r="86" fill="#eff4ff" stroke="#2563eb" stroke-dasharray="5 4" opacity="0.7" data-page-node-id="hA6zOfuAwix8ThM3iVmVXz"/>
+      <rect x="195" y="118" width="80" height="44" rx="9" fill="#f1f4f8" stroke="#64748b" stroke-width="2" data-page-node-id="L1drECppbleA9y2lVyK9MJ"/>
+      <text x="235" y="146" text-anchor="middle" font-size="13" font-weight="700" fill="#334" data-page-node-id="IiCmF1Z7IECxdqCSUFLmcW">AP</text>
+      <rect x="70" y="236" width="90" height="44" rx="9" fill="#eff4ff" stroke="#2563eb" stroke-width="2" data-page-node-id="55JNGWR6H5WD1FvqxMESCK"/>
+      <text x="115" y="263" text-anchor="middle" font-size="12.5" font-weight="700" fill="#2563eb" data-page-node-id="R3UyqrGbFiKnsxQKnNBTl7">STA1</text>
+      <rect x="310" y="236" width="90" height="44" rx="9" fill="#eff4ff" stroke="#2563eb" stroke-width="2" data-page-node-id="z9Ottawz47T8vgtJEvRNPO"/>
+      <text x="355" y="263" text-anchor="middle" font-size="12.5" font-weight="700" fill="#2563eb" data-page-node-id="LzDMCqgu91Ps4G3Joc5Kge">STA2</text>
+      <line x1="135" y1="240" x2="215" y2="164" stroke="#2563eb" stroke-width="2" data-page-node-id="eDcBmxVv7Mkx7l24DGW90s"/>
+      <line x1="335" y1="240" x2="255" y2="164" stroke="#2563eb" stroke-width="2" data-page-node-id="CNsbk1vAhtsDMGIECeBCnb"/>
+      <line x1="155" y1="248" x2="310" y2="248" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 5" data-page-node-id="3NsOCNPVvfvUqsCRzLn9Sk"/>
+      <text x="232" y="242" text-anchor="middle" font-size="12" fill="#dc2626" data-page-node-id="AYJR8VksSTGFISwpgwPYmj">互相听不到 ✕</text>
+      <text class="asub" x="235" y="302" text-anchor="middle" data-page-node-id="6YYzP1b8xYoKZnfmnURh5r">STA1、STA2 同时发 → 在 AP 处碰撞；双方毫无察觉 → 只能靠 ACK 超时 + RTS/CTS 化解</text>
+
+      <text x="740" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#0d9488" data-page-node-id="Bs6Z9uBDM9QctzZaoIxpuK">AC + FIT AP 集中式组网（中大型园区）</text>
+      <rect x="640" y="42" width="200" height="48" rx="10" fill="#fff8ec" stroke="#d97706" stroke-width="2" data-page-node-id="a0TG1APcERHvduRDNBeark"/>
+      <text x="740" y="63" text-anchor="middle" font-size="13" font-weight="700" fill="#d97706" data-page-node-id="rcUHsH8tqUfrFmSIL1DPcz">AC 无线控制器</text>
+      <text class="fsub" x="740" y="80" text-anchor="middle" data-page-node-id="KK5DBTkzsx5qHxizRK116i">统一配置 · 用户认证 · 漫游</text>
+      <rect x="520" y="140" width="110" height="42" rx="9" fill="#ecfdf8" stroke="#0d9488" stroke-width="2" data-page-node-id="LbPz0qAqlGpqt61vFdaPDv"/>
+      <text x="575" y="166" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0d9488" data-page-node-id="Gb8X8QsxRkyv9MMTbo8Viq">FIT AP1</text>
+      <rect x="770" y="140" width="110" height="42" rx="9" fill="#ecfdf8" stroke="#0d9488" stroke-width="2" data-page-node-id="i7P8C9qDrBErrzJIjNJdgs"/>
+      <text x="825" y="166" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0d9488" data-page-node-id="lKYE4vsqmbDvawttyAPpCq">FIT AP2</text>
+      <line x1="700" y1="90" x2="595" y2="136" stroke="#0d9488" stroke-width="2" stroke-dasharray="7 4" data-page-node-id="ZBdXWMjv34fvLbalAAqC9m"/>
+      <line x1="780" y1="90" x2="800" y2="136" stroke="#0d9488" stroke-width="2" stroke-dasharray="7 4" data-page-node-id="dHCLf7PJQB4lvY8DsFgqtc"/>
+      <text class="fsub" x="600" y="118" data-page-node-id="KmlCqCbOyeRwIZkGz3wM3F">CAPWAP 隧道</text>
+      <text class="fsub" x="838" y="118" data-page-node-id="Fx3IMfqh7ZhMEINDnmg1IY">（管理+数据）</text>
+      <rect x="470" y="228" width="90" height="40" rx="8" fill="#eff4ff" stroke="#2563eb" data-page-node-id="j5QglAYBoX80H10rnNb6vy"/>
+      <text x="515" y="253" text-anchor="middle" font-size="11.5" fill="#2563eb" font-weight="700" data-page-node-id="vHiSJ4siGKK5Wb4DygZCGx">STA 手机</text>
+      <rect x="560" y="228" width="90" height="40" rx="8" fill="#eff4ff" stroke="#2563eb" data-page-node-id="DkJmt0s6OIeBupZmA6zloZ"/>
+      <text x="605" y="253" text-anchor="middle" font-size="11.5" fill="#2563eb" font-weight="700" data-page-node-id="6JK5BEI91RGqbWAK63DFr6">STA 笔记本</text>
+      <rect x="770" y="228" width="90" height="40" rx="8" fill="#eff4ff" stroke="#2563eb" data-page-node-id="JSUNS6YEzaX9oEGyGstulh"/>
+      <text x="815" y="253" text-anchor="middle" font-size="11.5" fill="#2563eb" font-weight="700" data-page-node-id="KgU4JUuuCB4uFkiF7PC1KK">STA 平板</text>
+      <line x1="540" y1="228" x2="568" y2="184" stroke="#94a3b8" stroke-width="2" data-page-node-id="E03Zd53dd3T1qEKKnczBVx"/>
+      <line x1="610" y1="228" x2="586" y2="184" stroke="#94a3b8" stroke-width="2" data-page-node-id="zSxumQOIjow2YwYRmsGEfk"/>
+      <line x1="815" y1="228" x2="828" y2="184" stroke="#94a3b8" stroke-width="2" data-page-node-id="DdpfHgZ8bH1Emg4rEnzuuH"/>
+      <text class="asub" x="740" y="292" text-anchor="middle" data-page-node-id="gmV9vbkjHAzoQqjm9JAG72">AP 零配置上线：DHCP Option43/DNS 指引 → CAPWAP 建隧道 → 加入 AC → 配置下发</text>
+    </svg>
+    <figcaption data-page-node-id="qYb5naTxCNQ7BzCimRhNV2">图 6B-1 · 隐藏站点问题（左）与 AC+FIT AP 组网（右）</figcaption>
+  </figure>
+
+  <h3 data-page-node-id="3Dh7pmYlPKIeipDYfQwzzv">6B.3 FAT AP vs FIT AP；两种转发模式</h3>
+  <table class="cmp" data-page-node-id="ZU0O94vns822dheo9C9b74">
+    <tr data-page-node-id="DG6g3lHWucxvrJvuAbqBV7"><th style="width:130px" data-page-node-id="XjbkWye2DydBlvD4QK6W7a">对比项</th><th data-page-node-id="JI54hkCoeklAgKOufkJqYa">FAT AP（胖）</th><th data-page-node-id="Te4GZ8IvcjlDXU9kmKHEiL">FIT AP + AC（瘦）</th></tr>
+    <tr data-page-node-id="aX0kLj8VH3UoqlVFcqfxgj"><td data-page-node-id="mdI0XT4parpG5T5aSDNRXz">配置管理</td><td data-page-node-id="TKVTCNvLdehcBusxMckcUr">每台单独配置</td><td data-page-node-id="W83GSmz1SnIqnfvKmtVGCz">AP 零配置，AC 集中下发（CAPWAP）</td></tr>
+    <tr data-page-node-id="kBvbMwfbWsIsFFEHNACQ70"><td data-page-node-id="97wqv3pBR5AsFqMPQ7gE6L">适用规模</td><td data-page-node-id="2SA1suYOsXqHAUTWcB2B8U">家庭 / SOHO / 单点</td><td data-page-node-id="bdDbcEYXfsEkqe5BP5AdJt">园区成百上千 AP</td></tr>
+    <tr data-page-node-id="TP1tHXrVSF1jwm45IjaUk0"><td data-page-node-id="1BKVBy6zeOQ1pIkz2kktsB">漫游</td><td data-page-node-id="FBcIY3koTx2ujRTfSF83ug">不支持 AC 级漫游</td><td data-page-node-id="OT2tumViBKgZhjfgut21Ez">二层 / 三层漫游无缝切换</td></tr>
+  </table>
+  <table class="cmp" data-page-node-id="3u6giMBcBB3IAReMCkXkw2">
+    <tr data-page-node-id="Bz3GCdTOpexRDwWcdKswwy"><th style="width:130px" data-page-node-id="5IPzFhedAUFZ5OYK1cw5JW">转发模式</th><th data-page-node-id="PrsuqJUnQMjBEuxlRejeYV">数据路径</th><th data-page-node-id="jNj4tsuIog1bPHe0Jkfwcf">优缺点</th></tr>
+    <tr data-page-node-id="Pmhz5PBoUT3PsrrQlMhUzx"><td data-page-node-id="gGP0fdybvE7XyCEs7qJJ2V"><b data-page-node-id="zGomxdvC5VahSKpKYnrtIS">直接转发</b></td><td data-page-node-id="G9KYQGAIKwj1gdSQmrPXGu">STA → AP 就地脱 CAPWAP → 本地交换机 → 网关（业务数据<b data-page-node-id="K3GUUK3BPLaWss8oP4KIZ8">不过 AC</b>）</td><td data-page-node-id="hBoKf4aJBxsFov54L7k1XF">效率高；但 AC 管不到用户流量，策略下发麻烦</td></tr>
+    <tr data-page-node-id="a1CEFHNH9Az5EDjfElo5Sk"><td data-page-node-id="cR40RH2P4T9dMaCizoZs0m"><b data-page-node-id="G2gTrtRv1S6NoxVWasQFB3">隧道转发</b></td><td data-page-node-id="V7bN0OxE5yhfo6y7nMGtGu">STA → AP → <b data-page-node-id="unl9Uttkk6EFwBvFVZh9Aj">CAPWAP 封装送 AC</b> → AC 解封装出网</td><td data-page-node-id="E9kJBE95hTEnMMZHL5DjXx">AC 集中管控/审计；AC 与隧道成带宽与故障瓶颈</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="GHXodJ0CmhCJK0m4ebBoRD">STA 接入五步：<b data-page-node-id="9J7lTJ1KdQyzQaC2KF4UIJ">① 扫描</b>（被动收 AP 周期广播的 Beacon 帧 / 主动发 Probe Request）→ <b data-page-node-id="XRVIq9XxXZ1AAjnfB2wd4e">② 链路认证</b>（开放系统 / WPA2-PSK / 802.1X）→ <b data-page-node-id="JmgQOyOdCtnGtgSxCUarzh">③ 关联 Association</b> → <b data-page-node-id="FPjsxqZrW93g1g5MYcZsOx">④ DHCP 取地址</b> → <b data-page-node-id="J4IztByDg7wPQBSy0EazVD">⑤ 用户认证</b>（Portal/802.1X）后上网。安全演进：WEP（已破解）→ WPA（TKIP）→ <b data-page-node-id="rvRns1uKDM29L3G79aYU8G">WPA2（AES-CCMP）</b>→ WPA3（SAE）。</div>
+</section>
+
+<!-- ================= 7 IPv4 首部 ================= -->
+<section id="s7" data-page-node-id="6XxQUs5G0HxwD5PjT2PkL7">
+  <h2 data-page-node-id="wddcYXmaASQOUYlM5ersA4"><span class="no" data-page-node-id="TWaD9dclSxgAuRAf3PSM2A">07</span>IPv4 首部逐字段 + 分片计算</h2>
+  <p class="intro" data-page-node-id="cAnVbTo84qCoL7iZdLrIqx">IP 首部 20 字节起，是全网计算题的高频素材。重点记忆三个「单位」：首部长度按 <b data-page-node-id="Qf59GIO673SmQXDl9FIJGi">4B</b>、总长度按 <b data-page-node-id="kfFTQuB8OMmoJKf4l5HE2l">1B</b>、片偏移按 <b data-page-node-id="5jQ4QO0eC65FfpIhpkdpf7">8B</b>。</p>
+  <table class="fmt" data-page-node-id="qXDFTHGTDl2gImUamB4yQi">
+    <tr data-page-node-id="vOuZ9FrAmcw136sKdPJJL6">
+      <td style="width:9%" class="hln" data-page-node-id="4VZfINxB0JvEMv7JgBQ0bg">版本 4bit</td>
+      <td style="width:9%" class="hln" data-page-node-id="ntbSeDzuVm7677mEb7klDg">首部长 4bit</td>
+      <td style="width:12%" class="hln" data-page-node-id="12LpXxjS0YtIL9DXFbqbeF">区分服务 8bit</td>
+      <td style="width:16%" class="hln" data-page-node-id="KhgwRq0PLEsUhahUBsscL4">总长度 16bit</td>
+      <td style="width:14%" class="hl" data-page-node-id="E6ZENDSJl9QfHCFnQpgjwJ">标识 16bit</td>
+      <td style="width:11%" class="hl" data-page-node-id="mFQ0HVxRREdfRCS1xPOOCA">标志 3bit</td>
+      <td style="width:15%" class="hl" data-page-node-id="DAtVSmW246lcMz3FOogFeA">片偏移 13bit</td>
+      <td style="width:14%" class="hla" data-page-node-id="uCZ4WC1bodtNWCvp6n5rM9">TTL 8bit</td>
+    </tr>
+    <tr data-page-node-id="zGHaOVjVUAPbNvcM02MKd7">
+      <td colspan="2" class="hla" data-page-node-id="tAohmHRskjlyUTSxjlSDGA">生存时间 TTL</td>
+      <td class="hla" data-page-node-id="oUDWUbR1QiyBsfxGpWa191">协议 8bit</td>
+      <td colspan="2" class="hln" data-page-node-id="YvZBV47EZ8oAbFG97Gpe4Z">首部校验和 16bit</td>
+      <td colspan="2" style="color:#fff" class="hl" data-page-node-id="cogFNqmyiEDrKwvcXdZlId">源 IP 地址 32bit</td>
+      <td style="color:#fff" class="hl" data-page-node-id="gFF13SBLxyHohehFxhwn3I">目的 IP 32bit</td>
+    </tr>
+    <tr class="cap" data-page-node-id="jQw89U9JHqLfDWvH7PqSda">
+      <td data-page-node-id="l0umzRfnZvB6aJX2wMMgSA">4=IPv4</td><td data-page-node-id="SkP8pvUK0vanFhD6CyKOC3">单位4B，最大60B</td><td data-page-node-id="S6pSNCkgGk1SoBUSGIGrVm">QoS 标记</td><td data-page-node-id="D6YjfpWAB25lGC4RGgWLA4">首部+数据，单位1B，上限65535</td>
+      <td data-page-node-id="mHRqVne8lUvCWniJGusrDO">同一数据报的分片相同</td><td data-page-node-id="XfdRUGMQ3sjaGsPuncezzc">保留·DF·MF</td><td data-page-node-id="Bo5iSp33sjeFSDXbwAv5z5">单位8B</td><td data-page-node-id="K5x9cG1zh6DHhdk4x52ZHS">每过一路由器减1</td>
+    </tr>
+  </table>
+  <ul data-page-node-id="9vFCqs3qdGH73VeeEkugdX">
+    <li data-page-node-id="smxRUdjRXUrThPQsclyZDS"><b data-page-node-id="xrgFky0dJZzzSHJnVWVfF8">TTL</b>：不是时间！是跳数上限。减到 0 丢弃并回 ICMP Type=11（超时）——traceroute 的原理就是故意发 TTL=1,2,3…的包。</li>
+    <li data-page-node-id="x1rQMkEFCQ10nWs7H5FY3T"><b data-page-node-id="Ld4GKC2Hl9nBAcwyR2ooK5">协议号</b>：1=ICMP，6=TCP，17=UDP，89=OSPF（对比：端口是传输层的，协议号是网络层的分用依据）。</li>
+    <li data-page-node-id="evLi9CHAV6bUMFmshDkPML"><b data-page-node-id="GnBETSdh1eePSnsMYCPlTG">首部校验和</b>只校验首部且<b data-page-node-id="j0PZEthKOm15DncxiMdBVn">每跳重新计算</b>（TTL 变了）；数据部分不校验——数据完整性由传输层管。</li>
+  </ul>
+  <pre class="calc" data-page-node-id="TC7L9c4pJVuYzZqRsRsfNW">分片例题：一个 IP 数据报总长度 3820 B（首部 20 B，数据 3800 B），经过 MTU=1500 的链路。
+
+每片可装数据 ≤ 1500 − 20 = <span class="hl" data-page-node-id="giiEw3HZilaK7oCrCE381w">1480 B</span>（每片都要带完整 20B 首部）
+3800 = 1480 + 1480 + 840
+
+片1：总长 1500 · 数据 1480 · 片偏移 0/8 = <span class="hl" data-page-node-id="oshfREYg97k9kJChosroD7">0</span>   · MF=1
+片2：总长 1500 · 数据 1480 · 片偏移 1480/8 = <span class="hl" data-page-node-id="VVCzQr1hdCFgNuuClNFZ5N">185</span> · MF=1
+片3：总长 860  · 数据 840  · 片偏移 2960/8 = <span class="hl" data-page-node-id="ZUspBCjE8to2TT2Dwg2Ews">370</span> · MF=0（最后一片）
+
+三片「标识」字段完全相同（重组时归队）；<span class="cm" data-page-node-id="6NrpqT05F7OLhfqq02w8Ka">重组只在最终目的主机进行，中间路由器可对分片再分片。</span></pre>
+  <div class="note exam" data-page-node-id="tU6wNd1QiXPC0c08iq1GMN">① DF=1（不许分片）但超过 MTU → 丢弃并回 ICMP「目的不可达·需要分片」（PMTU 发现原理）。② 片偏移单位是 8B，所以除最后一片外<b data-page-node-id="I4bsAXUPAN68nbdObzY9RV">每片数据长度必须是 8 的倍数</b>。③ 分片丢失 → 整个数据报重传（传输层以为丢了一个报文段）。</div>
+</section>
+
+<!-- ================= 8 子网划分 ================= -->
+<section id="s8" data-page-node-id="JgSSLttUjo8FWEM8qR8n5A">
+  <h2 data-page-node-id="1sBve0MUoZJmnAxsAVDGuq"><span class="no" data-page-node-id="0byHVm0xIpW4g0rvPgKNAM">08</span>IP 地址体系、VLSM 子网划分与 CIDR 聚合（计算大题核心）</h2>
+  <p class="intro" data-page-node-id="d9WDbleFpNBh1nKAIM0Imu">考研网络题 70% 的计算都在这一节：判断同网段、划子网、聚合路由。核心动作只有一个——<b data-page-node-id="xgE6tRuh6qFLDcPyYiNnXL">把地址和掩码都写成二进制做 AND</b>。</p>
+
+  <h3 data-page-node-id="LF3pLtcSJLV4c2D2qD38jG">8.1 地址分类与特殊地址</h3>
+  <table class="cmp" data-page-node-id="pDmLcfpz9ZVmAAlC8IRy8k">
+    <tr data-page-node-id="XlDljizs7UN1UTSn7MBzr3"><th style="width:90px" data-page-node-id="xxuSKT0e5a4VcHqBWBB1BX">类别</th><th style="width:170px" data-page-node-id="0Kn3G90xsDVvhcp9nAdj2N">范围（第一字节）</th><th style="width:150px" data-page-node-id="dTUFIcb1vBMquHuJAepLi8">默认掩码</th><th data-page-node-id="0CuFcfH3QHisAHHRzVOlvd">网络数 × 主机数</th></tr>
+    <tr data-page-node-id="CEM1HolCDnegE7DVD4IECo"><td data-page-node-id="eLUYYO2UZ16j8ZIhFCklPV"><b data-page-node-id="77kR3QbyqGTegstNORV0oV">A</b></td><td data-page-node-id="13hTw6bl6kew7IIDACJmFL">1 ~ 126</td><td data-page-node-id="N7hRw9MAM9E6yzKCN9Rsdl"><b data-page-node-id="2d4RDxZfcVqEGcvPXC9Bqp">/8</b>（255.0.0.0）</td><td data-page-node-id="AeWgHQkVrGoO9IXcO6tzIC">126 × 2²⁴−2 ≈ 1677万</td></tr>
+    <tr data-page-node-id="ZcAOkfcHFHkgoCHuAA2oEO"><td data-page-node-id="BNNeBfGnskG7O5UCnJXrxl"><b data-page-node-id="okaBhFFA4LlR2nDbLhsQJ8">B</b></td><td data-page-node-id="zwfxBThPjlqkZBSAjIJaaM">128 ~ 191</td><td data-page-node-id="eL1QudTnSJaGdsPUtAdK1Q"><b data-page-node-id="rDyyCNLAt5mCojI87HuQj9">/16</b>（255.255.0.0）</td><td data-page-node-id="WatbM4p1920Oq5lwJI86VQ">2¹⁴ × 65534</td></tr>
+    <tr data-page-node-id="AUqLB6dvAM56WfIlgz2CBp"><td data-page-node-id="0qtfzfpLXVMOkfXpVlwVYH"><b data-page-node-id="1jpCd8BEBH02v4cG7GFH70">C</b></td><td data-page-node-id="Q2Wuj9kQZ8sMKQPq3RpQsQ">192 ~ 223</td><td data-page-node-id="tSsXAEsUgw8DkjSJgkUDpX"><b data-page-node-id="vRZCWDA6NCGfH9KIEFyVCc">/24</b>（255.255.255.0）</td><td data-page-node-id="QfKCmABl0JrRPRUbsYFcWO">2²¹ × 254</td></tr>
+    <tr data-page-node-id="i5WoL7MMw1QfjcpE03Jf3z"><td data-page-node-id="y0RKbjb9tXwDbQbvVWctX3">D / E</td><td data-page-node-id="lkyvYWwR1kCrAZCXPYqNA9">224~239 / 240~255</td><td data-page-node-id="FtP4Fp2DTWpdRZr0KUaiwY">—</td><td data-page-node-id="xmBCwfEjqtiJcraWfPZTNw">组播地址 / 保留实验</td></tr>
+  </table>
+  <table class="cmp" data-page-node-id="UkC1PmVhU3EabKfkiI7JbN">
+    <tr data-page-node-id="aZ9z3oEKPphc9CnNYDDqNR"><th data-page-node-id="ksP5gQHLyGXBRYqZfnwNig">特殊地址</th><th data-page-node-id="Jq8ot7EE0ir4WdouuKNGDn">含义</th><th data-page-node-id="PoIFmu8oHa3x1Cs7r22Q5I">能不能当源 / 目的</th></tr>
+    <tr data-page-node-id="dpEkHAEJfXllzcd2F0kcYK"><td data-page-node-id="uOJ5EA02msURjlq4bZ0HNF"><b data-page-node-id="PtBNK3ccrkBXJ6KWyE8xBE">127.0.0.1</b></td><td data-page-node-id="sUe9gw7q5sfipjeR7atiSp">环回测试（整段 127/8 保留）</td><td data-page-node-id="6YGOkBdps6ZCBDfdOITptU">不出主机</td></tr>
+    <tr data-page-node-id="PZvjFtpAEaORjXPpIYGuZS"><td data-page-node-id="ydvNa3Z1ItDE3jDMGoL2aU"><b data-page-node-id="80vp4AuHfUhAkUOGmTmJrw">0.0.0.0</b></td><td data-page-node-id="QuxHDdRJOqVttrXKHsGA49">本机无地址（DHCP 请求源）/ 默认路由 0.0.0.0/0</td><td data-page-node-id="lag6yqUWr62c8ISHbATXd8">可做源，不可做目的</td></tr>
+    <tr data-page-node-id="pz7tJUBRC4tA15QjudKsfl"><td data-page-node-id="6kMFfc8iwwxQFDkO8CMSUp"><b data-page-node-id="RX7d8aajqGRLHLifeTfDx0">255.255.255.255</b></td><td data-page-node-id="TxKFyqHJ47UaBUD9S2maQY">受限广播（不出本网段）</td><td data-page-node-id="QckIn244VEkPc7XweUtInc">只可做目的</td></tr>
+    <tr data-page-node-id="eMmRS3TuKOU9PtyeaOJtBg"><td data-page-node-id="DNmAJRvyNmMOdg9KSMn91g">主机号全 1（如 192.168.1.255/24）</td><td data-page-node-id="tcENUalihXR6ioam6OwLwQ">直接广播（定向到该网段全部主机）</td><td data-page-node-id="Mr3XY3aaaly06F5983HgRL">只可做目的</td></tr>
+    <tr data-page-node-id="H3GcRs72pxufZEuOMdjhoA"><td data-page-node-id="44FwI0lupmzqfssgpYRZUO">主机号全 0</td><td data-page-node-id="GdpONXxmzITnWA0QpvpqFn">网络地址本身</td><td data-page-node-id="Oe3xfizCmfuMi6MQfVurwb">不可分配给主机</td></tr>
+    <tr data-page-node-id="GQMHUoEi7JRIomNw0FrLIN"><td data-page-node-id="WJ6sObykGntZCtVopAftNv"><b data-page-node-id="OxrqV3PPX2k8HdHROWYDfn">169.254.0.0/16</b></td><td data-page-node-id="LearmTh3f2LmxDCnbFvxOu">链路本地地址（DHCP 失败时自动配置）</td><td data-page-node-id="muBbDCsuuEaRwL6VwE85S2">仅本链路有效</td></tr>
+    <tr data-page-node-id="u43mlWCa3reDbmBSulijRf"><td data-page-node-id="kawiItr10ozH8VCeC5nnGG"><b data-page-node-id="RXhE7HF71E6BFBxBMf5QxK">私网三段</b></td><td data-page-node-id="3ZW3x7LEUi1TiHl09vaMBB">10/8 · 172.16/12 · 192.168/16</td><td data-page-node-id="ZFQ7GmIxVTKSvaB72RxHlA">不出公网，配 NAT</td></tr>
+  </table>
+
+  <h3 data-page-node-id="RQeJzXazD6aomU71sTmVuK">8.2 VLSM 变长子网划分（完整例题）</h3>
+  <pre class="calc" data-page-node-id="3CRwHuHPXd0WWMTFCVPEsn">例：将 192.168.1.0/24 划分给四个网段：A 需 100 台主机、B 需 50 台、C 需 20 台、D 是路由器互联链路。
+
+思路：先算「可用主机数 = 2^(32−前缀) − 2」，<span class="cm" data-page-node-id="DhDpEZA714S6lBR4Zdql6U">从需求大的开始排，杜绝地址碎片</span>
+  A: 100 ≤ 2⁷−2=126 → /25（掩码 255.255.255.128）→ <span class="hl" data-page-node-id="nl6W0jBHbMaOPfjXPxFqtx">192.168.1.0/25</span>   可用 .1 ~ .126
+  B: 50  ≤ 2⁶−2=62  → /26（255.255.255.192）     → <span class="hl" data-page-node-id="aiXWOp805L4C0sMARhHnaO">192.168.1.128/26</span> 可用 .129 ~ .190
+  C: 20  ≤ 2⁵−2=30  → /27（255.255.255.224）     → <span class="hl" data-page-node-id="bQXroHFxqTB4jQ2uELBVJl">192.168.1.192/27</span> 可用 .193 ~ .222
+  D: 点对点只需 2   → /30（255.255.255.252）     → <span class="hl" data-page-node-id="HPIc9T1FJkYFZaGcP6dBBl">192.168.1.224/30</span> 可用 .225 ~ .226
+
+验算不重叠：块大小分别为 128 / 64 / 32 / 4，边界 .0 · .128 · .192 · .224 严格对齐 ✓</pre>
+  <div class="note exam" data-page-node-id="sSAuRFk1M37feXE2hsGiCH">速算表：<b data-page-node-id="ARHgHHusx2DCn0lcyTSCbv">/25→126，/26→62，/27→30，/28→14，/29→6，/30→2</b>；块大小（相邻子网间隔）= 256 − 掩码末字节。掩码 255.255.255.192 的块大小 = 256−192 = 64。判断 192.168.1.100/26 属于哪个子网：100 ÷ 64 = 1 余 36 → 属于 192.168.1.64/26（网络地址 64、广播 127）。</div>
+  <pre class="calc" data-page-node-id="gD079E0eOoYUTSyyiJwMiV">CIDR 聚合例题：把 4 条路由 192.168.0.0/24 ~ 192.168.3.0/24 聚合成一条。
+
+  0 → 000000<span class="hl" data-page-node-id="4Iuja3vuUcYtqNpHur0RSA">00</span>
+  1 → 000000<span class="hl" data-page-node-id="HPDIcJBNBhTnXvHobZfWxc">01</span>      第三字节前 6 位相同 → 聚合为
+  2 → 000000<span class="hl" data-page-node-id="Xh68iJfY5tR7CCpn3sahkk">10</span>      <span class="hl" data-page-node-id="gtpJ6IaZREMY8rWJC4dzk3">192.168.0.0/22</span>（掩码 255.255.252.0）
+  3 → 000000<span class="hl" data-page-node-id="SRZb0xMfxg8GDC7qHD6IGJ">11</span>
+
+同网段判断：IP₁ AND 掩码 == IP₂ AND 掩码 → 同网段（同网段直接 ARP 交付，否则发给网关）。</pre>
+</section>
+
+<!-- ================= 9 ICMP ================= -->
+<section id="s9" data-page-node-id="3JAwMHdfr5FgmHgPPuvqaL">
+  <h2 data-page-node-id="P66o3F8wRXoXLZ4szbQcL8"><span class="no" data-page-node-id="4WCDsjYojRQZUo6V1MV9qY">09</span>ICMP 报文全分类 + 「四种不发」规则</h2>
+  <table class="cmp" data-page-node-id="2rYTENwBhCkhJQlOhdM5Hd">
+    <tr data-page-node-id="mNCmXmeQekYsKG2q0QLXvC"><th style="width:110px" data-page-node-id="r3SBTGsBKlOiSlIM3kePSk">类别</th><th style="width:130px" data-page-node-id="459FLGqBH0bUSxzcdw4CJy">Type</th><th data-page-node-id="OnWCUq0omktlrTzo4pkLzA">报文 / 说明</th></tr>
+    <tr data-page-node-id="k9qEH5uuoZS4358sHcNEhc"><td rowspan="5" data-page-node-id="z8mAOzGuNFEmDL9xNTrbRq">差错报告</td><td data-page-node-id="GfqE58NR9ibELKiAkSEaQw"><b data-page-node-id="FWHz3Coiven92O7KNrkam3">3</b> 目的不可达</td><td data-page-node-id="RXpvkgiVn4guYMwrwueUwE">细分：0网络不可达 · 1主机不可达 · 3端口不可达 · 4需要分片但DF=1 等 16 种代码</td></tr>
+    <tr data-page-node-id="rubpSDjgH7fzThcbOgunBa"><td data-page-node-id="ZAsmowjDknyM3EOOkk6QB6"><b data-page-node-id="b3bbjfb42EnZZCsmQZXQgN">11</b> 超时</td><td data-page-node-id="aextfO7nUBbHJuGneRVPHO">代码0=TTL 减到 0（traceroute 用）；代码1=分片重组超时</td></tr>
+    <tr data-page-node-id="G4iXwJfFRYXbE8nhIgZK95"><td data-page-node-id="pDbn97gYcV1ubm3LdSkImR"><b data-page-node-id="Pn442uPoyHM2c4NyC1MXV8">5</b> 改变路由</td><td data-page-node-id="4BL9aoTG0nvqXomNLlh4LA">重定向：告诉主机「下次走别的网关更近」</td></tr>
+    <tr data-page-node-id="ZiBbtfrm0HhETtx5v2KGsP"><td data-page-node-id="goIuHBchK7DsQFLoC0IjdY"><b data-page-node-id="dCLMDw63WUuzGkK0f2yQDn">12</b> 参数问题</td><td data-page-node-id="lEssyAFqChWkgtWVJIVv79">首部字段有错</td></tr>
+    <tr data-page-node-id="q4VT5lt1Wd9yCL4EFPZxAt"><td data-page-node-id="YxwXDRJnIJnqSx2MZhAfoQ">4 源点抑制</td><td data-page-node-id="UX5AYFBDVv5P2TJv1XQoL3">已废弃</td></tr>
+    <tr data-page-node-id="AtQlbA3Akm1G4XhfROnYAo"><td rowspan="2" data-page-node-id="LcGb7mmdPSfScj75QHlttl">询问</td><td data-page-node-id="8MkNZZU4s0VM5IcCrPrwd2"><b data-page-node-id="UgB6aBvolw7Q0lezSdeGnR">8 / 0</b></td><td data-page-node-id="x0OnLLxGMGXLOF8UZ1xwnq">Echo 请求 / 回答（ping）</td></tr>
+    <tr data-page-node-id="oQMn36PQVQPCrCyaQburqp"><td data-page-node-id="lcfwQl4ckopYhgxzmgWGY3"><b data-page-node-id="bsbSCh933QI7zJMqSki8fO">13 / 14</b></td><td data-page-node-id="bJVogqB1swuSSHFGxvHcvO">时间戳请求 / 回答（测往返 + 时钟同步）</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="Nc7m2D0ng5XPGxcAmBHLZ0">以下 <b data-page-node-id="iUM2KwdZBtdj5DyuGkGylv">四种情况不发送 ICMP 差错报告</b>（考研选择高频）：① 对 ICMP 差错报文本身不再发；② 对<b data-page-node-id="2e2HC0e2farpErIRtoWaq2">第一个分片之后</b>的后续分片不发；③ 对具有<b data-page-node-id="wrrAFbpBsbilV5Dyn5sVBL">组播地址</b>的数据报不发；④ 对 127.0.0.1 / 特殊地址（127.0.0.0/8）不发。另加：路由器对到达接口的广播帧不发。</div>
+</section>
+
+<!-- ================= 10 路由协议 ================= -->
+<section id="s10" data-page-node-id="fdMVSSziONpSQ40FaQ9VI7">
+  <h2 data-page-node-id="kJu5p1DwelkngJBO5P3qbj"><span class="no" data-page-node-id="wPFxNksJwHgnvPNxUtrVrD">10</span>路由协议全景：RIP / OSPF / BGP 对比 + 路由优先级</h2>
+  <table class="cmp" data-page-node-id="Jrmqy2OrMqGz82fAD29kWv">
+    <tr data-page-node-id="ouOwbDEjXPU0ko56mXPMhf"><th style="width:130px" data-page-node-id="qFIG13749iMgE59EUVCk9M">对比项</th><th data-page-node-id="jDd5owxNUIF9WmG7oRXJs2">RIP</th><th data-page-node-id="b5qzuvHGna9kpyOC2LwDmV">OSPF</th><th data-page-node-id="KEJXJnRqcGLeVqs4eRGpi1">BGP-4</th></tr>
+    <tr data-page-node-id="AmXvuauvog7WlAG6o9aPAT"><td data-page-node-id="Z1SeMGH09DhtrJerVrgekf">类型</td><td data-page-node-id="N1If7ZyfP9oaQA8EPoUNU5">内部 IGP · <b data-page-node-id="M5I1TPzTKFyrhUWMpSpzFf">距离向量</b></td><td data-page-node-id="RZEFCdmv7TY9BxQ6ue7d1p">内部 IGP · <b data-page-node-id="RKKi0vY4imx6g6qst9dqX6">链路状态</b></td><td data-page-node-id="rOenpVqBHIUqtOuBi1aC0c">外部 EGP · <b data-page-node-id="dtnP0E9xajc79zLBkMDIOt">路径向量</b></td></tr>
+    <tr data-page-node-id="FGN96xSF6efuFA3c2BfbAD"><td data-page-node-id="j0vMDCz5ijEMFqeHY0ULw1">度量</td><td data-page-node-id="3AYIBiSjvK9MtaUOgIVdHx">跳数（≤15，16=不可达）</td><td data-page-node-id="oEZ5x0D3nxHlIEsVWKA8Ei">开销 = 带宽反比（10⁸/BW）</td><td data-page-node-id="uVzrEE9Sqb7oSAZ5swuhlh">策略属性（AS 路径等）</td></tr>
+    <tr data-page-node-id="isHI6cAsbQhyhcqsTMO2Hd"><td data-page-node-id="efvqzAEVZCckjvqVohoQ5s">交换内容</td><td data-page-node-id="T5O41NTC7yWZTeeayQBr90">整张路由表（周期 30s）</td><td data-page-node-id="yCiQgexgtG1bs52UebB7di">链路状态公告 LSA（触发式）</td><td data-page-node-id="0QBzEFt1xxJAXgX9DvpnvA">完整 BGP 路由 + 增量更新</td></tr>
+    <tr data-page-node-id="DtZ73OXoqJFsUKlUrwYsg6"><td data-page-node-id="2HeI4DrN2dwdAYSn1ryCyK">承载方式</td><td data-page-node-id="Rgo91HC85R1uDkWZsojLRD"><b data-page-node-id="Ejerlv9YPKm9Y2btulIhOB">UDP 520</b></td><td data-page-node-id="zRLyplcI9Q8CkC8QdKbPRp"><b data-page-node-id="FPJ823ckbl4y1YzGDqLFg5">IP 协议号 89</b>（自封装）</td><td data-page-node-id="YSwaHceausT2wNEZqYssMs"><b data-page-node-id="ozE96d3n9XmbczO7dWOCKP">TCP 179</b></td></tr>
+    <tr data-page-node-id="B4pCR37WXUBnAH5gSC3vKJ"><td data-page-node-id="INRKuFy7IiD5buifcahCHw">收敛速度</td><td data-page-node-id="M4HBAgBxGGsaWU2AAoGA9r">慢（坏消息传得慢）</td><td data-page-node-id="kj5p2UnCR1JAmphMBKE9wG">快</td><td data-page-node-id="DBsLn1zEXp3MlveD0jub3M">慢（为策略服务）</td></tr>
+    <tr data-page-node-id="mp5wUb39nn23u5WqSFdpga"><td data-page-node-id="NHZqr8syEM1l9kLH2tObSf">规模</td><td data-page-node-id="C6vmRrwHArkUU39RSFNnWD">小网络</td><td data-page-node-id="xoKkDWqxtcq7fCHwZiJHva">中大型、分区域</td><td data-page-node-id="fifsjbfCD16JobGuHYAKN5">互联网 AS 之间</td></tr>
+  </table>
+
+  <h3 data-page-node-id="CdriN1YbFL6FMgjfFND4Fn">10.1 RIP 的环路问题与五大对策</h3>
+  <p data-page-node-id="wR07ekSSvdxUsMjRcc7hva">RIP「基于传闻」：A 从 B 学到的路由又会被 B 从 A 处学回去 —— 拓扑变化时形成计数到无穷。对策：</p>
+  <table class="cmp" data-page-node-id="9OEHV4OiJQcSkDQou2HnNx">
+    <tr data-page-node-id="7Sb3BTl7Pi5OGbMHU45f2G"><th style="width:150px" data-page-node-id="bFZJjLrseFRZP53rPCl02X">对策</th><th data-page-node-id="RexyY89rAFjlFoDTxoU3bg">原理</th></tr>
+    <tr data-page-node-id="81nfbsRkZ7q0fWr3GpP607"><td data-page-node-id="5Tmpk0T70VeTV3lN849CN4">最大跳数 16</td><td data-page-node-id="TUfE9XtvaY1uB2ur37Jw0I">把「无穷大」定义为 16 跳，计数到 16 停止</td></tr>
+    <tr data-page-node-id="DpesAp4LMJFkYnJm8IcTYj"><td data-page-node-id="pVDZwJt9trbk6E2E2zNkt7"><b data-page-node-id="sVlaaxaBrY1lnV8BrmL45P">水平分割</b></td><td data-page-node-id="QCMgmG8Q6zlPyX0KzEJfVc">从某接口学来的路由，不再从该接口通告回去</td></tr>
+    <tr data-page-node-id="DrGT9gw9bBsYAv84sk7nIE"><td data-page-node-id="gPe0NYB340WY5x0MqHS1No"><b data-page-node-id="09i98Pa8UX3xZTOilXSWRH">毒性逆转</b></td><td data-page-node-id="aKmILkbEYQQVx6U78TGCs3">从某接口学来的路由，从该接口通告时置为 16 跳（不可达）—— 更彻底但费带宽</td></tr>
+    <tr data-page-node-id="bPVV6FD02n40TgxkcnseXB"><td data-page-node-id="l5J2wbTgoV9A1Ylv8HGh9V">触发更新</td><td data-page-node-id="uxFBRmKB2XUGNb5RB6xyNc">拓扑变化立即通告，不等 30s 周期</td></tr>
+    <tr data-page-node-id="vMYvWFBv7vwUXBPoPMI5U8"><td data-page-node-id="OXr7hEibz3xBx2vqYFRq2K">抑制计时</td><td data-page-node-id="IMMOapWPXW6NGLGQ7FKxCm">路由失效后先抑制定时间，防止轻信邻居的过时好消息</td></tr>
+  </table>
+
+  <h3 data-page-node-id="qgdv4KX0DEgNUjsI703fU3">10.2 OSPF 细节：五种报文、区域、DR 选举</h3>
+  <table class="cmp" data-page-node-id="278PvqXPwL15vYRaieb8gZ">
+    <tr data-page-node-id="2naiXeptdbvtWLQRvWu8kC"><th style="width:130px" data-page-node-id="qclPWGDKWaxBYXuN7RhjUE">报文</th><th data-page-node-id="FVHyIZ6fUubSI9oQFnXHSW">作用</th></tr>
+    <tr data-page-node-id="2GHs2tOzQ56c09S9OrwmH7"><td data-page-node-id="FpUDqT9v0rBLGlP2q9JRwP"><b data-page-node-id="wqu80DJmTNLq7vFk0G3UzL">Hello</b></td><td data-page-node-id="fv6WHonNgQioa3doWI9Ewb">发现/维持邻居（组播 224.0.0.5，10s/次，Dead 40s）</td></tr>
+    <tr data-page-node-id="fYkSCIewVETiHOyqwmWIey"><td data-page-node-id="AoUCMbGGiEzDv2tOPSVbiZ"><b data-page-node-id="hAMVCnqBuw8Qm2IaxqMFN3">DD</b> 数据库描述</td><td data-page-node-id="HbGrEmOLu1tChQI5XBTqmi">给本机 LSDB 的「目录摘要」，协商主从</td></tr>
+    <tr data-page-node-id="gsbtIurz7h3nJfAiO4kBwv"><td data-page-node-id="KmXPoCBwaSYOpgEIC9zaAJ"><b data-page-node-id="WO3EJEqBTUztGZBxCwDQiy">LSR</b> 链路状态请求</td><td data-page-node-id="p8Z4nbN4HDoO2b8RHsEnIu">对照摘要，索要缺失的 LSA 明细</td></tr>
+    <tr data-page-node-id="GWDqstDEV6jeKUy6ESU6su"><td data-page-node-id="zbhySigcBKLnkFmfPLBUlB"><b data-page-node-id="PDWIPOdF5dSBvnlLsILYAp">LSU</b> 链路状态更新</td><td data-page-node-id="3wnQJELl5JjGsKwsAUuIBx">携带 LSA 主体（泛洪的载体）</td></tr>
+    <tr data-page-node-id="U315dcE9iCoGxN0IysYZmn"><td data-page-node-id="EaFHZSQHzkhkPWoXmXtBrU"><b data-page-node-id="oFAgQlgPaOm1FLG5DW23oh">LSAck</b></td><td data-page-node-id="t5VRkyxbmVl6AVdMXlREbG">确认收到 LSA（可靠泛洪）</td></tr>
+  </table>
+  <ul data-page-node-id="AhGmuQX7YbO1z2fep5lXfs">
+    <li data-page-node-id="fYsSgctDGg3HLHlTadd977"><b data-page-node-id="TM37Bdqx8p0ofjhtH3oxro">区域设计</b>：骨干区域 <b data-page-node-id="noHV6lTGsdShBZoSvDAm8m">Area 0</b> 必须存在且连续；非骨干区域必须与 Area 0 相连（不相连用虚连接）。区域边界路由器 <b data-page-node-id="y531FnbLUnPpV1r2yZSbIS">ABR</b>（连 Area 0 与普通区域）、自治系统边界路由器 <b data-page-node-id="lfF2lHmP8KLWh8Ya16eMae">ASBR</b>（引外部路由）。</li>
+    <li data-page-node-id="cSjUZbt8mwWzYAEFpDyHSO"><b data-page-node-id="5Grqr4rKfV4snLzNk7xK3D">邻居 vs 邻接</b>：Hello 互见即邻居；<b data-page-node-id="xHcAuL0hdwxdlhI4pZsVxR">同步完 LSDB（到达 Full）才是邻接</b>。广播网中只与 DR/BDR 建立完全邻接（把 O(n²) 邻接数降为 O(n)）。</li>
+    <li data-page-node-id="BM9DFu2pIpzrrgkUo4fa30"><b data-page-node-id="PSmJ71fTwvpu49sh5zTXGf">DR/BDR 选举规则</b>：比较<b data-page-node-id="UjUhztGTVQO817IxB91YYW">接口优先级（0~255，默认 1，0 表示不参与）</b>→ 相同比 <b data-page-node-id="JWFaE0zmWN6JiB4PBwNbEm">Router ID（最大者胜）</b>。<b data-page-node-id="V3OjCJGXBSYYiuPgQMUEjB">不抢占</b>：DR 在位时新加入的高优先级路由器不抢，等下次选举。</li>
+  </ul>
+
+  <h3 data-page-node-id="YPDX8bdVtt8UzINJda4hkd">10.3 路由来源优先级（华为）与浮动静态路由</h3>
+  <table class="cmp" data-page-node-id="2nkdZHdWmV7PR9ZKm53sNY">
+    <tr data-page-node-id="B1zYvrGoOLFhbG78lGaOao"><th data-page-node-id="GStkjYpM9HrnzrHtPuPFAk">直连 Direct</th><th data-page-node-id="ar4FfshvuE265Brv5g36rx">OSPF</th><th data-page-node-id="6IPxxFNiSvaf4ZAawGGl9k">IS-IS</th><th data-page-node-id="aa274iAfbX34fQyLZuHXCG">静态 Static</th><th data-page-node-id="kDBJcf3y2G5q6q0a9GvzWN">RIP</th><th data-page-node-id="RzsDizfybFSRQDGlGjOVOp">OSPF ASE</th><th data-page-node-id="VPF8B3OcClOs5AEioLTU2g">BGP</th></tr>
+    <tr data-page-node-id="78mzqhghWDP748iWPiaA7A"><td class="ctr" data-page-node-id="jBPEQMaAvLHbSBiaDorSYO"><b data-page-node-id="c1btMUfZjOpMPWKLndAHHX">0</b></td><td class="ctr" data-page-node-id="X0aneMdnzeTISIbQ9vDxdv"><b data-page-node-id="2zvSUsNcdOrQ4GXbGtNBJG">10</b></td><td class="ctr" data-page-node-id="r3L0uBUyoBa1EAWabMFJGd"><b data-page-node-id="LAAQYFHIgofy5CF4qutzvi">15</b></td><td class="ctr" data-page-node-id="DoHfJj1ZR9DG5SIXfXTpeP"><b data-page-node-id="wW6CcBeFlArPcudG5pVrn7">60</b></td><td class="ctr" data-page-node-id="8TaxpOkH6eHoCIelYPlzMR"><b data-page-node-id="tnloGUinZzvCiVVBptY7EU">100</b></td><td class="ctr" data-page-node-id="5fGva837k04P3dT22TNxPn"><b data-page-node-id="dmSp1kkHOr8CwD60tp9dEm">150</b></td><td class="ctr" data-page-node-id="LJjvQMQgbCckDz22DLy6kl"><b data-page-node-id="HRAfBIofhawOTnb7CE3bCt">255</b></td></tr>
+  </table>
+  <p data-page-node-id="qePQlq2588VET0imd33pHn">不同协议学习到同一网段时比<b data-page-node-id="PBYtvqhNkwW8pa9C8ZuKA5">优先级（preference）</b>（思科叫管理距离：直连0/静态1/EIGRP90/OSPF110/RIP120/BGP20/255）；同协议内部比开销/度量。<b data-page-node-id="WK6iP2J2IXwsCMK379tGMN">浮动静态路由</b>：把备份静态路由的优先级调大（如 100），主链路（OSPF）正常时不进表，故障时顶上 —— 天然的备份路由。</p>
+  <div class="note exam" data-page-node-id="7rFzibIyQeDAxnnC6Ia8b8">最长前缀匹配优先于一切来源优先级：路由表里同时有 10.1.1.0/24 和 10.1.0.0/16 时，去 10.1.1.5 永远走 /24 那条，无论它是谁学的。</div>
+</section>
+
+<!-- ================= 11 NAT ================= -->
+<section id="s11" data-page-node-id="LTKEiOQTAfY4Lf30eNnETw">
+  <h2 data-page-node-id="rAXPqvUGhvIhOG1BQ8akFH"><span class="no" data-page-node-id="wBETSegcDw17YayaZH2U3e">11</span>NAT 四种类型与选型</h2>
+  <table class="cmp" data-page-node-id="CgVIrvwXFgfcY7gYI1opS4">
+    <tr data-page-node-id="Qrh1B7SotHZxmPN7jmYlSq"><th style="width:150px" data-page-node-id="HrW3DMvWKx6P5JmVAIbKf5">类型</th><th data-page-node-id="gS7kMBsZLhBGoDZvqZF4uS">转换内容</th><th data-page-node-id="sC8EX9SMggEV4izFCVoXfD">典型场景</th></tr>
+    <tr data-page-node-id="OdSDONKYlP2wEgG8Aevbk0"><td data-page-node-id="GoY6AP9c5CFOpetVxFCWJd"><b data-page-node-id="yEBcg3R22tJT4MWK21b1tn">静态 NAT</b></td><td data-page-node-id="8hYQI954vzhw7os1f5Y1eW">一个私网 IP ↔ 一个公网 IP，一对一固定</td><td data-page-node-id="TN5ilRj73nOcszlwF5khHX">内网服务器需要被公网固定访问</td></tr>
+    <tr data-page-node-id="b6wmO7mFJkuTBOH0nUllIx"><td data-page-node-id="4oNS0ZDO4EUEfv4xhQxJrZ"><b data-page-node-id="Es2h7xONKkRvnHQpno1AxN">动态 NAT</b></td><td data-page-node-id="RthO3QIQe3K4Urs73rJuEj">私网 IP 从公网地址池临时借用（仍一对一）</td><td data-page-node-id="UJKvAJ4U3M6I62W3TPQjsf">内网多主机上外网，公网 IP 足够多</td></tr>
+    <tr data-page-node-id="CTL5fxBWo3StygtjMWNgvZ"><td data-page-node-id="WITBm8ZSdqrfIMWwCmAdKP"><b data-page-node-id="svE9qtHtazpZCfG5mLDCjc">NAPT / Easy IP</b></td><td data-page-node-id="ajqLpg01XzNxaedhppG7Rt">IP+<b data-page-node-id="nC6Vhh25eJFEhnKUSnQDb4">端口</b> 多对一复用（Easy IP 直接复用出接口地址）</td><td data-page-node-id="KDasLuwELkvYZz1z95UF9i">家庭/企业主流：一个公网 IP 带全内网</td></tr>
+    <tr data-page-node-id="sclOYLKJVUby2BWSAOaJpY"><td data-page-node-id="hwbe3j96MXKn8u1h1vhqHO"><b data-page-node-id="Gllqm6Vo7ohmNBB7aHUoXF">NAT Server</b>（端口映射）</td><td data-page-node-id="X28KYGgYSJ6AvplD2kQRmg">公网 IP:Port → 内网 Server:Port（目的 NAT）</td><td data-page-node-id="yl4CDtwBcMkrcVB3qUBQhi">把内网 Web/FTP 服务器发布到公网</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="1ZjP3ke9GXATV6ElD2AAjH">NAT 的代价：① 破坏端到端原则，P2P/打洞变难；② 只转换 IP 头，<b data-page-node-id="b024VKm8c84nvEj7HgbcFG">不处理报文内嵌地址的协议</b>（FTP、SIP 需要 ALG 应用层网关配合）；③ 查表转发增加延迟。回程报文按转换表逆操作；表中无条目的主动入包一律丢弃 —— 天然「防火墙」效果。</div>
+</section>
+
+<!-- ================= 12 TCP/UDP 首部 ================= -->
+<section id="s12" data-page-node-id="fdTDY6vjYtHhZSm8PIt1BG">
+  <h2 data-page-node-id="zwAwS0xIXG1fWcjsr0XdGt"><span class="no" data-page-node-id="bc8GQ0mFQ2Jv79i4VI1fgN">12</span>传输层：TCP / UDP 首部逐字段</h2>
+  <h3 data-page-node-id="cdwJNRXY93lcg0Yk0NnQHB">12.1 UDP 首部（固定 8 字节，就这么点）</h3>
+  <table class="fmt" data-page-node-id="nWrRqEU3huFqpOJRM7f8Pi">
+    <tr data-page-node-id="cMSQpd8L6O9pEiETEf1ZNc">
+      <td style="width:25%" class="hla" data-page-node-id="snopbCT1I4zq2c1PlByJxS">源端口 16bit</td>
+      <td style="width:25%" class="hla" data-page-node-id="HVbPjxyQdxzWmuXorUGnIQ">目的端口 16bit</td>
+      <td style="width:25%" class="hla" data-page-node-id="286eEPzGyVszUFd5rqtkJJ">长度 16bit</td>
+      <td style="width:25%" class="hla" data-page-node-id="9FLGFIT1sA8UxEW5vXjQ7o">校验和 16bit</td>
+    </tr>
+    <tr class="cap" data-page-node-id="wHyQowgaRagDqaYdawyfMr"><td data-page-node-id="k5KTLlc1wZHLlz9XkNGNTU">可全 0（无需回包）</td><td data-page-node-id="ipM4zohOvuHtYB55pxl2CA">分用依据</td><td data-page-node-id="HrLVaBDeyALFPIcHDyKOUa">首部+数据（单位字节）</td><td data-page-node-id="EpXpp4r47A3s7uNve9qUAp">可选；校验需加 12B 伪首部</td></tr>
+  </table>
+  <ul data-page-node-id="POvvpVyauOf9QK8a5Z7rF8">
+    <li data-page-node-id="W9ihe6X5q3Q2rOlaacqWgt">无连接、不保证可靠、不排序、无拥塞控制 —— 报文应用全交付（<b data-page-node-id="wvECGSnqBUYGIMpXIySCfO">面向报文</b>，应用给多长发多长）。</li>
+    <li data-page-node-id="T1n1CGH5GYaAS8drkFsAUV"><b data-page-node-id="FS7vXsyUPaJNMzIKoteFm6">伪首部</b>：临时拼接「源IP+目的IP+0+协议号(17)+UDP长度」参与校验和计算但不传输 —— 让 UDP 顺带验证「IP 有没有把包送错主机」。</li>
+  </ul>
+
+  <h3 data-page-node-id="FsWG5iIVdUwlmLPr7gZCav">12.2 TCP 首部（固定 20 字节 + 可选）</h3>
+  <table class="fmt" data-page-node-id="lu6qejLEa7Pusgu9iB2oH4">
+    <tr data-page-node-id="drTG3PkhBHbUCWWZnAsHGr">
+      <td colspan="2" class="hl" data-page-node-id="lKXDDv7zBvKWacnb3pTiWD">源端口 16bit</td>
+      <td colspan="2" class="hl" data-page-node-id="Q1XitJhjnaeQffYEbCPp7x">目的端口 16bit</td>
+      <td class="hla" data-page-node-id="3HUG438bSHAAefvnlwl3ln">序号 seq 32bit</td>
+    </tr>
+    <tr data-page-node-id="IXR9F4h8XfqnyE4BR3cNOA">
+      <td colspan="4" class="hla" data-page-node-id="PsWatKf1aCJqDhPG106HrJ">确认号 ack 32bit（期望收到的下一个字节序号）</td>
+      <td class="hln" data-page-node-id="jfiPpGm3Yk6jOFrfas7an5">数据偏移 4bit</td>
+    </tr>
+    <tr data-page-node-id="JccUJJKQoy4u2dIIgy33xs">
+      <td style="width:10%" class="hln" data-page-node-id="eH3HJa6CYbphkPi8YP2qSJ">保留 6bit</td>
+      <td style="width:15%" class="hll" data-page-node-id="THCP9jQUICty16WIV2F3jr">URG ACK PSH</td>
+      <td style="width:15%" class="hll" data-page-node-id="7ITdWSBskugALuIeZHYcBN">RST SYN FIN</td>
+      <td class="hln" data-page-node-id="QqBbgtOLHMIPZlj115lg4U">窗口 16bit（接收方通告 rwnd）</td>
+      <td class="hln" data-page-node-id="jFgg0wRcbogrKcqGguXpKd">校验和 16bit</td>
+    </tr>
+    <tr data-page-node-id="ww19ZXrO7WdvnXy7SkCzbi">
+      <td colspan="2" class="hln" data-page-node-id="Zu45eQse8xMJXj5Q1wL5Z0">紧急指针 16bit</td>
+      <td colspan="3" data-page-node-id="Q7iqHowtslZeyYydDv2QKB">选项（最长 40B：MSS、窗口扩大、SACK、时间戳）+ 填充</td>
+    </tr>
+  </table>
+  <ul data-page-node-id="bdWKJDBZMQ1t1NIScNHIjg">
+    <li data-page-node-id="YE4CCfNPtaiQAzSEkdTl48"><b data-page-node-id="kkwG6FhM7Vd98I9y4QKR6B">seq / ack 单位是「字节」</b>不是报文段 —— 每个字节都有编号；ack = 已正确收到的最后字节号 + 1（累计确认）。</li>
+    <li data-page-node-id="ixVEMdqwLrJxUfXQ4zwXyv"><b data-page-node-id="HZ2jDwDulwTUJMVD3xSugD">数据偏移</b>：首部长度，单位 <b data-page-node-id="FMluNSzYU9ur6Watk02kLB">4B</b>（最大 60B，与 IP 首部一个套路）。</li>
+    <li data-page-node-id="kKrvxVwxz5gI8ToaQXErCW">六个标志位逐个记：<b data-page-node-id="qjRiUAmlUKpZKE5cozlECG">URG</b> 紧急位有效 · <b data-page-node-id="KNJFAGADNilQK88ECsB4Bj">ACK</b>=1 时 ack 字段才有意义（握手后恒为 1）· <b data-page-node-id="21tYVsEDvXXf2Z8AvblOAT">PSH</b> 尽快上交应用 · <b data-page-node-id="IV1loMKNvEzFlUeXyRY6gg">RST</b> 重置连接（端口未监听就回它）· <b data-page-node-id="KET2OHA4phSQWu8oo6wOnC">SYN</b> 请求建连 · <b data-page-node-id="8d4jj0vJEwfBzuZHRL8igY">FIN</b> 请求释放。</li>
+    <li data-page-node-id="MIAmyCb1by56HJNC0i0HiC"><b data-page-node-id="Yt0sQTGQOp15lCZFAnjjC6">窗口</b>：接收方通告还能接收多少字节（rwnd）→ 流量控制的数据载体；MSS 常见 1460 = 1500 − 20(IP) − 20(TCP)，在 SYN 报文的选项里协商。</li>
+  </ul>
+  <div class="note exam" data-page-node-id="ysFGgHlcGOVHzvLZItohnx">对比题：TCP 面向<b data-page-node-id="CpNiGNw25JiaabE4s1YHV3">字节流</b>（发送多少、怎么分块由 TCP 决定，应用看到的是流）；UDP 面向<b data-page-node-id="rrdm6meSfaPEGjDsD39zAJ">报文</b>。TCP 首部固定 20B、UDP 8B、IP 20B —— 最小总开销 28B vs 48B。</div>
+</section>
+
+<!-- ================= 13 可靠传输机制 ================= -->
+<section id="s13" data-page-node-id="LkV7bzLEviHjYFovXeIqCq">
+  <h2 data-page-node-id="fwobfFULAPlCT76QH7vMHs"><span class="no" data-page-node-id="aslTzyqyKXsHxI0fiZnxmn">13</span>TCP 可靠传输：确认重传、超时计算（RTT 估计公式）</h2>
+  <ul data-page-node-id="FtXhc7rqjXNRN7CgFEwSGt">
+    <li data-page-node-id="ZYehtEAmL2JzQyh788rGNz"><b data-page-node-id="GRXuiUf4Fc0wQ1U38UxRj9">序号 + 确认</b>：按字节编号；接收方采用<b data-page-node-id="l5JecPfls68CsF0uPbeanJ">累计确认</b>（ACK n = n 前全收到），失序段先缓存（SACK 可精确报告洞的位置）。</li>
+    <li data-page-node-id="Ga1BA4VxIPHrQ4eFpROChj"><b data-page-node-id="3oovRJQKcO5OP0C4irD1xE">超时重传</b>：每发一个段启动计时器，超时未确认就重传，并把超时时间 RTO 加倍（每连续超时一次翻倍，防止拥塞雪上加霜）。</li>
+    <li data-page-node-id="cld5c7vh4EDFEex6pZAOMJ"><b data-page-node-id="U9j6DKgoEfj8QIZ3Q9s4Fz">快速重传</b>：收到 <b data-page-node-id="QQB3d6zaj4t6ZVX8dpKTCW">3 个重复 ACK</b>（不必等超时）立即重传缺失段 —— 后面拥塞控制里的「快重传」就靠它触发。</li>
+  </ul>
+  <pre class="calc" data-page-node-id="jUKGeqwUf4kFTybN6fO9Ut">RTO 自适应算法（RFC 6298，考研考过）：
+  每测得一个新样本 RTT<sub data-page-node-id="XEq7GtesAaH4Ox1GGSB7sK">样</sub>：
+    RTTs（加权平均往返时间） = (1 − α) × 旧RTTs + α × RTT<sub data-page-node-id="k8Ohe785NBHOxpJiXyr6Aw">样</sub>     <span class="cm" data-page-node-id="Y8JWnkxeeIOWdIShQ1qu75">推荐 α = 1/8</span>
+    RTTd（偏差）            = (1 − β) × 旧RTTd + β × |RTTs − RTT<sub data-page-node-id="qIZ9kLIy4lwiKVmnHAFuix">样</sub>|  <span class="cm" data-page-node-id="CikyVRME44mHGXeaYmZnJl">推荐 β = 1/4</span>
+    RTO = RTTs + 4 × RTTd
+
+例：RTTs=100ms，新样本 80ms → RTTs = 7/8×100 + 1/8×80 = 97.5ms
+    （样本值围绕真实值波动，加权平均滤除抖动；首测时 RTTs=样本，RTTd=样本/2）</pre>
+</section>
+
+<!-- ================= 14 流量/拥塞 ================= -->
+<section id="s14" data-page-node-id="Zl6RUF557wzYbucxEYM0gs">
+  <h2 data-page-node-id="wlAfO6Uo5ELSgnc0DhsL21"><span class="no" data-page-node-id="hv1LFoBB6YNOosX9qN2xtd">14</span>流量控制与拥塞控制（四算法 + cwnd 曲线必考）</h2>
+  <p class="intro" data-page-node-id="laD5iBRIZjl8xrjihSueHy">流量控制是<b data-page-node-id="bEzdy6uYKBbNLU14CWSH7R">点对点</b>的（不让发送方压垮接收方，载体 = rwnd）；拥塞控制是<b data-page-node-id="Pm6XxyoJG8E3PdKxWPWAL8">全局</b>的（不让发送方压垮网络，载体 = cwnd）。实际发送窗口 = <b data-page-node-id="zCHD1NtGHazgCNXEgGteTf">min(rwnd, cwnd)</b>。</p>
+  <figure class="fig" data-page-node-id="yNcLDLv8gTKxHM7ibhskM3">
+    <svg viewBox="0 0 1000 380" data-page-node-id="KszsAmpLo1fmCA4RET431q">
+      <line x1="60" y1="320" x2="790" y2="320" stroke="#334" stroke-width="1.5" marker-end="url(#m-gray)" data-page-node-id="adxGC3elFd5Hy5DJ0Avl2g"/>
+      <line x1="60" y1="320" x2="60" y2="30" stroke="#334" stroke-width="1.5" marker-end="url(#m-gray)" data-page-node-id="TuqOSw9rrHWVByhLmzkPaV"/>
+      <text x="775" y="344" font-size="12.5" fill="#334" data-page-node-id="ShBn7j4uXGKKr0O1UFWLpg">传输轮次</text>
+      <text x="70" y="42" font-size="12.5" fill="#334" data-page-node-id="vYB6Nx6kRct2sdsXyBwooG">cwnd（报文段）</text>
+      <line x1="60" y1="104" x2="760" y2="104" stroke="#dc2626" stroke-width="1" stroke-dasharray="6 4" data-page-node-id="qMd3pFmUaZDZK2FzX5ZoZP"/>
+      <text class="asub" x="700" y="98" fill="#dc2626" data-page-node-id="wITuYU1GPZvsXUZkQNH8wJ">ssthresh₁ = 16</text>
+      <line x1="60" y1="148" x2="760" y2="148" stroke="#d97706" stroke-width="1" stroke-dasharray="6 4" data-page-node-id="n7mGJG41rNYglOXXXLD4mr"/>
+      <text class="asub" x="700" y="142" fill="#d97706" data-page-node-id="bVYu1JkrlBj9551EQOd8II">ssthresh₂ = 12（丢包后降）</text>
+      <polyline points="94,306 128,292 162,264 196,220 230,148
+                         264,134 298,120 332,106 366,92 400,78 434,64 468,50
+                         502,148 536,134 570,120 604,106 638,92"
+                fill="none" stroke="#2563eb" stroke-width="2.5" data-page-node-id="WkbzLG2yGjcmoAumgnj4SW"/>
+      <g fill="#dc2626" data-page-node-id="p7ldoOCD3sGSK2tZI4SCm7">
+        <circle cx="468" cy="50" r="5" data-page-node-id="SXd54j7SasTeQuHf7HEwjY"/>
+      </g>
+      <text class="asub" x="492" y="40" fill="#dc2626" data-page-node-id="JpvyzvHZQR9TmI7QxohQtW">第 13 轮：报文段丢失</text>
+      <text class="asub" x="492" y="57" fill="#dc2626" data-page-node-id="xGta3AEsPJ7dM2Llkl5nWp">3 个重复 ACK → 快重传 + 快恢复</text>
+      <text class="asub" x="240" y="240" fill="#2563eb" font-weight="700" data-page-node-id="BBlGDOGV1LsWy9CsqpDNaw">慢启动：cwnd 从 1 指数增长 1→2→4→8→16</text>
+      <text class="asub" x="330" y="105" fill="#d97706" data-page-node-id="0dEw8Z8douUsdBJw3QQ5Hw">达到 ssthresh → 转拥塞避免（线性 +1）</text>
+      <text class="asub" x="530" y="180" fill="#2563eb" data-page-node-id="7ZYGKSueqvaO9Z9gMQwPSn">快恢复：ssthresh=cwnd/2=12，cwnd 直接跳到 12</text>
+      <text class="asub" x="560" y="197" fill="#2563eb" data-page-node-id="vsdAK48gD2jqwd7tfRFTCf">继续拥塞避免线性增长</text>
+      <rect x="620" y="220" width="380" height="140" rx="10" fill="#f6f8fb" stroke="#dde3ec" data-page-node-id="djFmeurodWhMhUIEjykqj4"/>
+      <text class="albl" x="640" y="248" font-weight="700" data-page-node-id="O5yR1956nZ0aQnJ4cOUOpb">如果丢包是「超时」而不是重复 ACK：</text>
+      <text class="ntxt" x="640" y="274" data-page-node-id="ZKsyAtMfIK2MFlOHx9mu6B">ssthresh = cwnd/2，但 cwnd 归 1 →</text>
+      <text class="ntxt" x="640" y="298" data-page-node-id="72lFrnF9Pmi86qDFWR6sjR">重新慢启动到新 ssthresh（更保守）。</text>
+      <text class="ntxt" x="640" y="330" data-page-node-id="fKlfvrhFeGCVKNX3mAroNN">四算法记忆：<tspan font-weight="700" data-page-node-id="Cs5gZX1v6TAmBkeUVdRoUS">慢启动 · 拥塞避免 · 快重传 · 快恢复</tspan></text>
+      <text class="ntxt" x="640" y="352" data-page-node-id="PQIgW4IhWaGrZnuMu4MeT3">慢启动/拥塞避免必考；快重传/快恢复成对出现。</text>
+    </svg>
+    <figcaption data-page-node-id="uBpmLnhCBO89S9ZVCWodlJ">图 14 · 拥塞窗口演化曲线：慢启动 → 拥塞避免 → 丢包 → 快重传/快恢复</figcaption>
+  </figure>
+  <table class="cmp" data-page-node-id="eTemzfRXPzciBgjbHuLFtD">
+    <tr data-page-node-id="spTrpzpfT9v9cZVtreq4xv"><th style="width:130px" data-page-node-id="MegwooHhulXxNkFTmlFTnb">算法</th><th data-page-node-id="H6h44DBtqzIAkDPzMOSASu">触发条件</th><th data-page-node-id="TK2hxa0fjO2o6MGgsN3yGe">动作</th></tr>
+    <tr data-page-node-id="9WFCevyil0gqE3YxG4yzlY"><td data-page-node-id="QLOIdhfydRmUyqHgo1AKWF"><b data-page-node-id="FheCjWtaBAMBIR65iNWLp7">慢启动</b></td><td data-page-node-id="G1ckyoWkgAlfa9gaR3DbQc">连接刚建立 / 超时后重启</td><td data-page-node-id="n6F5gCldX80ZsKmhTK45Pd">cwnd=1（或初始窗口 10），每轮<b data-page-node-id="brjHlVzKibETuPW7U2PaI8">指数</b>翻倍，直到 ≥ ssthresh</td></tr>
+    <tr data-page-node-id="uaD6vup3lzWWnf9BcFlqAo"><td data-page-node-id="Qi9xqTSRXjFMZ7hlWHZGCR"><b data-page-node-id="BBvMU69f1yLEx9wePWmrKT">拥塞避免</b></td><td data-page-node-id="h86CH2AhWddhDURZszaPhu">cwnd ≥ ssthresh</td><td data-page-node-id="Zcu4EePYkg3viBpMKyHU4B">每轮<b data-page-node-id="Xnwj2xe8O1JTXweEDwBSi8">线性加 1</b>（加法增大）</td></tr>
+    <tr data-page-node-id="90BtO2n1IpK51EePQe2Bcp"><td data-page-node-id="LJYCe0K0qnMGLazMSFPHnG"><b data-page-node-id="VjCqa4gGYT5SoXG8qnVENf">快重传</b></td><td data-page-node-id="7nHf0nDI62YIQ3KioKWSyJ">收到 3 个重复 ACK</td><td data-page-node-id="MPhHAYdzIpm9kRiCznOxYA">不等超时，立即重传丢失段</td></tr>
+    <tr data-page-node-id="KJgqAWnUgH0yldbR8sRftM"><td data-page-node-id="mb0PnPjW1ZxLmYx7aShFda"><b data-page-node-id="HuAAMxxpxD3b9LTZ5YnC3t">快恢复</b></td><td data-page-node-id="ANFmlcNXuDw9cJDCsq4l8X">伴随快重传</td><td data-page-node-id="zI3E29OhR1FmjCc5nPcUft">ssthresh=cwnd/2，cwnd=新 ssthresh（乘法减小后继续线性）</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="6to9N13LpUqZJtfECFCCad">超时与重复 ACK 的动作不同：<b data-page-node-id="CV8PFWKy27z19tyfQEWbra">超时 → cwnd 归 1 重新慢启动</b>；<b data-page-node-id="aUgnZrPZEJff7IgcAaU0GM">3 重复 ACK → 减半不归 1</b>（说明网络还在送 ACK，没瘫）。初值 ssthresh 通常 16（教材图），实际 Linux 初始 cwnd=10。捎带：发送窗口 min(rwnd, cwnd)，两端题目常设 rwnd=4000、cwnd=2000 之类，答案是 min。</div>
+</section>
+
+<!-- ================= 15 握手细节 ================= -->
+<section id="s15" data-page-node-id="uxSNwX0nFuD7XOKpl2wHoT">
+  <h2 data-page-node-id="nXoZQDpSn3dNeKziSU3ktG"><span class="no" data-page-node-id="Oih0nFeZyhNXFG5bVgfQL9">15</span>三次握手为什么是三次？TIME_WAIT 为什么等 2MSL？</h2>
+  <h3 data-page-node-id="52ojGgdw3FIu3M6KyElP5D">15.1 三次不可省（标准答案）</h3>
+  <ul data-page-node-id="L1CamUzvgvCdDADgvouZlS">
+    <li data-page-node-id="Y58MDVhn5jA0EPvdjT6R2j"><b data-page-node-id="CI3AQuUMC2EVo9gGKJ8J2X">两次不够</b>：若只有 SYN→SYN+ACK 两次，服务端发出 SYN+ACK 后即认为连接建立；若这个报文<b data-page-node-id="12mC8EypVWcguJjKP3NxSS">滞留在网络中</b>，客户端迟迟不回 ACK，服务端就一直干等 —— 资源泄漏（历史上著名的「已失效连接请求」问题）。</li>
+    <li data-page-node-id="lSfuyZrgB1pIVINoE1FCny"><b data-page-node-id="PquNi5CjXmKLWHwP5rCF39">四次冗余</b>：第三次 ACK 可与第一个数据段合并发送，四次浪费一个 RTT。</li>
+    <li data-page-node-id="sh5ZORZ7xPbDTpiB3aBNtK">本质：三次是让<b data-page-node-id="ohAWcDTdRvZxV9aKAanUxV">双方的「发送能力 + 接收能力」都得到对方确认</b>的最少次数，并同步双方初始序号 x、y。</li>
+  </ul>
+  <h3 data-page-node-id="VRZsEoHEEeTwrdOGeNIEVB">15.2 SYN Flood 攻击与防护</h3>
+  <p data-page-node-id="ZJgKKjyQX27ylG4VSxLZZz">攻击者海量伪造 SYN 且不回最后的 ACK，服务端半连接队列被塞满。防护：<b data-page-node-id="bwF6lJ2pRIueo6PacnVW9n">Syn Cookie</b>（不保存半连接状态，把状态编码进序号回传）、缩短半连接超时、网关 SYN Proxy 代理。</p>
+  <h3 data-page-node-id="wvMF0dXqAH3ltm5sGmAlc7">15.3 四次挥手与 2MSL（TIME_WAIT）的两个原因</h3>
+  <ul data-page-node-id="1AsA60oFGLdUfLATrCEifS">
+    <li data-page-node-id="qb1NkIhgK5RtLa2Nt4uSNA"><b data-page-node-id="kc2mTZuAvmmbNyRcTcdObj">① 保证最后的 ACK 可达</b>：若最后的 ACK 丢了，对方会重传 FIN；主动方此时还在 TIME_WAIT 中就能重发 ACK。等满 2MSL 后才彻底关闭 ——「一个来回的保底时间」。</li>
+    <li data-page-node-id="YkxZ43BHle4MqZ0YmXdSS2"><b data-page-node-id="FcXPROPcTReoXMlcO9Jtid">② 让本连接的旧报文在网络中自然消亡</b>：新连接（同四元组）不会收到旧连接迷路的报文。</li>
+  </ul>
+  <div class="note exam" data-page-node-id="fLGyuoUTXHBNBJFcxbzYwF">MSL（最长报文段寿命）典型 2 分钟。主动关闭方才有 TIME_WAIT；大量 TIME_WAIT 是短连接服务的通病（内核参数 tcp_tw_reuse 等可缓解）。另外挥手也可能变「三次」：服务端若无数据要发，ACK 与 FIN 可合并（延迟确认机制）。</div>
+</section>
+
+<!-- ================= 16 HTTP/HTTPS ================= -->
+<section id="s16" data-page-node-id="jnKYT9G5wRJS089RmMB9j6">
+  <h2 data-page-node-id="OW9Rdm78p9MItlGew5egM0"><span class="no" data-page-node-id="v2pIwy3ZgFvxIu8nJ9vQm8">16</span>HTTP 报文结构、状态码、1.0/1.1/2 演进与 HTTPS(TLS) 握手</h2>
+  <h3 data-page-node-id="6GD36dpgCvSUdYsD2EBSWy">16.1 HTTP 报文结构（ASCII 文本协议）</h3>
+  <pre class="cmd" data-page-node-id="5m62rrhbo4Um6WVcocOSNr"><span class="cm" data-page-node-id="a4u4TZBYw06p8JU8gYdwjC"># 请求报文</span>                                  <span class="cm" data-page-node-id="5xGNbw8qaAGmpFUsDFQ4lE"># 响应报文</span>
+GET /index.html HTTP/1.1        ← 请求行    HTTP/1.1 200 OK               ← 状态行
+Host: www.example.com                      Content-Type: text/html
+User-Agent: Mozilla/5.0        ← 首部      Content-Length: 1024          ← 首部
+Accept: text/html                          Cache-Control: max-age=3600
+<span class="kw" data-page-node-id="a8HTmAb2BJhuUns8YX0gHN">（空行）</span>                                    <span class="kw" data-page-node-id="ZyZbrVFCT9WuuwprHRCXzv">（空行）</span>
+（可选请求体）                               &lt;html&gt;…&lt;/html&gt;                ← 实体主体</pre>
+  <table class="cmp" data-page-node-id="378kDgL4Cma3hsP8PPb0uB">
+    <tr data-page-node-id="4xX1iMEFwB7ctLaPmxXXkF"><th style="width:110px" data-page-node-id="baKoQxPrFvhYA2B4SYyxOK">方法</th><th data-page-node-id="F2OcnSUNnUjbUil6EpI4Ff">语义</th><th style="width:110px" data-page-node-id="hQQeHWXPZOUcihWG0hXHv5">状态码</th><th data-page-node-id="frweJNHpFXsGc0P6DbaMlD">含义</th></tr>
+    <tr data-page-node-id="HSqobEKgQoi8LRRjkPFBS1"><td data-page-node-id="dt1DMeIq60NnIenDTJbYgF"><b data-page-node-id="fq8Jd8cQJ90WeoMxPX2bfo">GET</b></td><td data-page-node-id="m9OTPjbsEJBOrZYw6A6B9X">读资源（参数在 URL，可缓存可收藏）</td><td data-page-node-id="W9NAbn4VMrrrfg1MxodhEG"><b data-page-node-id="ovsi4ohC6VjTx2VaSFNCFD">200</b></td><td data-page-node-id="DeLN3N3VSbbDoKw0ZUhelN">成功</td></tr>
+    <tr data-page-node-id="KtKxqvGKYVa8qHqKwLQXF6"><td data-page-node-id="HGpTh4BWmrnLFLMcGkSg2O"><b data-page-node-id="5Eu9Kh70QBrdlmJZiz76JP">POST</b></td><td data-page-node-id="2hafmxajF6dzc3tCCe0Gbr">提交数据（表单体）</td><td data-page-node-id="LQAHHr76HFzDFKL2IzqOC3"><b data-page-node-id="yk3eH9dxMbFSj1gLRLgCEH">301 / 302</b></td><td data-page-node-id="GJUKCSg4EbcYQVR8iWnzoB">永久 / 临时重定向</td></tr>
+    <tr data-page-node-id="5eyWM5mGlbexDEunIrWOmm"><td data-page-node-id="LWGVTJBJrmBFEtxGrfFf2S"><b data-page-node-id="zUUK0kSTz5Wkl01frPgEXb">PUT</b></td><td data-page-node-id="gf6DD1rE5WpQacgRE2ay48">整体替换资源</td><td data-page-node-id="Q7ffWAWjrzab5sXoDdeNf0"><b data-page-node-id="iUvMc4j9jt5I1mXMcFvPU2">304</b></td><td data-page-node-id="dgBReINQVq4HVIzFVT5Om1">缓存仍有效（配合 If-Modified-Since）</td></tr>
+    <tr data-page-node-id="aQGF5VcUd3zdgX9iEhVCrp"><td data-page-node-id="RzCy8kfdpf34eAA4nlWDd0"><b data-page-node-id="h6FMDrAd0ZB07kq2Bq44v6">DELETE / HEAD</b></td><td data-page-node-id="iCmFapFzCcBJrZlxMzvhu0">删除 / 只要响应头不要体</td><td data-page-node-id="XwD7mCzXdSQkwIaSSIFrPU"><b data-page-node-id="Xs4SaHBTGTXDyMRUDILM9D">403 / 404</b></td><td data-page-node-id="KyMxSaI3gHITQ28Gz2vM0w">禁止 / 资源不存在</td></tr>
+    <tr data-page-node-id="K6Bcu3Ivxa3UofZZRW5NNk"><td data-page-node-id="ipBALanMj4GEt06zOkgB2c">Cookie / Session</td><td colspan="3" data-page-node-id="U7mojM9vv3sRHXhMkpUBJf">HTTP 无状态 → Cookie 存客户端（服务端下发）；Session 存服务端（靠 Cookie 里的 SessionID 关联）</td></tr>
+  </table>
+  <table class="cmp" data-page-node-id="cnG7vjA1Apc2qSPHU7pycO">
+    <tr data-page-node-id="yc0mOZOwqwn8sS6DQtPhKC"><th style="width:110px" data-page-node-id="3NkImuCaQhkXGUvJMEzYKC">版本</th><th data-page-node-id="Ku1SUoiitZwB0GVmVhAzkN">连接模型</th><th data-page-node-id="gFxn0diRZ0qAvKdH5HyHvE">关键改进 / 缺陷</th></tr>
+    <tr data-page-node-id="9quLIOzCCyMIOqeXgyuGgz"><td data-page-node-id="uLYQ7zfRUdCXGIDDzrXKgC"><b data-page-node-id="V7K2onhBQxlDfrrYaXM67Q">HTTP/1.0</b></td><td data-page-node-id="oUvV2HrHQmAypPBv6sIfPg">短连接：每请求一次 TCP</td><td data-page-node-id="zPqZT1PVczB6GW4TvLEpkt">三次握手开销大</td></tr>
+    <tr data-page-node-id="VywGTlFy3by8ww6e7VFUFa"><td data-page-node-id="Y47dVFUo6Zx7JvaUqTeB9o"><b data-page-node-id="jpWNcDgIakrT1ooydrFeTc">HTTP/1.1</b></td><td data-page-node-id="WvTYY8qRhDKwCIDNn8Fi1S"><b data-page-node-id="YslEHdlYZsPuwjsWCpA6cb">持久连接 keep-alive</b>（默认）+ 管线化</td><td data-page-node-id="xnF0VcRyyKwPL94cI4rwV7">管线化有队头阻塞，实际靠并发多条连接</td></tr>
+    <tr data-page-node-id="CfUYQQqzLBqd6nENTjJsUe"><td data-page-node-id="zXw256g4EvQULDsEKQOx6J"><b data-page-node-id="phIMv1NXlPmksB4tl6rWFK">HTTP/2</b></td><td data-page-node-id="wGcRHuwNKXGCjkhnHITYRz">单连接多路复用 + 二进制分帧 + 头部压缩 + 服务器推送</td><td data-page-node-id="uY7VsQBkhxlO3EEgnO766k">TCP 层队头阻塞仍在 → HTTP/3 改用 QUIC(UDP)</td></tr>
+  </table>
+
+  <h3 data-page-node-id="yDpUTXHSPz4oO55qh4YJFI">16.2 HTTPS = HTTP over TLS：握手时序（非对称换密钥，对称传数据）</h3>
+  <figure class="fig" data-page-node-id="todKpFF81D9rrLxFYeNTG9">
+    <svg viewBox="0 0 1000 340" data-page-node-id="pby3dXfuLbGyB6PvMLHAB5">
+      <rect class="hbox" x="120" y="8" width="180" height="38" rx="9" data-page-node-id="ynK22ObR2LzFKmImICSWKs"/>
+      <text class="hname" x="210" y="32" text-anchor="middle" data-page-node-id="xML82EeGZ5FzDsxmiDQITE">客户端</text>
+      <rect class="hbox" x="700" y="8" width="180" height="38" rx="9" data-page-node-id="6xB4KAGjBCzpR9PLHumnDL"/>
+      <text class="hname" x="790" y="32" text-anchor="middle" data-page-node-id="M5xO6QoBn3LObCVbWn5eTG">服务器</text>
+      <line class="life" x1="210" y1="46" x2="210" y2="316" data-page-node-id="WgQsnH37aPWfHLH2Jmjz8y"/>
+      <line class="life" x1="790" y1="46" x2="790" y2="316" data-page-node-id="IUqCQCUZpWNwF5sWx6Eoad"/>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="214" y1="85" x2="786" y2="85" data-page-node-id="VMmBqPj8BsuXBoQKb6hLZH"/>
+      <text class="albl" x="500" y="74" text-anchor="middle" data-page-node-id="E1wtnYAuPOJUXL6KbFLGSK">① ClientHello：TLS 版本 + 客户端随机数 + 支持的密码套件</text>
+      <line class="ar" stroke="#0d9488" marker-end="url(#m-teal)" x1="786" y1="135" x2="214" y2="135" data-page-node-id="SZ4tHoFhtf9Gn585RvAhB3"/>
+      <text class="albl" x="500" y="124" text-anchor="middle" data-page-node-id="YVwe9aa8v0WndRbo8H89qA">② ServerHello + 证书（含服务器公钥，CA 签名）</text>
+      <text class="asub" x="500" y="142" text-anchor="middle" data-page-node-id="Q908z562G9GPUfBaOJZmy9">（ECDHE 模式还带服务器临时公钥）</text>
+      <rect class="fnote" x="255" y="160" width="230" height="30" rx="8" data-page-node-id="2LiSE8diyPXwCPdGmqCsxu"/>
+      <text class="ntxt" x="370" y="180" text-anchor="middle" data-page-node-id="dDwyKuAmozHXNf7ZMTG1qI">③ 客户端验证证书链（预置根 CA 公钥）</text>
+      <line class="ar" stroke="#7c3aed" marker-end="url(#m-violet)" x1="214" y1="230" x2="786" y2="230" data-page-node-id="LEUDbQbwcBAGAQA8DG4W2m"/>
+      <text class="albl" x="500" y="219" text-anchor="middle" data-page-node-id="f6dQjlsqXQVBXI9zeqEhJd">④ ClientKeyExchange（预主密钥 / ECDHE 参数）+ ChangeCipherSpec + Finished</text>
+      <text class="asub" x="500" y="247" text-anchor="middle" data-page-node-id="Uq1yR0GIddFGVG2EMPxup5">双方用「随机数1+2+预主密钥」独立算出同一会话密钥</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="786" y1="285" x2="214" y2="285" data-page-node-id="C3HyRVDvx3gTEKk1Hz95Ws"/>
+      <text class="albl" x="500" y="274" text-anchor="middle" data-page-node-id="9WZRewc6Ac0uFgTFxs6b7y">⑤ ChangeCipherSpec + Finished → 之后应用数据全部对称加密（AES）</text>
+      <text class="asub" x="500" y="316" text-anchor="middle" data-page-node-id="VZiCWBVF9EsxhJIbbOceCZ">非对称加密（RSA/ECDHE）只用在握手阶段换密钥 —— 解决「对称密钥怎么安全送达」；HTTP 先于 TLS 完成明文解析，TLS 在传输层与应用层之间</text>
+    </svg>
+    <figcaption data-page-node-id="B8BeFMSPNe4kDzUSt3UKEz">图 16 · TLS 1.2 握手时序（1.3 优化为 1-RTT）</figcaption>
+  </figure>
+  <div class="note exam" data-page-node-id="37Kwm3joIcz97e06W8Ylxs">HTTPS 默认 <b data-page-node-id="2rMG8GWImmJtC39ns3IbsG">443 端口</b>。证书验证三查：<b data-page-node-id="sTwBLeLj1wtPXgcuYD0BoB">签名链是否到受信根 CA · 域名是否匹配 · 是否在有效期</b>。ECDHE 相比 RSA 密钥交换的优势：每次会话临时密钥（前向保密），私钥泄露也解不开历史流量。</div>
+</section>
+
+<!-- ================= 17 FTP ================= -->
+<section id="s17" data-page-node-id="lEqyEyR2BGfa3LdiWB92kp">
+  <h2 data-page-node-id="yDyorpzz4bFVK8oZBUXCtV"><span class="no" data-page-node-id="zlgTxZDJEG6iqOHkyFJXGg">17</span>FTP：控制与数据双连接、主动模式 vs 被动模式</h2>
+  <figure class="fig" data-page-node-id="Hplop3tgrrC8OSx6oKTzrR">
+    <svg viewBox="0 0 1000 280" data-page-node-id="ATJCj13jz99Wp5XcLKZFuu">
+      <text x="250" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#d97706" data-page-node-id="TkvxFFS5M8RDMc5Yncbgad">主动模式 PORT（默认）</text>
+      <rect class="hbox" x="120" y="40" width="130" height="36" rx="9" data-page-node-id="JxbtcuEGTjVdAbTAZdpTca"/><text class="hname" x="185" y="64" text-anchor="middle" font-size="13" data-page-node-id="2Fp1KjwCZRTAfxr54JqX4h">客户端</text>
+      <rect class="hbox" x="260" y="40" width="130" height="36" rx="9" data-page-node-id="0QtrxCmJiPgvW7x5ys5nmO"/><text class="hname" x="325" y="64" text-anchor="middle" font-size="13" data-page-node-id="UI56MENebD3yodhY2KJ2vP">服务器</text>
+      <line class="life" x1="185" y1="76" x2="185" y2="250" data-page-node-id="NiDc0kC9EFdpoHoNe1TxMc"/><line class="life" x1="325" y1="76" x2="325" y2="250" data-page-node-id="DrVtxrEnGCc7seS9EGiBkX"/>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="189" y1="110" x2="321" y2="110" data-page-node-id="32OCzPs0SbDLOKdWD2F4NV"/>
+      <text class="albl" x="255" y="100" text-anchor="middle" font-size="12.5" data-page-node-id="XzcoX8QGV695WHnwEsysDo">TCP 21 · 控制连接（全程保持）</text>
+      <text class="albl" x="255" y="150" text-anchor="middle" font-size="12.5" data-page-node-id="3HV61g5H555jaJBWKq6Ta9">PORT 命令：告诉服务器</text>
+      <text class="albl" x="255" y="167" text-anchor="middle" font-size="12.5" data-page-node-id="mE5FgO3Wltpg1TUw9knImx">「我的数据端口是 p」</text>
+      <line class="ar" stroke="#0d9488" marker-end="url(#m-teal)" x1="321" y1="210" x2="189" y2="210" data-page-node-id="IsF0GJ2RzhK6j4VmwjGFCk"/>
+      <text class="albl" x="255" y="200" text-anchor="middle" font-size="12.5" data-page-node-id="EP7CEsEUxDMqBKFmODBcyN">服务器从 <tspan fill="#dc2626" font-weight="700" data-page-node-id="kwwzUFMGeJuarCjSt8Zznk">TCP 20</tspan> 主动连客户端 p</text>
+      <text class="albl" x="255" y="217" text-anchor="middle" font-size="12.5" data-page-node-id="cPJBKh9i64pGjoneiUVANZ">→ 建数据连接传文件</text>
+      <text class="asub" x="250" y="272" text-anchor="middle" data-page-node-id="HDfRwpyLWvcXQG1l44t7B1">缺点：客户端在 NAT/防火墙后会被入站连接打穿 → 现代网络常失败</text>
+
+      <text x="750" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#059669" data-page-node-id="jSjhduKiSW65LjTGTBjHAf">被动模式 PASV（浏览器/客户端默认）</text>
+      <rect class="hbox" x="620" y="40" width="130" height="36" rx="9" data-page-node-id="2fi8EKTVv6ft3MJm51484t"/><text class="hname" x="685" y="64" text-anchor="middle" font-size="13" data-page-node-id="NUInlsvbkCoHdiP29NUmMk">客户端</text>
+      <rect class="hbox" x="760" y="40" width="130" height="36" rx="9" data-page-node-id="yhc1joCbowIo90aUJzV6cs"/><text class="hname" x="825" y="64" text-anchor="middle" font-size="13" data-page-node-id="mvmSs6Ul5ZWGYFY8AXDql7">服务器</text>
+      <line class="life" x1="685" y1="76" x2="685" y2="250" data-page-node-id="4GsAYHA0Bmw1uWdw884Vqp"/><line class="life" x1="825" y1="76" x2="825" y2="250" data-page-node-id="0DbrXnxXjTPRwi6XYCjpOm"/>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="689" y1="110" x2="821" y2="110" data-page-node-id="Ofud3d7BaQ0QCH6D2S4MrX"/>
+      <text class="albl" x="755" y="100" text-anchor="middle" font-size="12.5" data-page-node-id="x2G1vGB5oten5Gr7FU0Q76">TCP 21 · 控制连接</text>
+      <text class="albl" x="755" y="150" text-anchor="middle" font-size="12.5" data-page-node-id="RrZVrvlItpEjqYxaGrbVqg">PASV 命令：请开个口</text>
+      <line class="ar" stroke="#0d9488" marker-end="url(#m-teal)" x1="689" y1="200" x2="821" y2="200" data-page-node-id="i7o6dm35GssxWwF11rNtka"/>
+      <text class="albl" x="755" y="185" text-anchor="middle" font-size="12.5" data-page-node-id="X9Vt2Wvwc7FrMkABU7AaP7">服务器随机开一个高位端口 q</text>
+      <text class="albl" x="755" y="202" text-anchor="middle" font-size="12.5" data-page-node-id="MgKNteUyglHhB57hg3MpbS">客户端<b data-page-node-id="I7KslgzDcFnpa0ZMzKnASQ">主动</b>连 q → 数据连接</text>
+      <text class="asub" x="750" y="272" text-anchor="middle" data-page-node-id="7NrOmvWihENlJ6yV6oKs3t">两个连接都由客户端发起 → 穿 NAT 友好；防火墙需放行高位端口段</text>
+    </svg>
+    <figcaption data-page-node-id="mfOD5SGrz9L4K3gVJIk4st">图 17 · FTP 两种模式的连接方向（考「谁主动连谁」）</figcaption>
+  </figure>
+  <div class="note exam" data-page-node-id="xqYd7xyFyEMAklmABJPTpr">FTP 控制连接<b data-page-node-id="uwjL8gRmpKdms3EJBOMUf2">整场保持</b>（带外传送命令），数据连接按需建立、传完即断。明文传输 → 生产环境用 <b data-page-node-id="GaMECtGaUTdnhDUjyGJ7hN">SFTP（SSH 通道）或 FTPS（TLS）</b>。FTP 传输两种方式：文本模式（ASCII，自动换行转换）与二进制模式（IMAGE，逐字节原样）——传压缩包必须二进制。</div>
+</section>
+
+<!-- ================= 18 DNS ================= -->
+<section id="s18" data-page-node-id="3aEWECPbn5zd8FvBRLeKSX">
+  <h2 data-page-node-id="p5Qj2XJ5zACAWZDreGCBHd"><span class="no" data-page-node-id="q0PXIg4llNllbLUTVJp8Jz">18</span>DNS 报文格式与资源记录（RR）类型</h2>
+  <table class="cmp" data-page-node-id="8tpaS70QWHwLeMQNDTiLtj">
+    <tr data-page-node-id="HUQLUBjd2ASJZCu45FCKpW"><th style="width:130px" data-page-node-id="4QoDuPXjzTADTNepgAnWz5">报文段</th><th data-page-node-id="o3DbzBAh2LDqZklqjvK6f6">内容</th></tr>
+    <tr data-page-node-id="32h06ujpB8xOnmbwhYBjDp"><td data-page-node-id="1mUPtVdsM1MQp4QmuPoG3O"><b data-page-node-id="sHIxX8EvyjR8pXL50gVTEf">首部 12B</b></td><td data-page-node-id="BQhZ5O8hK4q66Y0tlNm19j">事务 ID（匹配问答）+ 标志位（QR 查询/响应 · RD 期望递归 · RA 可递归 · RCode）+ 四个「数量」字段</td></tr>
+    <tr data-page-node-id="CpZzFqjSV5Wkyf8xFJUheL"><td data-page-node-id="VSXJyn4eTEeS8ehVkVgEid"><b data-page-node-id="sdv4422moyx4nmYmqCrUFL">问题区</b></td><td data-page-node-id="78jDxnhimBPnmz3uoNUrln">查询名 + 类型 + 类（IN）</td></tr>
+    <tr data-page-node-id="uq7aUi4XhM3JANLGamrkws"><td data-page-node-id="AeeaCHANmPq6ZQSkjjDgeG"><b data-page-node-id="asZY4dDPeXSbUndsMQvBEm">回答 / 授权 / 附加区</b></td><td data-page-node-id="CdXuh9LHL8U2utdHeGO8CV">若干资源记录 RR（响应报文才有）</td></tr>
+  </table>
+  <table class="cmp" data-page-node-id="SF9ILqBL2AzQozprIqcBZl">
+    <tr data-page-node-id="qGirBwOC9wlfxQBeZj5rBF"><th style="width:120px" data-page-node-id="EpA2QBdqicyGH0iGkJPDh6">RR 类型</th><th data-page-node-id="1S8ansKZBqkvzSROQLsVHW">记录内容</th><th data-page-node-id="n5EppI2Cov5YqaALsZSZIO">示例</th></tr>
+    <tr data-page-node-id="D3gH0k66MdQmRgdjXfIBNC"><td data-page-node-id="u6P0z1DpuIKNTmbffRV6Gs"><b data-page-node-id="PTSM2eTAiFFuZu70mGW6Sx">A</b></td><td data-page-node-id="yLpjopsLhVnwKJanJ7hDHi">域名 → IPv4</td><td data-page-node-id="abXh3bmbRvMFEAPnWHX4Hd">www.example.com → 93.184.216.34</td></tr>
+    <tr data-page-node-id="tmy7mwBLJqCx7zYAP9T8sR"><td data-page-node-id="LtZcOmk0ioTtqu8php00xp"><b data-page-node-id="m6dXC1vP1qpBwRkQJungJo">AAAA</b></td><td data-page-node-id="Yy6QsdSCnmkQsIOHaaIFVP">域名 → IPv6</td><td data-page-node-id="9VmRpIhgMUVyvkI6zCd6UQ">www.example.com → 2606:2800::1</td></tr>
+    <tr data-page-node-id="mBadStpUNuJDpNRC5E7W4B"><td data-page-node-id="Fmjolrec8NEXoazDDKUQYc"><b data-page-node-id="CcDLvtrWmgzQXVLXqR7wRl">CNAME</b></td><td data-page-node-id="V5AdvPjAGUrsLG92IGv6wn">别名 → 规范名（再查一次）</td><td data-page-node-id="DeJsFythdSAhH1Eohh3HWx">blog.example.com → example.github.io</td></tr>
+    <tr data-page-node-id="BURpcLrCvHf3jwVXhZf1OE"><td data-page-node-id="DkI3tB7U3Ln0minWP45O05"><b data-page-node-id="aLPxV1DfSk81eJTKwcNCEq">NS</b></td><td data-page-node-id="V76mEcBcbjEEiVFDCas2jf">区域的权威 DNS 服务器</td><td data-page-node-id="Ul9VbP0Xkild7FduANbxuP">example.com 的 NS = ns1.provider.com</td></tr>
+    <tr data-page-node-id="JyTN1eWyTsnz70aD3VDGIW"><td data-page-node-id="OCiW4G33S3mrzdLhdMap9z"><b data-page-node-id="3kfLSIbS4uLOQKNC4BRTH2">MX</b></td><td data-page-node-id="WDWBHCivUJtudY6uLcxcOS">邮件交换服务器（带优先级）</td><td data-page-node-id="H5ayICUCmHsViExIeCzxjp">example.com → mail 优先级 10</td></tr>
+    <tr data-page-node-id="73XsHG8unNtiFgHo2zGnAy"><td data-page-node-id="xlHkpYCcmFAsgPzx7ZCjvo"><b data-page-node-id="zZOWObYJg2DEATkXK9Mqkj">PTR</b></td><td data-page-node-id="8JCSOu1gA7r5SPcPKJc1I6">IP → 域名（反向解析，用 in-addr.arpa 域）</td><td data-page-node-id="otXIHU65CBsZXS2lglMHAS">34.216.184.93.in-addr.arpa → www…</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="dZsIREYWZjEPV08EbHz0jZ">① 查询走 <b data-page-node-id="3CTywhPmbdCyw8zYNLeCSr">UDP 53</b>（响应超 512B 或区域传送 AXFR 用 TCP 53）。② 递归与迭代分界：主机→本地 DNS 递归；本地 DNS→根/顶级/权威迭代。③ 根服务器全球 13 套逻辑地址（a~m.root-servers.net），靠任播镜像分布。④ 缓存 TTL 由 RR 自带，命中顺序：浏览器缓存→hosts→本地 DNS 缓存→正式查询。</div>
+</section>
+
+<!-- ================= 19 DHCP 租约 ================= -->
+<section id="s19" data-page-node-id="gFmq6se1R7xkiyp1tk8Uuf">
+  <h2 data-page-node-id="BL1J30ypmqL6g0xCyfND56"><span class="no" data-page-node-id="JStUw9njqbClvHDjols8HB">19</span>DHCP 租约生命周期、中继与安全（Snooping）</h2>
+  <figure class="fig" data-page-node-id="gIbiIlN1Fv0hrbaQzgcBIo">
+    <svg viewBox="0 0 1000 200" data-page-node-id="WsSTnHphGDhg8v1slz9RkG">
+      <line x1="80" y1="90" x2="920" y2="90" stroke="#334" stroke-width="2.5" marker-end="url(#m-gray)" data-page-node-id="VUKVcQWPLFSZHMrPPejmVA"/>
+      <text x="80" y="120" text-anchor="middle" font-size="12.5" fill="#059669" font-weight="700" data-page-node-id="YVJh6cp6Aa98oqnrXY4Cyg">0%（获得租约）</text>
+      <text x="80" y="138" text-anchor="middle" font-size="11.5" fill="#7b8595" data-page-node-id="gPDo17EFAFCIeAxrjiFV97">DORA 完成</text>
+      <line x1="500" y1="70" x2="500" y2="110" stroke="#d97706" stroke-width="2.5" data-page-node-id="korg1gQTIq0UyqGoDOX1b2"/>
+      <text x="500" y="52" text-anchor="middle" font-size="12.5" fill="#d97706" font-weight="700" data-page-node-id="2VTCFNBrKvwg5SfJkJ6E9o">T1 = 50% 租期</text>
+      <text x="500" y="132" text-anchor="middle" font-size="11.5" fill="#7b8595" data-page-node-id="b9fcl7Jmfmbz4ZvyrQXCdM">单播 Request 向原服务器续租（Init-renew）</text>
+      <text x="500" y="149" text-anchor="middle" font-size="11.5" fill="#7b8595" data-page-node-id="PUcnE5gBllaGzhRk6NN80H">成功 → 租期重置；失败继续用</text>
+      <line x1="875" y1="70" x2="875" y2="110" stroke="#dc2626" stroke-width="2.5" data-page-node-id="X5OlWjdE7kueKyyR6l42om"/>
+      <text x="875" y="52" text-anchor="middle" font-size="12.5" fill="#dc2626" font-weight="700" data-page-node-id="obIswVaDrh3woiyVQW7TK8">T2 = 87.5%</text>
+      <text x="875" y="132" text-anchor="middle" font-size="11.5" fill="#7b8595" data-page-node-id="T44OqDeGA0wD8TEbYHacHD">改广播 Request（Rebinding），</text>
+      <text x="875" y="149" text-anchor="middle" font-size="11.5" fill="#7b8595" data-page-node-id="Vowddgsx1EnxECK2P2DN62">任何服务器可应答</text>
+      <text x="920" y="120" text-anchor="end" font-size="12.5" fill="#dc2626" font-weight="700" data-page-node-id="EFLhQPm3ilC0WTsh1t8A0G">100% 租期到</text>
+      <text x="920" y="138" text-anchor="end" font-size="11.5" fill="#7b8595" data-page-node-id="ENj0WolVh3QKNwrS58ZFwF">释放地址 → 重新 DISCOVER</text>
+      <text class="asub" x="500" y="185" text-anchor="middle" data-page-node-id="O97CkpnUBvFKst5ZjMjGw2">华为设备租期默认 1 天；ipconfig /release + /renew 手动走一遍；DHCP 中继（Relay）让跨网段客户端也能拿到地址：中继代理把广播转单播并填入 giaddr 字段（网关 IP）供服务器选地址池</text>
+    </svg>
+    <figcaption data-page-node-id="NX6fBdQQnJVUvokoDK4EYH">图 19 · DHCP 租约时间轴：50% 续租 → 87.5% 重绑定 → 100% 重新初始化</figcaption>
+  </figure>
+  <table class="cmp" data-page-node-id="HxdFGK4NCiUAiH6zG8wlFt">
+    <tr data-page-node-id="TVllQbqjn65Z5F6903W6cQ"><th style="width:130px" data-page-node-id="spRL5BKzugUuk6oMveV1Hp">报文</th><th style="width:100px" data-page-node-id="MGCzhSBzokd41h5rmtEZfc">方向</th><th data-page-node-id="abCUuYm7SUEPjyWEOs45ZD">作用 / 考点</th></tr>
+    <tr data-page-node-id="M6iIcuPAYjixmfVk2KCWWs"><td data-page-node-id="cFENJ1HwK6R6TfD2Z7B6J2"><b data-page-node-id="EMqpcaaESiabQYCLLY8BaG">Discover / Offer / Request / ACK</b></td><td data-page-node-id="ze109gVC5YKiAa5MbgRsqt">C↔S ×4</td><td data-page-node-id="LEaTjPGG2Xcz6hgUybyyil">DORA 主流程</td></tr>
+    <tr data-page-node-id="7MDfDixMDwigSGh4DnAqgu"><td data-page-node-id="xfwMUDdafQZajrhej9nZIY"><b data-page-node-id="4lt4lqzV4Bcc7X6DtQ30fj">NAK</b></td><td data-page-node-id="7xDyW8qN05ExAIa4L7uN17">S→C</td><td data-page-node-id="o9rHLbxvwhJF08VY8P9aD3">请求的地址不可用（如地址池变了）</td></tr>
+    <tr data-page-node-id="IvSdKIp1EgBVLv3n9h8EAr"><td data-page-node-id="ABiMW6JBrU1KPeQVJbcC4Q"><b data-page-node-id="eGNDl2b0b8Ac9BMGVD6v4Y">Decline</b></td><td data-page-node-id="tYgvucarsHv2PkQb75cOVd">C→S</td><td data-page-node-id="BIzSRMZZ8KdVUq13EfzDO3">客户端发现地址冲突（做了免费 ARP 检测）</td></tr>
+    <tr data-page-node-id="wCb6pqDFAokNQ7er7Pn4uR"><td data-page-node-id="r2q6xVcxkjFcftKLncFBjK"><b data-page-node-id="drI8VyrqyGESaKaCBNzIgE">Release</b></td><td data-page-node-id="Sf35Uz5rFhERhNHDRhZ3T2">C→S</td><td data-page-node-id="Pc8xiuPhQIf0Ri0jqTNrWF">主动退租</td></tr>
+    <tr data-page-node-id="bUvnOWbvUGTRQq36QC4t1g"><td data-page-node-id="uXbj5LQvOi4G0pyGQRiJ8f"><b data-page-node-id="yh0gIjWInZIkdsC1tKT8C8">Inform</b></td><td data-page-node-id="afW22805D51ED9oRgXz0V4">C→S</td><td data-page-node-id="dVrbVmmrzvLofbYhcWN7rZ">已有静态地址，只要其余配置（DNS/网关）</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="rHHH0UvqWkxUPrOwRYycZ6"><b data-page-node-id="ZXSReQqGmITC3UAnUQuypB">DHCP Snooping</b>：交换机把接合法服务器的口设为「信任口」，其余口丢弃 Offer/ACK —— 防私接 DHCP 服务器（中间人劫持）；同时从合法 DHCP 报文中生成「Snooping 绑定表」（IP-MAC-端口），供 ARP 检测/IP 源防护引用。</div>
+</section>
+
+<!-- ================= 20 SSH 与邮件 ================= -->
+<section id="s20" data-page-node-id="WXsgBK6yTfzHCwq7HA2H4S">
+  <h2 data-page-node-id="uQHDmYaDcVbIkGtzI87XLU"><span class="no" data-page-node-id="KJeaQZSPgpvUHBDRArnBm1">20</span>SSH 握手四步 vs Telnet；邮件系统推拉模型</h2>
+  <h3 data-page-node-id="on6JhFBPA9aqo9v0CVqmoC">20.1 SSH 会话建立（TCP 22 之上的应用层协议）</h3>
+  <ol data-page-node-id="daOqoKjJ8XaBnTP2iiSNLW">
+    <li data-page-node-id="WDILW7ETSMpJyOATALTn8D"><b data-page-node-id="2UfqZ0CJAI5GGkgyKcP5dW">版本协商</b>：双方交换 SSH-2.0 协议版本字符串。</li>
+    <li data-page-node-id="wQhXrIiFmGIVBejFIXEUZ8"><b data-page-node-id="ti1YHZh6c4P3x1xResj7FT">算法协商</b>：交换各自支持的加密/HMAC/压缩算法列表，取双方交集。</li>
+    <li data-page-node-id="V95oUnN20Igzs7nuJsO4QC"><b data-page-node-id="zak0owhLwBfbJRCfNBrtun">DH 密钥交换</b>：协商会话密钥（服务端发主机密钥指纹，客户端核对 known_hosts 防中间人）。</li>
+    <li data-page-node-id="HcD4RnsKfgFNUVmR5FB4tI"><b data-page-node-id="v3tJ1CgWhEcWrRe2x7R7wF">用户认证</b>：password / publickey（RSA/ECC 密钥对，免密登录）/ keyboard-interactive；认证后进入加密会话通道（可复用跑 SCP/SFTP/端口转发）。</li>
+  </ol>
+  <table class="cmp" data-page-node-id="vOSFC9FYsyeEGXMtGQHkeV">
+    <tr data-page-node-id="o9fiFmoC6jwjR73Ra0UIKo"><th style="width:150px" data-page-node-id="BgUHBWgQycpDt10hloX6mt">对比项</th><th data-page-node-id="IDI9ujdCczAmjjpVxe9C7u">Telnet（TCP 23）</th><th data-page-node-id="S6RbhTgYRE111uC5HJ3Kmx">SSH（TCP 22）</th></tr>
+    <tr data-page-node-id="bEG3geNQPaivbnj5ZqjH13"><td data-page-node-id="D1y5gqJhwOhHwxaYdJ4gqi">数据</td><td data-page-node-id="DK7sqzXWYHga9HjhCv1x9t">全部明文（口令可被抓包）</td><td data-page-node-id="tKvDGCz9gVKIQGKKKEosgo">全程加密</td></tr>
+    <tr data-page-node-id="Or6lAmTuCUezAx4qEGM9bi"><td data-page-node-id="jlY4Snz3i6GVXT19AdHYPk">认证方式</td><td data-page-node-id="yEnGSCAkXD2L5r2KBF1HGG">仅口令</td><td data-page-node-id="rYEG8GczF6HH3VTkEGLEyR">口令 / 公钥密钥对</td></tr>
+    <tr data-page-node-id="wAkEpq4Nlk0QCJwAQX7XX6"><td data-page-node-id="gCxn637cgMixhkXk1pDGE2">完整性强</td><td data-page-node-id="eIrvUgxHyrgOTA3nwmG6JO">无</td><td data-page-node-id="wszTBV0knBxMQVyKFTHUcH">HMAC 完整性校验</td></tr>
+    <tr data-page-node-id="itHc4eQxptaFwkFlsEWYkU"><td data-page-node-id="noO5xD6xs6UGFu38k4Qn5i">结论</td><td colspan="2" data-page-node-id="lGdhUilvAfdpKasZpVdwGW">设备远程管理一律 <b data-page-node-id="gHOzfTHyv2v4sOyNaRngOK">Stelnet（SSH）</b>，Telnet 只在受控实验网保留</td></tr>
+  </table>
+  <h3 data-page-node-id="xMHT63TvxPaEexyHzGI7ra">20.2 邮件：发送「推」、接收「拉」</h3>
+  <p data-page-node-id="UCLSBYBz3ZgIf63uvSM858"><b data-page-node-id="6yBzGMU33VAGzSYrPpRFy3">发件方 UA →（SMTP 推）→ 发件服务器 →（SMTP 推）→ 收件服务器 →（POP3/IMAP 拉）→ 收件方 UA</b>。SMTP（25，提交用 587）只管推、只能传 7 位 ASCII → MIME 扩展编码传附件。POP3（110）下载到本机（默认删服务器副本）；<b data-page-node-id="q2PqcZ6ShQxZr4xh7H4mFi">IMAP（143）邮件留在服务器、多端同步</b> —— 现代邮箱标配。Web 邮箱两端都是 HTTP。</p>
+</section>
+
+<!-- ================= 21 ACL ================= -->
+<section id="s21" data-page-node-id="Kgamh6BDEKYVGDiZxO1dcm">
+  <h2 data-page-node-id="TyAiQ5hBBZaSFCFBE94yZ6"><span class="no" data-page-node-id="vbEKjUwx2UO2Jpe1OhGp6z">21</span>ACL 访问控制列表：分类、通配符掩码、匹配规则与部署位置</h2>
+  <p class="intro" data-page-node-id="NuRYrakAwQIFsbGZqH1qtM">ACL 是路由器/交换机上的一条条「规则」，对经过的报文按五元组匹配后执行 permit / deny。它本身不是安全功能，是一张「匹配表」，被 traffic-filter、NAT、QoS、路由策略引用后才生效。</p>
+
+  <h3 data-page-node-id="zt1qnjQ7Zx493Q8fsnszLM">21.1 分类（华为编号段必背）</h3>
+  <table class="cmp" data-page-node-id="DLCdM8UyIejP13J8e00ZoS">
+    <tr data-page-node-id="YfzesM4S0B15vNjpbSTijM"><th style="width:120px" data-page-node-id="L55Ax31ks55fHFRKEfAV5P">类型</th><th style="width:150px" data-page-node-id="MJXF3r4gVBoKOmNlGuyIPC">编号范围</th><th data-page-node-id="qeb5Dr5IziKPMF8D15vv6E">可匹配字段</th><th data-page-node-id="ALbqicdHnMv3LjBHSBivGb">典型用途</th></tr>
+    <tr data-page-node-id="fL2JwV2wKUkPVKt59PUuSi"><td data-page-node-id="nGFEF0wLs4hXCVlXASnq5L"><b data-page-node-id="uG94ajlIKkD2UsWO77TrnA">基本 ACL</b></td><td data-page-node-id="SELEfqOJpQsbJkeYHAEFVz"><b data-page-node-id="AWULMZcshWbWFTuIpFA8FS">2000 ~ 2999</b></td><td data-page-node-id="4RUT4RWVFUnzQCCgx6OKiP">只看<b data-page-node-id="YYgKzp8sDhwA7xUguDw6Us">源 IP</b></td><td data-page-node-id="l0XqOVac11baSbQfH3DKjm">简单限制；<b data-page-node-id="uvUyj2Aq5s4ZgGHOnQHIMg">靠近目的部署</b>（避免误伤其他流量）</td></tr>
+    <tr data-page-node-id="foJApfVNQsDH3fKJdf9wrd"><td data-page-node-id="7H9Y2SZRH6KSvEBqTOQfTY"><b data-page-node-id="TbGnn0HASPuuTxKBWaPCiK">高级 ACL</b></td><td data-page-node-id="HX6IKqqrYIMHnf5IIubpBf"><b data-page-node-id="2GvPTgkMtMKqczoVT5GWsf">3000 ~ 3999</b></td><td data-page-node-id="eNu2KXUzoQ7uu04TzdxSDX">源/目 IP + 协议号 + 源/目<b data-page-node-id="FNL65jIqi8DtB3T27r9IC0">端口</b>（五元组）</td><td data-page-node-id="Uf9FTg2UDEb7QXqQcGVhSC">精确控制；<b data-page-node-id="utDH6mV9WdT42tEbGEHgk0">靠近源部署</b>（尽早丢弃省带宽）</td></tr>
+    <tr data-page-node-id="atsTlaZexcD9hqnDGmBBgb"><td data-page-node-id="B6wDzMTk2fURd9JqHgenO1">二层 ACL</td><td data-page-node-id="DR12u9QQYdVYUOgeJuz6DE">4000 ~ 4999</td><td data-page-node-id="XtDTKqO3nDPj85orfCftfb">源/目 MAC、以太帧类型</td><td data-page-node-id="5nEFcYLyxs2ppSKVpQsvst">二层过滤</td></tr>
+    <tr data-page-node-id="N74WHhb2okSIoBlq4CMHiZ"><td data-page-node-id="x4hRf8UpDntzl80KZ2XRFq">用户自定义 ACL</td><td data-page-node-id="aC6r5BgbuLuLuZrkwrS9q3">5000 ~ 5999</td><td data-page-node-id="7hEHzGwrNs4bjxOUR7a0EX">报文任意偏移字节</td><td data-page-node-id="CUn9IEsjpgM1NSYid1jTkh">特殊协议</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="4IDoEIHscqTiziITMOaJxW">部署口诀（考试原题级别）：<b data-page-node-id="RfIWVHGLu1gXPEltZH6z7a">「基本 ACL 靠近目的，高级 ACL 靠近源」</b>。原因：基本 ACL 只认源 IP，放太靠源会把该源发往其他目的的正常流量也拦掉。</div>
+
+  <h3 data-page-node-id="OIyj03FeMWwMFc4XkbNgOT">21.2 通配符掩码（wildcard，与子网掩码写法不同！）</h3>
+  <ul data-page-node-id="QWezqBOkWrLBF10SaTbHyA">
+    <li data-page-node-id="iTyi9HWNDAwIiWDzxeCxIE">规则：<b data-page-node-id="TQBvq8BYMOpwfDyYAT6MzR">0 = 这一位必须严格匹配，1 = 这一位随意</b>。不是掩码的反写那么简单 —— 中间可以不连续。</li>
+    <li data-page-node-id="x6qYVVxu8orz4AXtzJoXFq"><b data-page-node-id="2XnCfqxvmuywL8uPi3gvY4">192.168.1.0 0.0.0.255</b> → 匹配整个 C 段；<b data-page-node-id="sMAzIkxJDltt4ADKI5k0cR">192.168.1.1 0.0.0.0</b>（或 host 192.168.1.1）→ 匹配单机；<b data-page-node-id="6yfeD2JRoyYiIiVNFsJuc0">any</b> = 0.0.0.0 255.255.255.255。</li>
+    <li data-page-node-id="yHHHZWJApQvqLjnAwRje78">反例：<b data-page-node-id="qp3nHE5KC2d7mZQ5SToXmD">192.168.1.0 0.0.0.3</b> 只匹配 192.168.1.0~3 这 4 个地址（偶数对齐的块，起止受 2ⁿ 约束）。</li>
+  </ul>
+
+  <h3 data-page-node-id="rvifW5ulNl7mC9Jxn8Mm6e">21.3 匹配流程与方向（inbound / outbound）</h3>
+  <figure class="fig" data-page-node-id="BHe8Vt7LnGIYQDQ8teZJFU">
+    <svg viewBox="0 0 1000 300" data-page-node-id="14xEVkk5ZBOtDjEiEfoQBh">
+      <g text-anchor="middle" data-page-node-id="IWDinozxBGrWrHPYyoPtJm">
+        <rect class="flowbox" x="40" y="20" width="360" height="40" rx="9" data-page-node-id="jCFg3SbgrHpO8HNPM7vww9"/>
+        <text class="ftxt" x="220" y="45" data-page-node-id="eB9St5RLHUQ5nETeHvzxKI">报文到达接口</text>
+        <polygon points="220,90 340,122 220,154 100,122" fill="#fff8ec" stroke="#d97706" stroke-width="1.5" data-page-node-id="BVnkiSqzWxcU2E0kQohQXe"/>
+        <text class="ftxt" x="220" y="118" font-size="12.5" data-page-node-id="FfkRuG5HVG6DQWPXoN611e">该方向引用了 ACL？</text>
+        <rect class="flowbox" x="40" y="196" width="360" height="40" rx="9" fill="#eff4ff" stroke="#2563eb" data-page-node-id="ZNGa7fw2ivJDKlD4hEOiu0"/>
+        <text class="ftxt" x="220" y="221" data-page-node-id="PIuJoo7YEK4taVxb6aaSNE">按<b data-page-node-id="WFlQaZuqUWuR7752hiFHV7">规则编号从小到大</b>逐条比对五元组</text>
+        <polygon points="220,252 340,278 220,296? " fill="none" stroke="none" data-page-node-id="jPqh38HvfrZ2v7PVKhCEdR"/>
+      </g>
+      <g stroke="#94a3b8" stroke-width="2" fill="none" data-page-node-id="RoCOM1DdOK3IF6ExEr3ynR">
+        <line x1="220" y1="60" x2="220" y2="86" marker-end="url(#m-gray)" data-page-node-id="5iho9HdzY2AjIKlrVa6x0e"/>
+        <line x1="220" y1="154" x2="220" y2="192" marker-end="url(#m-gray)" data-page-node-id="rdEHkKU0Oz6V5JR1EheKIF"/>
+        <text class="fsub" x="238" y="176" data-page-node-id="Alr2fCJpJRAsiyTJBFlBfu">是</text>
+        <line x1="340" y1="122" x2="480" y2="122" marker-end="url(#m-gray)" data-page-node-id="PMAQdEQKxrB1le0o59eFZ8"/>
+        <text class="fsub" x="410" y="112" data-page-node-id="o1VkJZOmoDgEa5xVpJztCA">否 → 直接进入正常转发流程</text>
+      </g>
+      <g text-anchor="middle" data-page-node-id="FSPpr76ESas7wT94qB0Eov">
+        <polygon points="700,60 800,122 700,184 600,122" fill="#fff8ec" stroke="#d97706" stroke-width="1.5" data-page-node-id="iRff1gzhxjDc4t9EXnhfpu"/>
+        <text class="ftxt" x="700" y="118" font-size="12.5" data-page-node-id="9GCBcxfFSqFalz9YqLAa9u">命中某条规则？</text>
+        <text class="fsub" x="700" y="138" data-page-node-id="iFBJW3MORIf84cD4C48JKX">（命中即停，不再看后面）</text>
+        <rect x="560" y="222" width="130" height="40" rx="9" fill="#ecfdf8" stroke="#059669" data-page-node-id="ZsVcPdAapdkvR2RxTiNfBh"/>
+        <text class="ftxt" x="625" y="247" font-size="12.5" fill="#059669" data-page-node-id="5ALlDBHUByPUfcCAUSMroC">permit 放行</text>
+        <rect x="720" y="222" width="130" height="40" rx="9" fill="#fef2f2" stroke="#dc2626" data-page-node-id="ATEK9b3CXSfCfZGFqZUVRL"/>
+        <text class="ftxt" x="785" y="247" font-size="12.5" fill="#dc2626" data-page-node-id="o3zoHDIf9gqidUf1hZLoQF">deny 丢弃</text>
+        <rect x="860" y="222" width="130" height="40" rx="9" fill="#fef2f2" stroke="#dc2626" stroke-dasharray="5 4" data-page-node-id="flpsGyejhjgsyoDuedyPwe"/>
+        <text class="ftxt" x="925" y="247" font-size="12.5" fill="#dc2626" data-page-node-id="qAjpt2H5BSkeApHVjPROpj">全部未命中 →</text>
+        <text class="fsub" x="925" y="261" fill="#dc2626" data-page-node-id="BvB6nm3HrAfe5gEGmauHac">隐含 deny any 丢弃！</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="2" fill="none" data-page-node-id="ETW9pRGQgyFHSiC8VqnGau">
+        <line x1="640" y1="176" x2="625" y2="218" marker-end="url(#m-gray)" data-page-node-id="2JOIpxECHVD7BqKD3xee40"/>
+        <line x1="760" y1="176" x2="785" y2="218" marker-end="url(#m-gray)" data-page-node-id="xDmoyiFLIgkukDzEnZNd6c"/>
+        <line x1="790" y1="130" x2="900" y2="218" marker-end="url(#m-gray)" data-page-node-id="kKl7TIuwQeat0iaVGgLOpg"/>
+        <text class="fsub" x="866" y="160" data-page-node-id="3tsX5SM9nCy8QSCxrg6cgV">否</text>
+      </g>
+      <text class="asub" x="470" y="120" data-page-node-id="UqjbZZQcmM89CiZ7X5cMxQ"></text>
+    </svg>
+    <figcaption data-page-node-id="E16CdpoJhgDzYktfBNJHR2">图 21-1 · ACL 匹配流程：顺序比对、命中即停、<b data-page-node-id="ZiDLF59CHtpmyKDtEnEvTN">末尾隐含 deny any</b></figcaption>
+  </figure>
+  <table class="cmp" data-page-node-id="UoOxBcZ4xsHDR6si8MRJIw">
+    <tr data-page-node-id="kT5z83tEAuqbysVDWm7xmk"><th style="width:130px" data-page-node-id="5CSgVEbk8iBc2jcx8yk253">方向</th><th data-page-node-id="cBwlFEQZ4fKBvVqnBukPmv">过滤时机</th><th data-page-node-id="G0mEZScBZqiPaIdqzJ6QEv">思考方式</th></tr>
+    <tr data-page-node-id="jqEWhoenbo4sduaeFeFvvE"><td data-page-node-id="023sBg1GGiTPqgLmhSbo7F"><b data-page-node-id="IZQXgXWvQ5Ynor23zVZZuV">inbound</b>（入方向）</td><td data-page-node-id="Z2GTLNDbRMlrimFtcgGLtY">进入接口，<b data-page-node-id="GpW3zFCh7A6FrFCGppHg9A">先过滤再查路由表</b> —— 拦垃圾流量最省 CPU</td><td data-page-node-id="bC0Ol26i6f6MAuvSEwCyRk">站在设备上问：「这个包从这进来该不该放？」</td></tr>
+    <tr data-page-node-id="GH2AgFiSSdM7ZBlBPAHGqR"><td data-page-node-id="wBQfB4MCW2NczJVVDzdMMO"><b data-page-node-id="qHnCt4o0yLkv6wKuZZlTm1">outbound</b>（出方向）</td><td data-page-node-id="kDLfL6esgYlBNmvG5MToqp">出接口前最后把关</td><td data-page-node-id="xJTgSK2VUwd9eRtfCToEIC">「离开设备的包该不该走这个口出去？」</td></tr>
+  </table>
+  <pre class="cmd" data-page-node-id="lQBLF6Dq9pVT1wIfB7FWE9"><span class="cm" data-page-node-id="3oNXrkGVa7eIa3fhz4dB94"># 例：禁止财务部(192.168.20.0/24)访问服务器网段(10.1.100.0/24)，其余放行</span>
+[FW] acl 3001
+[FW-acl-adv-3001] rule 5 deny ip source 192.168.20.0 0.0.0.255 destination 10.1.100.0 0.0.0.255
+[FW-acl-adv-3001] rule 100 permit ip          <span class="cm" data-page-node-id="sKN3gWzFO4N6qij0vXNmrw"># 不写这句会被隐含 deny 全拦！</span>
+[FW] interface GigabitEthernet0/0/2
+[FW-GigabitEthernet0/0/2] traffic-filter inbound acl 3001</pre>
+  <div class="note exam" data-page-node-id="wn9x7ZdcC0Ft5O7N7J5xHF">三个必坑：① 每条 ACL 末尾<b data-page-node-id="KxPp4gE5dxIAfbA7U3sTdf">隐含 deny any</b>（华为部分场景默认 permit？——考试按「隐含 deny」答）；② 规则顺序即执行顺序，新规则要手动指定合适编号（步长 5，便于中间插规则）；③ ACL 不过滤<b data-page-node-id="6Fve7xhxCTH6Dsi4mBq9pl">路由器自身发出</b>的报文（要过滤需用其他手段）；④ telnet/SSH 本身不下发 ACL 到业务口 —— 是应用到 VTY 线路。</div>
+</section>
+
+<!-- ================= 22 AAA ================= -->
+<section id="s22" data-page-node-id="buBjQLgpijxFZEOXYdyKLU">
+  <h2 data-page-node-id="p0l61SnF69EKXy3r4kZW9u"><span class="no" data-page-node-id="pgIbLqXGBoaAWxObUAk0B8">22</span>AAA：认证、授权、记账（RADIUS 全流程）</h2>
+  <table class="cmp" data-page-node-id="5L8J4Von1ePirA1Zmdv6w3">
+    <tr data-page-node-id="xh30pC93eZ1htxweaYGoxJ"><th style="width:150px" data-page-node-id="SilmuiWLG0PrfSRdsIOm7j">三 A</th><th data-page-node-id="e7E9sYC27Ep7MZjP0gIICF">回答的问题</th><th data-page-node-id="11u5GelS1YvvGmj1HMPDN8">典型手段</th></tr>
+    <tr data-page-node-id="T7JImHvCN4gvTEPWEn8HW2"><td data-page-node-id="CliGNjuJC9nmHMaN0y81Y9"><b data-page-node-id="gdf8eD2Z6aO9Tq7GY5Ow4V">认证 Authentication</b></td><td data-page-node-id="C3DpZm8omunQqWPujswkqA">「你是谁？」</td><td data-page-node-id="3DX00WDzy946B8xF2dm9Vj">账号口令 / 证书 / 802.1X</td></tr>
+    <tr data-page-node-id="fAagCMMLfKYnzEtU3rSPs7"><td data-page-node-id="mqLzV5WHbp9n0fdr6dsjdp"><b data-page-node-id="Oil7vGUGLG7gIf9xw6uctd">授权 Authorization</b></td><td data-page-node-id="SyHSgywTtToZfMfT7xVuE5">「你能干什么？」</td><td data-page-node-id="5yu4Zwbfm8SD2XuP8LYiAz">下放权限属性：能用哪些命令、进哪个 VLAN、分什么 IP</td></tr>
+    <tr data-page-node-id="WSVKxWbjLtSRj7gFzlycuX"><td data-page-node-id="RDhybvDqBIaYSNuWBiqdsK"><b data-page-node-id="x0cgFz8j5fiGMDoPA2eIqy">记账 Accounting</b></td><td data-page-node-id="wq40H7PSzLKyxLrQxAcVrP">「你干了什么？」</td><td data-page-node-id="6JoIgMd20AjD0GMVSNZsQx">记录上线时间、流量、操作日志（计费/审计）</td></tr>
+  </table>
+  <table class="cmp" data-page-node-id="8P1l4jqF7CAnI2clLU13wM">
+    <tr data-page-node-id="tZyJLbWfhdmc4f5iEQBKST"><th style="width:170px" data-page-node-id="VXHHfDfxY5MJLInvb4DVd6">实现方式</th><th data-page-node-id="kX7FrRviqeg6xbsC3t2e4j">说明</th></tr>
+    <tr data-page-node-id="rsZW2YP5w7WkDMsznM0OoA"><td data-page-node-id="3jRjEimhyGoxm681EUhrol"><b data-page-node-id="JcnbLFK5y5FUVLjRjzTPKn">本地 AAA</b></td><td data-page-node-id="A4fzsNZAoCV2YnGTuC9y0p">账号存在设备本地（local-user），小规模；无集中管理</td></tr>
+    <tr data-page-node-id="B4TvwYN0j8clgK57oISZcA"><td data-page-node-id="2fHTGssHBuJyIqQBJGDvEb"><b data-page-node-id="TWpdY1bO9DbA54qS8x1ENg">服务器式 AAA</b></td><td data-page-node-id="ioNh2h23oHpiLZHG4DYA75">设备（NAS）把认证转给中央服务器：<b data-page-node-id="Dsr4YJoXyhZHDeqBMl3EuK">RADIUS</b>（UDP 1812/1813，IETF 标准）或 HWTACACS/TACACS+（TCP 49，思科系）</td></tr>
+  </table>
+
+  <figure class="fig" data-page-node-id="1x4mk5iulFX6PfNTIRc6Ux">
+    <svg viewBox="0 0 1000 320" data-page-node-id="wjAnbmEVWg5JFHIUzXoerq">
+      <rect class="hbox" x="60" y="8" width="190" height="46" rx="9" data-page-node-id="UhbbwcCZiXyG11opJYNURR"/>
+      <text class="hname" x="155" y="28" text-anchor="middle" data-page-node-id="QXCtWeBCjuBK0HVR7ysouu">用户（STA / 管理员）</text>
+      <text class="hsub" x="155" y="45" text-anchor="middle" data-page-node-id="ZJuxkQCVHNqXRDZdOAGkan">输账号口令</text>
+      <rect class="hbox" x="410" y="8" width="180" height="46" rx="9" data-page-node-id="NND7cophrBgpBAAOGfxuCA"/>
+      <text class="hname" x="500" y="28" text-anchor="middle" data-page-node-id="QUvR5jbaFcGR22LtIZD42H">NAS / 网关设备</text>
+      <text class="hsub" x="500" y="45" text-anchor="middle" data-page-node-id="UVFcbPwDafsI1HcpPC33wz">接入控制器 · 转发者</text>
+      <rect class="hbox" x="780" y="8" width="190" height="46" rx="9" data-page-node-id="gL2epPwBueu2BTDxGFbNXC"/>
+      <text class="hname" x="875" y="28" text-anchor="middle" data-page-node-id="HoHwzAWWULDnx01sX1XWl7">RADIUS 服务器</text>
+      <text class="hsub" x="875" y="45" text-anchor="middle" data-page-node-id="t68n6hguOKLRlDoqjowJY8">UDP 1812 认证 · 1813 计费</text>
+      <line class="life" x1="155" y1="54" x2="155" y2="300" data-page-node-id="YLdRUK6C2q4kDDYzZ5wS4H"/>
+      <line class="life" x1="500" y1="54" x2="500" y2="300" data-page-node-id="eooc1Og2yH7VNymPYDHskF"/>
+      <line class="life" x1="875" y1="54" x2="875" y2="300" data-page-node-id="dFqr38vOHdqPRcrjQmy71q"/>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="159" y1="90" x2="496" y2="90" data-page-node-id="BSoy6lACItfmjnoZ9gdpyx"/>
+      <text class="albl" x="328" y="80" text-anchor="middle" data-page-node-id="GIU3rO9wipklpi4actVsIo">① 提交账号口令（Web 表单 / 802.1X supplicant）</text>
+      <line class="ar" stroke="#d97706" marker-end="url(#m-amber)" x1="504" y1="130" x2="871" y2="130" data-page-node-id="jclSY9II2oAy2lhfYPgnUg"/>
+      <text class="albl" x="688" y="120" text-anchor="middle" data-page-node-id="elaCpPkcmBrUxqBjkcMjeS">② Access-Request（口令加密后封装；CHAP 不传明文）</text>
+      <text class="asub" x="688" y="148" text-anchor="middle" data-page-node-id="43rVwupBGhGZKUTyN0zEPI">服务器查用户库 / 对接 AD·LDAP 校验</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="871" y1="190" x2="504" y2="190" data-page-node-id="VEmNce2V85FOlgcCTUXGS3"/>
+      <text class="albl" x="688" y="180" text-anchor="middle" data-page-node-id="YT2cukAZx0F4PwmmsA5QzO">③ Access-Accept / Reject + 授权属性</text>
+      <text class="asub" x="688" y="208" text-anchor="middle" data-page-node-id="7vFv42BvRsjCCSgTv01LoQ">属性举例：下发 VLAN 30、ACL 编号、可用带宽</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="496" y1="240" x2="159" y2="240" data-page-node-id="tVCoHTcBGnh5xmaHCkhvku"/>
+      <text class="albl" x="328" y="230" text-anchor="middle" data-page-node-id="JJ9TBerDJCPdXnTgybrY69">④ 放行接入，按授权属性执行</text>
+      <line class="ar" stroke="#7c3aed" marker-end="url(#m-violet)" x1="504" y1="278" x2="871" y2="278" data-page-node-id="1p4Cn0CDpfQ00PWASf1hav"/>
+      <text class="albl" x="688" y="268" text-anchor="middle" data-page-node-id="19fdZEWZBE5zhujIAFyMHF">⑤ Accounting：Start → Interim（周期）→ Stop（下线/流量/时长入账）</text>
+    </svg>
+    <figcaption data-page-node-id="rEjRoM1fAjor34jpxDz3LH">图 22 · RADIUS 认证-授权-记账全流程（NAS = Network Access Server，如 AC/BRAS/VPN 网关）</figcaption>
+  </figure>
+  <table class="cmp" data-page-node-id="QPATkhNRj5cDUhVwN0nwiV">
+    <tr data-page-node-id="zm04vpQnxF6dGis6HVoIsB"><th style="width:170px" data-page-node-id="MFjYbG8wqmcSlgYl4JezJ2">对比项</th><th data-page-node-id="Xr8nbVNwAFXOIPEKzyDGrK">RADIUS</th><th data-page-node-id="8g3QrlG4AlgHb4wAHRmv6x">HWTACACS / TACACS+</th></tr>
+    <tr data-page-node-id="CyiTeeRyDp1tierShj4nUw"><td data-page-node-id="YPDSL8PtjEwhu4h2hC2o5h">传输</td><td data-page-node-id="a7ZxH1bIMTTlYJQEuxTTOK"><b data-page-node-id="xgHRM98TD6eQdgVQQimRVQ">UDP 1812/1813</b></td><td data-page-node-id="zKYSbkTCwXyJNMhiYmY4xI"><b data-page-node-id="6kFyg7DSntFP3WaRXqi616">TCP 49</b>（可靠）</td></tr>
+    <tr data-page-node-id="95AMtBGVEGo0Fheyaowvbm"><td data-page-node-id="mC9WW4intEUm1S3ABwFCPu">AA 分离</td><td data-page-node-id="NZHHhoh4pgL8gjiKILF6h1">认证+授权合并于一个响应</td><td data-page-node-id="rsC5g5jf9QiRWF94sYtR42"><b data-page-node-id="4q8oKcwqtUADF0B5sjLxoT">认证、授权、记账完全分离</b></td></tr>
+    <tr data-page-node-id="QwNOicgY2Rca1Kuu8aD1SF"><td data-page-node-id="4ugnH4cbgKFio4fXn4W2eR">加密</td><td data-page-node-id="icMFDUEBITXuWCBa2eotR1">只加密口令字段</td><td data-page-node-id="8VSNNPZhNaFqrZhUqvjFkz">整报文加密</td></tr>
+    <tr data-page-node-id="FBWk6DGCsMeISX5MBTBQWl"><td data-page-node-id="NOPRdNQDDj4sy0qDrB5GZf">适合</td><td data-page-node-id="jDy5eN1ueTsoqK2I1y3XAK">网络接入（WLAN 802.1X、宽带拨号）—— 行业标准</td><td data-page-node-id="HkdieF9DllffC2o3Xkoht6">设备管理类登录（命令级授权精细）</td></tr>
+  </table>
+  <div class="note exam" data-page-node-id="vfzEdFneVCOsRlsoEP1GMg">WLAN 里的 802.1X = <b data-page-node-id="QIdE3oUmF0vRYmg2XD98vX"> supplicant（终端）+ authenticator（AP/AC，只做传话筒）+ RADIUS 服务器</b>，EAP 报文经 AP 用 RADIUS 封装（EAPoL → RADIUS）到服务器完成认证 —— AP 不接触口令，这是「可扩展认证」的设计精髓。</div>
+</section>
+
+<!-- ================= 23 综合例题 ================= -->
+<section id="s23" data-page-node-id="pp5iIsN0F5z7Cr0BRy4vtr">
+  <h2 data-page-node-id="H6E7jD5vHUD9fZVs4AV4iq"><span class="no" data-page-node-id="CXZkM819fskXBQWjuUXN4X">23</span>综合例题：冲突域/广播域计数、子网速算、设备组网</h2>
+  <figure class="fig" data-page-node-id="PiTgr20wF7qWdYl5EnArAH">
+    <svg viewBox="0 0 1000 300" data-page-node-id="wupkx21QO8r3PnKNho6LbF">
+      <rect x="430" y="16" width="150" height="44" rx="9" fill="#fff8ec" stroke="#d97706" stroke-width="2" data-page-node-id="PJMwcxaapgukG4def5xkxb"/>
+      <text x="505" y="44" text-anchor="middle" font-size="13" font-weight="700" fill="#d97706" data-page-node-id="q7R3NBXN22CXQ8WOxBbTXA">路由器 R</text>
+      <rect x="430" y="140" width="150" height="44" rx="9" fill="#f5f0ff" stroke="#7c3aed" stroke-width="2" data-page-node-id="kehc5ASCwNrhS0rXESvQwI"/>
+      <text x="505" y="168" text-anchor="middle" font-size="13" font-weight="700" fill="#7c3aed" data-page-node-id="hv1yVyS5FNQnniqBYYQTcq">交换机 S（4口）</text>
+      <line x1="505" y1="60" x2="505" y2="136" stroke="#94a3b8" stroke-width="2.5" data-page-node-id="9EfmFe8m6LtYBZAi2UZyWl"/>
+      <rect x="150" y="140" width="130" height="44" rx="9" fill="#f1f4f8" stroke="#64748b" stroke-width="2" data-page-node-id="ujCv9Ch6CCtXp87Elua7Yd"/>
+      <text x="215" y="168" text-anchor="middle" font-size="13" font-weight="700" fill="#64748b" data-page-node-id="v6ZxhkbZfkKhSqNBkyX0ro">集线器 Hub</text>
+      <line x1="430" y1="166" x2="284" y2="162" stroke="#94a3b8" stroke-width="2.5" data-page-node-id="nkDDiHCwyjYzvrRGT4lC39"/>
+      <rect x="60" y="240" width="90" height="40" rx="8" fill="#eff4ff" stroke="#2563eb" data-page-node-id="wYWN1JVBEiZSM2KTWAEbwo"/>
+      <text x="105" y="265" text-anchor="middle" font-size="12" fill="#2563eb" font-weight="700" data-page-node-id="04nP8DMIbmVyVjodsFD3Kf">PC-a</text>
+      <rect x="180" y="240" width="90" height="40" rx="8" fill="#eff4ff" stroke="#2563eb" data-page-node-id="yu2vJ9J2PbRlaJirC0WsLD"/>
+      <text x="225" y="265" text-anchor="middle" font-size="12" fill="#2563eb" font-weight="700" data-page-node-id="3QvH6cWJEenmTH0NL1Dwa9">PC-b</text>
+      <line x1="105" y1="236" x2="190" y2="186" stroke="#94a3b8" stroke-width="2" data-page-node-id="Ab97vkzc9LR1emK8VNfWDe"/>
+      <line x1="225" y1="236" x2="230" y2="186" stroke="#94a3b8" stroke-width="2" data-page-node-id="jheYe9LJ9HPlp6ajusRiXO"/>
+      <rect x="640" y="240" width="90" height="40" rx="8" fill="#eff4ff" stroke="#2563eb" data-page-node-id="JfT50Zzwy4Ex7YFq78a3gb"/>
+      <text x="685" y="265" text-anchor="middle" font-size="12" fill="#2563eb" font-weight="700" data-page-node-id="h315AXeclnVPdxAFHouwTS">PC1</text>
+      <rect x="760" y="240" width="90" height="40" rx="8" fill="#eff4ff" stroke="#2563eb" data-page-node-id="vn1QpS9Q65Q3CnjWKCUAte"/>
+      <text x="805" y="265" text-anchor="middle" font-size="12" fill="#2563eb" font-weight="700" data-page-node-id="xuQPIaCywNcu5xOtX5eJ7w">PC2</text>
+      <line x1="590" y1="176" x2="665" y2="236" stroke="#94a3b8" stroke-width="2" data-page-node-id="l0NosLreNLh0EDggOZb0VW"/>
+      <line x1="600" y1="176" x2="790" y2="236" stroke="#94a3b8" stroke-width="2" data-page-node-id="CyqXyiCUDj1J36VFnAHgwZ"/>
+      <text class="ntxt" x="505" y="100" text-anchor="middle" fill="#059669" font-weight="700" data-page-node-id="pBhQ9EGQYj2RCRLDGuasET">广播域分界线</text>
+      <g font-size="13" fill="#3a4354" data-page-node-id="FzxS7n7dtIEXO8NMhIi6Go">
+        <text x="60" y="40" font-weight="700" data-page-node-id="0XiVEMoOAnE7yeYfRQfKtU">解题口诀：</text>
+        <text x="60" y="64" data-page-node-id="GPYphqSNY4rdxqIGqeDLEM">· 集线器不隔离任何域</text>
+        <text x="60" y="88" data-page-node-id="rjcsSZg0M7Z052HuX6pzkz">· 交换机隔离<b data-page-node-id="P6ClTyXTenZC3auCY0iBUX">冲突域</b>（每口一个）</text>
+        <text x="60" y="112" data-page-node-id="C1t5rpfobHnweqnOwAarml">· 路由器/VLAN 隔离<b data-page-node-id="QOd3lH8gLoqU65b0eOYFs5">广播域</b></text>
+      </g>
+      <rect x="330" y="196" width="360" height="76" rx="10" fill="#ecfdf8" stroke="#059669" data-page-node-id="SM0O6mIrvKCbgPx3BEzAZ6"/>
+      <text class="albl" x="510" y="224" text-anchor="middle" font-weight="700" fill="#059669" data-page-node-id="tCo0ajZebo520BCcNBmEiH">答案：冲突域 4 个</text>
+      <text class="asub" x="510" y="246" text-anchor="middle" data-page-node-id="OXxH1h8AGWF4cV8YT5oycb">R–S 链路 1 · Hub 整体算 1（含 PC-a/PC-b）· S–PC1 链路 1 · S–PC2 链路 1</text>
+      <text class="asub" x="510" y="264" text-anchor="middle" data-page-node-id="x3ApflicQFAVwSBATsniDu">广播域 2 个（路由器两侧）—— 若交换机划了 2 个 VLAN 则广播域 = 3</text>
+    </svg>
+    <figcaption data-page-node-id="i8MITugnVtShfQnhdgEu3f">图 23-1 · 冲突域 / 广播域计数经典题</figcaption>
+  </figure>
+
+  <table class="cmp" data-page-node-id="m4sFWQH5GB9mX8jAMsHc59">
+    <tr data-page-node-id="QSjGrOwrQ13rK4h9vCsz8S"><th data-page-node-id="Ws5ImDosaysYXtVOglFYRe">需求主机数</th><th data-page-node-id="pLo6Xrlj47aHx1Ucws3yWN">选前缀</th><th data-page-node-id="UeQpICCsF1Oxs47d1ZrHGu">掩码</th><th data-page-node-id="DIg8W1hD0RsDAi7qbGCEDB">块大小</th><th data-page-node-id="Dto12a0zVVxG7erhKfV9Nh">可用地址</th></tr>
+    <tr data-page-node-id="JD9K69xqSTgK5Mv9DdXidc"><td class="ctr" data-page-node-id="wTOtBI9pLC5IqtZrz2kWYz">≤ 126</td><td class="ctr" data-page-node-id="vAPZeaI0h0Y2pwSLIXpIEr"><b data-page-node-id="RJbEtUbG2dEqs2M3HmX7C2">/25</b></td><td data-page-node-id="8LnPuQsF3mysj9YAoAXnHP"><b data-page-node-id="LxswdkO6uOjq0zKH6bDoSM">255.255.255.128</b></td><td class="ctr" data-page-node-id="5VYmlHBCl09KXVPmGajbvz">128</td><td class="ctr" data-page-node-id="Xy07jBLaopmCcYEXB1j4Ag">126</td></tr>
+    <tr data-page-node-id="ZpNdTQLzkEfMFdM3sbkPuB"><td class="ctr" data-page-node-id="nFdDju7C2eHyTAnaO8DuME">≤ 62</td><td class="ctr" data-page-node-id="YgaGN3c4sjRQ6YVx8OmYNg"><b data-page-node-id="LTK67UAQasZA27knNFPd7d">/26</b></td><td data-page-node-id="lwxgGHHpt6J5ie86rt25Cv">255.255.255.192</td><td class="ctr" data-page-node-id="uVYIAx4rzOuqTFpc8YDO8D">64</td><td class="ctr" data-page-node-id="A2EcPB9XLY81Eno4A6DIib">62</td></tr>
+    <tr data-page-node-id="EoPaF4dwaeXkVGkjyAnHRk"><td class="ctr" data-page-node-id="4P2JYiOF8PmsnZA6rmrfpF">≤ 30</td><td class="ctr" data-page-node-id="u0JhxulhHxaqO6Lr3u4wgg"><b data-page-node-id="gikDe3xqqTSm03UWqye0dt">/27</b></td><td data-page-node-id="nLkYcBZ2nsvYCPk0l1dk0G">255.255.255.224</td><td class="ctr" data-page-node-id="g2yT1OREWoO18rAqW5CyOC">32</td><td class="ctr" data-page-node-id="Lv10NHYpomBX5UpCP0w2X8">30</td></tr>
+    <tr data-page-node-id="EFfFZqznoTDalcz8jr1l3r"><td class="ctr" data-page-node-id="2jPExNKxY7beZTSA8boz73">≤ 14</td><td class="ctr" data-page-node-id="uO4lesqyDibciUDp50m7IK"><b data-page-node-id="2DLMWDD10oPE7JvqiXOsda">/28</b></td><td data-page-node-id="GoPhbhEXBe8GlFFQ86pH5a">255.255.255.240</td><td class="ctr" data-page-node-id="sjBAyMgHL4w1ioGtGXH2mz">16</td><td class="ctr" data-page-node-id="QVAUTfjI4iGEcQ3DAxxm9d">14</td></tr>
+    <tr data-page-node-id="LktZEyeXByljZco8kEdfGN"><td class="ctr" data-page-node-id="XXBzQup7bWw0FvG13nxruv">2（点对点）</td><td class="ctr" data-page-node-id="pOLWEujfQfYR99mBuEurVr"><b data-page-node-id="WgF0BekwGuwwkASU0AUlV6">/30</b></td><td data-page-node-id="u7GqVkEAFsNJ2yQ8I2mvBz">255.255.255.252</td><td class="ctr" data-page-node-id="qxczZEHcZzDWG6huBgaRB5">4</td><td class="ctr" data-page-node-id="gQN8Nw3FgYYIBknRGSJPEz">2</td></tr>
+    <tr data-page-node-id="GfMV7ymiHTnzG02TrljS1t"><td class="ctr" data-page-node-id="vFgDIUWG9yCMlutHpR3adV">点对点更省（IPv6/新方案）</td><td class="ctr" data-page-node-id="AQL5XCKaVFajeRv2vZXdgp"><b data-page-node-id="0yS8nilGhilSn2CV04YGxa">/31</b></td><td data-page-node-id="uHouSOkzf5aKc7xG3FBGe1">255.255.255.254</td><td class="ctr" data-page-node-id="eyoEECvwqyaqXbi2mEVG31">2</td><td class="ctr" data-page-node-id="JMvtsC7CXP6uyEJagMc0CW">2（RFC 3021）</td></tr>
+  </table>
+
+  <div class="note exam" data-page-node-id="lIj4wRL0VabeFWA6kNMmh8">大题答题框架（子网规划题）：① 按需求<b data-page-node-id="SJszzMXCSISZH9M8GD45RD">从大到小</b>排网段 → ② 选最小够用的前缀 → ③ 依块大小顺序切分、写下「网络地址 – 可用范围 – 广播地址」→ ④ 网关习惯用可用段的<b data-page-node-id="mHcziXzXU8znLKcxZwJ8hk">第一个</b>地址 → ⑤ 检查有没有重叠、有没有漏。路由聚合题反过来：把各网段写二进制找<b data-page-node-id="E151VR4DiREYMD1FcNjp3X">公共前缀</b>。</div>
+  <div class="note ok" data-page-node-id="dQZKfCWSO6KwWHdNcPhTbA">三大页食用建议：先读「五层模型」页建框架 → 本页逐节精读+动手复算例题 → 「流程图解」页考前快速回顾交互流程。配套 HCIA 大纲的重点章节占比：IP 技术基础 25% &gt; 以太网 20% &gt; 安全与服务 15% —— 时间紧就按这个权重分配。</div>
+</section>
+
+
+</div>
+</body>
+</html>

@@ -35,7 +35,7 @@ const visibleDrafts = computed(() => {
 });
 
 function typeLabel(draft) {
-  return draft.contentType === "TREE" ? "进化树" : "文章";
+  return { TREE: "进化树", LAUP: "Laup 文章" }[draft.contentType] || "文章";
 }
 
 function modeLabel(mode) {
@@ -124,6 +124,10 @@ onMounted(loadDrafts);
       <div class="create-actions">
         <RouterLink to="/create-post">写文章</RouterLink>
         <RouterLink to="/evolution-tree">制作树相</RouterLink>
+        <!-- Laup 写作早就是站内路由了（见 services/drafts.js 的 draftEditorLocation），
+             这里以前还挂着 public/laup/ 那份静态副本 → 整页跳转、两个入口落点不一致。 -->
+        <RouterLink to="/laup">写 Laup 文章</RouterLink>
+        <RouterLink to="/notebook">写 Notebook</RouterLink>
         <button
           class="clear-drafts"
           type="button"
@@ -143,6 +147,8 @@ onMounted(loadDrafts);
             { value: 'ALL', label: '全部' },
             { value: 'ARTICLE', label: '文章' },
             { value: 'TREE', label: '进化树' },
+            { value: 'LAUP', label: 'Laup 文章' },
+            { value: 'NOTEBOOK', label: 'Notebook' },
           ]"
           :key="option.value"
           type="button"
@@ -174,6 +180,7 @@ onMounted(loadDrafts);
           保存于 {{ formatDateTime(draft.updatedAt) }}
         </time>
         <footer>
+          <!-- Laup 草稿的落点是 /laup/ 静态页（路由里没有），只能整页跳 -->
           <RouterLink :to="draftEditorLocation(draft)">继续编辑</RouterLink>
           <button type="button" @click="copyDraft(draft)">复制</button>
           <button class="danger" type="button" @click="removeDraft(draft)">删除</button>

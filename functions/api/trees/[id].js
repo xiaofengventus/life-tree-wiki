@@ -57,13 +57,6 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
 
   const body = await readJson(request, 600 * 1024);
   const visibility = normalizeVisibility(body.visibility, existing.visibility || PUBLIC_VISIBILITY);
-  if (existing.visibility === PUBLIC_VISIBILITY && visibility === PRIVATE_VISIBILITY) {
-    throw new ApiError(
-      409,
-      "已经公开的进化树不能改回仅自己可见",
-      "PUBLIC_WORK_CANNOT_BECOME_PRIVATE",
-    );
-  }
   const isPrivateSave = visibility === PRIVATE_VISIBILITY;
   const publishingPrivate = existing.visibility === PRIVATE_VISIBILITY &&
     visibility === PUBLIC_VISIBILITY;

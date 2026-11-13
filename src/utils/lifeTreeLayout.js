@@ -18,10 +18,14 @@ export const LIFE_TREE_LAYOUT = {
   SIBLING_GAP: 8,
   LEAF_BRANCH: 26,
   BRANCH_END_PAD: 22,
-  IMAGE_HEIGHT: 56,
-  IMAGE_WIDTH: 72,
+  // 图片按原始比例等比缩放进这个最大外接框，不裁剪不变形
+  IMAGE_MAX_WIDTH: 120,
+  IMAGE_MAX_HEIGHT: 90,
+  IMAGE_DEFAULT_ASPECT: 4 / 3,
   IMAGE_GAP: 8,
   LABEL_INDENT: 6,
+  // 收起三角按钮占据的宽度（有子节点的节点才预留）
+  FOLD_TOGGLE_WIDTH: 16,
   MIN_BRANCH: 44,
   MARGIN_X: 90,
   MARGIN_Y: 70,
@@ -91,18 +95,56 @@ function nodeImage(data) {
 }
 
 /**
+ * 把图片的原始尺寸等比缩放进 IMAGE_MAX_* 外接框。
+ * 图片完整可见、比例不变（编辑器里看到的就是这个效果）；
+ * 缺少尺寸信息时退回 4:3，不会出现被压扁的拉伸图。
+ */
+export function resolveImageSize(imageSize) {
+  const width = Number(imageSize?.width);
+  const height = Number(imageSize?.height);
+  const aspect =
+    Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+      ? width / height
+      : LIFE_TREE_LAYOUT.IMAGE_DEFAULT_ASPECT;
+  const maxWidth = LIFE_TREE_LAYOUT.IMAGE_MAX_WIDTH;
+  const maxHeight = LIFE_TREE_LAYOUT.IMAGE_MAX_HEIGHT;
+  let boxWidth = maxWidth;
+  let boxHeight = maxWidth / aspect;
+  if (boxHeight > maxHeight) {
+    boxHeight = maxHeight;
+    boxWidth = maxHeight * aspect;
+  }
+  return { width: Math.round(boxWidth), height: Math.round(boxHeight) };
+}
+
+/** 统计一个节点的全部后代数量（用于折叠后显示 +N） */
+export function countDescendants(node) {
+  let total = 0;
+  const children = Array.isArray(node?.children) ? node.children : [];
+  for (const child of children) {
+    if (!child) continue;
+    total += 1 + countDescendants(child);
+  }
+  return total;
+}
+
+/**
  * 计算整棵树的布局。
  * 返回 { nodes, branches, width, height }：
  * - nodes: 文字/图片的定位信息（kind: "leaf" | "internal"）
  * - branches: 树枝矩形（dir: "h" | "v"，均为真实 DOM 元素）
  */
-export function computeLifeTreeLayout(root) {
+export function computeLifeTreeLayout(root, options = {}) {
   const nodes = [];
   const branches = [];
   let fallbackId = 0;
   let maxRight = 0;
 
   const M = LIFE_TREE_LAYOUT;
+  const collapsed =
+    options.collapsed instanceof Set
+      ? options.collapsed
+      : new Set(Array.isArray(options.collapsed) ? options.collapsed : []);
 
   function layoutNode(node, depth, x, yStart) {
     const data = node?.data || {};
@@ -115,47 +157,59 @@ export function computeLifeTreeLayout(root) {
     const age = String(data.age || "").trim();
     const imageUrl = nodeImage(data);
     const hasImage = Boolean(imageUrl);
+    const imageSize = hasImage ? resolveImageSize(data.imageSize) : null;
     const contentLinks = Array.isArray(data.contentLinks) ? data.contentLinks : [];
     const citationNumbers = Array.isArray(data.citationNumbers)
       ? data.citationNumbers
       : [];
-    const labelWidth = measureLabel({
+    const hasChildren = children.length > 0;
+    const isCollapsed = hasChildren && collapsed.has(id);
+    const labelWidth =
+      measureLabel({
+        segments,
+        age,
+        citationCount: citationNumbers.length,
+        isRoot,
+      }) + (hasChildren ? M.FOLD_TOGGLE_WIDTH : 0);
+    const shared = {
+      id,
+      depth,
+      x,
+      labelWidth,
       segments,
       age,
-      citationCount: citationNumbers.length,
+      imageUrl,
+      hasImage,
+      contentLinks,
+      citationNumbers,
       isRoot,
-    });
+      hasChildren,
+      collapsed: isCollapsed,
+      hiddenCount: isCollapsed ? countDescendants(node) : 0,
+    };
 
-    if (children.length === 0) {
+    if (!hasChildren) {
       // 叶节点：名字与图片都在树枝右侧
-      const band = Math.max(M.ROW_HEIGHT, hasImage ? M.IMAGE_HEIGHT + 10 : 0);
+      const band = Math.max(M.ROW_HEIGHT, hasImage ? imageSize.height + 10 : 0);
       const branchY = yStart + band / 2;
       const labelLeft = x + M.LEAF_BRANCH + M.IMAGE_GAP;
-      const nodeInfo = {
-        id,
+      const imageBox = hasImage
+        ? {
+            left: labelLeft + labelWidth + M.IMAGE_GAP,
+            top: branchY - imageSize.height / 2,
+            width: imageSize.width,
+            height: imageSize.height,
+          }
+        : null;
+      nodes.push({
+        ...shared,
         kind: "leaf",
-        depth,
-        x,
         branchY,
         branchLength: M.LEAF_BRANCH,
         labelLeft,
         labelTop: branchY - M.LINE_HEIGHT / 2,
-        labelWidth,
-        segments,
-        age,
-        imageUrl,
-        hasImage,
-        imageBox: hasImage
-          ? {
-              left: labelLeft + labelWidth + M.IMAGE_GAP,
-              top: branchY - M.IMAGE_HEIGHT / 2,
-            }
-          : null,
-        contentLinks,
-        citationNumbers,
-        isRoot,
-      };
-      nodes.push(nodeInfo);
+        imageBox,
+      });
       branches.push({
         id: `${id}-h`,
         dir: "h",
@@ -165,9 +219,7 @@ export function computeLifeTreeLayout(root) {
       });
       maxRight = Math.max(
         maxRight,
-        nodeInfo.imageBox
-          ? nodeInfo.imageBox.left + M.IMAGE_WIDTH
-          : labelLeft + labelWidth,
+        imageBox ? imageBox.left + imageBox.width : labelLeft + labelWidth,
       );
       return { branchY, band };
     }
@@ -177,17 +229,56 @@ export function computeLifeTreeLayout(root) {
       segments.length > 0 || Boolean(age) || citationNumbers.length > 0;
     const reserve =
       (hasLabel ? M.LINE_HEIGHT + M.LABEL_GAP : 0) +
-      (hasImage ? M.IMAGE_HEIGHT + M.LABEL_GAP : 0);
+      (hasImage ? imageSize.height + M.LABEL_GAP : 0);
     const branchLength = Math.max(
       M.MIN_BRANCH,
       M.LABEL_INDENT + labelWidth + M.BRANCH_END_PAD,
     );
-    const childX = x + branchLength;
+    const labelLeft = x + M.LABEL_INDENT;
+    const imageBox = hasImage
+      ? {
+          left: labelLeft,
+          top: 0,
+          width: imageSize.width,
+          height: imageSize.height,
+        }
+      : null;
+
+    // 收起的节点：不再向下递归，整块收成「名字 + 图片」那么高
+    if (isCollapsed) {
+      const band = reserve + M.ROW_HEIGHT;
+      const branchY = yStart + reserve + M.ROW_HEIGHT / 2;
+      const labelTop = branchY - reserve;
+      if (imageBox) {
+        imageBox.top = labelTop + (hasLabel ? M.LINE_HEIGHT + M.LABEL_GAP : 0);
+      }
+      nodes.push({
+        ...shared,
+        kind: "internal",
+        branchY,
+        branchLength,
+        labelLeft,
+        labelTop,
+        imageBox,
+      });
+      branches.push({
+        id: `${id}-h`,
+        dir: "h",
+        x,
+        y: branchY,
+        length: branchLength,
+      });
+      maxRight = Math.max(maxRight, x + branchLength);
+      if (imageBox) {
+        maxRight = Math.max(maxRight, imageBox.left + imageBox.width);
+      }
+      return { branchY, band };
+    }
 
     let cursorY = yStart + reserve;
     const childResults = [];
     children.forEach((child, index) => {
-      const result = layoutNode(child, depth + 1, childX, cursorY);
+      const result = layoutNode(child, depth + 1, x + branchLength, cursorY);
       childResults.push(result);
       cursorY += result.band;
       if (index < children.length - 1) cursorY += M.SIBLING_GAP;
@@ -197,30 +288,18 @@ export function computeLifeTreeLayout(root) {
     const last = childResults[childResults.length - 1];
     const branchY = (first.branchY + last.branchY) / 2;
     const labelTop = branchY - reserve;
+    if (imageBox) {
+      imageBox.top = labelTop + (hasLabel ? M.LINE_HEIGHT + M.LABEL_GAP : 0);
+    }
 
     nodes.push({
-      id,
+      ...shared,
       kind: "internal",
-      depth,
-      x,
       branchY,
       branchLength,
-      labelLeft: x + M.LABEL_INDENT,
+      labelLeft,
       labelTop,
-      labelWidth,
-      segments,
-      age,
-      imageUrl,
-      hasImage,
-      imageBox: hasImage
-        ? {
-            left: x + M.LABEL_INDENT,
-            top: labelTop + (hasLabel ? M.LINE_HEIGHT + M.LABEL_GAP : 0),
-          }
-        : null,
-      contentLinks,
-      citationNumbers,
-      isRoot,
+      imageBox,
     });
 
     branches.push({ id: `${id}-h`, dir: "h", x, y: branchY, length: branchLength });
@@ -238,8 +317,8 @@ export function computeLifeTreeLayout(root) {
     }
 
     maxRight = Math.max(maxRight, x + branchLength);
-    if (hasImage) {
-      maxRight = Math.max(maxRight, x + M.LABEL_INDENT + M.IMAGE_WIDTH);
+    if (imageBox) {
+      maxRight = Math.max(maxRight, imageBox.left + imageBox.width);
     }
     return { branchY, band: cursorY - yStart };
   }

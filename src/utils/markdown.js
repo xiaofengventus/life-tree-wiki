@@ -2,6 +2,7 @@ import { micromark } from "micromark";
 import { gfm, gfmHtml } from "micromark-extension-gfm";
 import { math } from "micromark-extension-math";
 import { mathSourceHtml } from "./micromarkMathSourceHtml";
+import { normalizeLatexDelimiters, upgradeTextLatex } from "./latexScan.js";
 import { sanitizeHtml } from "./sanitizeHtml";
 
 const MAX_MARKDOWN_LENGTH = 500_000;
@@ -77,12 +78,36 @@ function normalizeTaskLists(rawHtml) {
   return parsed.body.innerHTML;
 }
 
+/**
+ * 把**文字层**里手写的 LaTeX 升级成公式节点。
+ *
+ * ⚠️ 这一步必须有，否则「预览」和「插入正文」会分叉成两套结果：
+ *
+ *     预览  → decorateRichHtml(renderFormulaNodes(markdownToSafeHtml(src)))
+ *     插入  → markdownToSafeHtml(src)
+ *
+ * `renderFormulaNodes` 里含 upgradeTextLatex，而插入这条路原来没有 ——
+ * 同一份 Markdown，预览里公式渲染正常，插进编辑器却是一串裸文本。
+ * 用户看到的正是「导入后在预览是对的、到编辑器就不一样了」。
+ *
+ * 放在 sanitize **之前**：新建出来的公式节点正好由 sanitize 统一校验（safeFormula），
+ * 不用另开一条安全的旁路。
+ */
+function upgradeLatexNodes(rawHtml) {
+  if (typeof DOMParser === "undefined") return rawHtml;
+  const parsed = new DOMParser().parseFromString(`<body>${rawHtml || ""}</body>`, "text/html");
+  upgradeTextLatex(parsed);
+  return parsed.body.innerHTML;
+}
+
 export function markdownSyntaxToHtml(markdown) {
   const source = String(markdown || "");
   if (source.length > MAX_MARKDOWN_LENGTH) {
     throw new Error("Markdown 内容不能超过 50 万个字符");
   }
-  return micromark(source, {
+  // 先归一化 LaTeX 风格定界符：CommonMark 会把 `\(` `\[` 当反斜杠转义吃掉，
+  // 导致 `\(a=1\)` 变成 `(a=1)` —— 公式源码直接损坏。归一成 `$` 系再交给 micromark。
+  return micromark(normalizeLatexDelimiters(source), {
     allowDangerousHtml: false,
     allowDangerousProtocol: false,
     extensions: [gfm(), math()],
@@ -91,5 +116,7 @@ export function markdownSyntaxToHtml(markdown) {
 }
 
 export function markdownToSafeHtml(markdown) {
-  return wrapMarkdownImages(sanitizeHtml(normalizeTaskLists(markdownSyntaxToHtml(markdown))));
+  return wrapMarkdownImages(
+    sanitizeHtml(upgradeLatexNodes(normalizeTaskLists(markdownSyntaxToHtml(markdown)))),
+  );
 }

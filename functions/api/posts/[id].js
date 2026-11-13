@@ -4,10 +4,16 @@ import {
   requireUser,
 } from "../../../server/auth.js";
 import { ApiError, json, readJson, withApi } from "../../../server/http.js";
-import { ensurePublicPostTitleAvailable, loadPost, normalizePostType } from "../../../server/posts.js";
+import {
+  ensurePublicPostTitleAvailable,
+  loadPost,
+  normalizeContentFormat,
+  normalizePostType,
+} from "../../../server/posts.js";
 import { formatPublicId, parsePublicId } from "../../../server/publicIds.js";
 import { enforceRateLimit } from "../../../server/rateLimit.js";
 import { htmlToPlainText, sanitizePostHtml } from "../../../server/sanitize.js";
+import { renderLaupPost } from "../../../server/laup.js";
 import { cleanText, validateLicense, validateTags } from "../../../server/validation.js";
 import {
   managedMediaHashesFromHtml,
@@ -32,8 +38,48 @@ import {
 
 export const onRequestGet = withApi(async ({ request, params, env }) => {
   const viewer = await getCurrentUser(env.DB, request);
+  const url = new URL(request.url);
+  const revisionParam = url.searchParams.get("revision");
   const post = await loadPost(env.DB, String(params.id), { viewerId: viewer?.id });
   if (!post) throw new ApiError(404, "文章不存在", "POST_NOT_FOUND");
+
+  // ?revision=N —— 取某一版的内容快照（历史对比 / 回滚用）。
+  // 源码（content_laup）随快照一起返回：diff 和回滚都在源码层面做。
+  if (revisionParam !== null) {
+    const revisionNumber = Number(revisionParam);
+    if (!Number.isInteger(revisionNumber) || revisionNumber < 1) {
+      throw new ApiError(400, "版本号无效", "INVALID_REVISION");
+    }
+    const revision = await env.DB.prepare(
+      `SELECT r.revision_number, r.title, r.content_html, r.content_laup,
+              r.change_note, r.created_at,
+              u.display_name AS editor_name, u.public_id AS editor_public_id
+         FROM post_revisions r LEFT JOIN users u ON u.id = r.created_by
+        WHERE r.post_id = ? AND r.revision_number = ?`,
+    ).bind(post.id, revisionNumber).first();
+    if (!revision) throw new ApiError(404, "历史版本不存在", "REVISION_NOT_FOUND");
+    return json(
+      {
+        success: true,
+        revision: {
+          revisionCount: revision.revision_number,
+          title: revision.title,
+          changeNote: revision.change_note,
+          submittedAt: revision.created_at,
+          editor: revision.editor_name || "",
+          editorUid: revision.editor_public_id
+            ? formatPublicId("user", revision.editor_public_id)
+            : "",
+          contentType: revision.content_laup ? "laup" : "html",
+          // laup 文章给源码（diff/回滚的真相）；html 文章给清洗后的 HTML
+          contentSource: revision.content_laup || "",
+          content: revision.content_html,
+        },
+      },
+      { headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=1800" } },
+    );
+  }
+
   return json(
     { success: true, post },
     {
@@ -64,13 +110,8 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
 
   const body = await readJson(request, 420 * 1024);
   const visibility = normalizeVisibility(body.visibility, existing.visibility || PUBLIC_VISIBILITY);
-  if (existing.visibility === PUBLIC_VISIBILITY && visibility === PRIVATE_VISIBILITY) {
-    throw new ApiError(
-      409,
-      "已经公开的文章不能改回仅自己可见",
-      "PUBLIC_WORK_CANNOT_BECOME_PRIVATE",
-    );
-  }
+  // 公开 ⇄ 私密都允许改（2026-10-12 起）：私密作品已不设槽位上限，
+  // 转私有没有容量问题；编辑表单里也能直接切（作者本人权限不变）。
   const isPrivateSave = visibility === PRIVATE_VISIBILITY;
   const publishingPrivate = existing.visibility === PRIVATE_VISIBILITY &&
     visibility === PUBLIC_VISIBILITY;
@@ -93,11 +134,25 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
     }
   }
   const author = cleanText(body.author || existing.author, "作者", { minimum: 1, maximum: 120 });
-  const contentHtml = await sanitizePostHtml(body.content);
+  // 体裁不写就沿用这篇原来的 —— 只传 content 的老调用方不会把 Laup 正文降级成富文本。
+  const contentFormat = Object.hasOwn(body, "contentFormat")
+    ? normalizeContentFormat(body.contentFormat)
+    : (existing.content_laup ? "laup" : "html");
+  let contentHtml;
+  let contentText;
+  let contentSource = null;
+  if (contentFormat === "laup") {
+    const rendered = renderLaupPost(body.content);
+    contentHtml = rendered.html;
+    contentText = rendered.text;
+    contentSource = String(body.content ?? "");
+  } else {
+    contentHtml = await sanitizePostHtml(body.content);
+    contentText = htmlToPlainText(contentHtml);
+  }
   const citations = sanitizeCitations(body.citations);
   validateCitationMarkers(contentHtml, citations);
   const citationsJson = JSON.stringify(citations);
-  const contentText = htmlToPlainText(contentHtml);
   if (!isPrivateSave && !contentText) {
     throw new ApiError(400, "文章正文不能为空", "EMPTY_CONTENT");
   }
@@ -165,12 +220,13 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
   const statements = [
     env.DB.prepare(
       `UPDATE posts SET title = ?, author = ?, cover_media_hash = ?, content_html = ?, content_text = ?,
+        content_laup = ?,
         tags_json = ?, type = ?, classification_card_json = ?, citations_json = ?,
         license = ?, revision_count = ?,
         change_note = ?, visibility = ?, version = ?, updated_at = ?
        WHERE id = ? AND version = ? AND deleted_at IS NULL`,
     ).bind(
-      title, author, coverHash, contentHtml, contentText, tagsJson, postType,
+      title, author, coverHash, contentHtml, contentText, contentSource, tagsJson, postType,
       classificationCardJson, citationsJson,
       license, nextRevision, changeNote, visibility, nextVersion,
       now, id, expectedVersion,
@@ -180,13 +236,14 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
     statements.push(
       env.DB.prepare(
         `INSERT INTO post_revisions
-          (post_id, revision_number, title, content_html, classification_card_json,
+          (post_id, revision_number, title, content_html, content_laup,
+           classification_card_json,
            citations_json, change_note, created_at, created_by)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE EXISTS (SELECT 1 FROM posts WHERE id = ? AND version = ?)`,
       ).bind(
-        id, nextRevision, title, contentHtml, classificationCardJson, citationsJson,
-        changeNote, now, user.id, id, nextVersion,
+        id, nextRevision, title, contentHtml, contentSource, classificationCardJson,
+        citationsJson, changeNote, now, user.id, id, nextVersion,
       ),
     );
   }
@@ -204,6 +261,15 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
         releasePrivateWorkSlotStatement(env.DB, "POST", id),
       );
     }
+  } else if (existing.visibility === PUBLIC_VISIBILITY) {
+    // 公开 → 私密：公开镜像里撤下（同步事件发 DELETE）。
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO sync_events (entity_type, entity_id, operation, version, occurred_at)
+         SELECT 'post', ?, 'DELETE', ?, ?
+          WHERE EXISTS (SELECT 1 FROM posts WHERE id = ? AND version = ?)`,
+      ).bind(id, nextVersion, now, id, nextVersion),
+    );
   }
   let results;
   try {

@@ -532,3 +532,18 @@
   font-size: 1em;
   white-space: pre;
 }
+
+/* ---------- Markdown 单元格的渲染结果（见 utils/markdownCell.js）----------
+   内部样式一律复用上面那套 .post-content 作用域（容器本身带着这个 class），
+   这里只补「作为一个整体块」需要的外边距。 */
+.life-md-cell-body {
+  margin: 1.6em 0;
+}
+
+.life-md-cell-body > :first-child {
+  margin-top: 0;
+}
+
+.life-md-cell-body > :last-child {
+  margin-bottom: 0;
+}

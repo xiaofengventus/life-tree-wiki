@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="PfuyGveY21dvHZdQICLKau">
+<head data-page-node-id="YxfKiflTjZ2QnDOf98cR3B">
+<meta charset="UTF-8" data-page-node-id="R6YXg3rCrcPfD3dOVdw1Q3">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="QjWTAy1rFDKUptA2WW04uB">
+<title>计算机网络 · 协议流程与设备原理 — 图解</title>
+<style>
+  :root {
+    --bg:#f4f6fa; --card:#fff; --ink:#1e2530; --muted:#5b6676; --line:#dde3ec;
+    --app:#2563eb; --app-bg:#eff4ff;
+    --tra:#0d9488; --tra-bg:#ecfdf8;
+    --net:#d97706; --net-bg:#fff8ec;
+    --lnk:#7c3aed; --lnk-bg:#f5f0ff;
+    --phy:#64748b; --phy-bg:#f1f4f8;
+    --red:#dc2626; --green:#059669;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; background:var(--bg); color:var(--ink); padding:0 16px 80px; }
+  .page { max-width:1080px; margin:0 auto; }
+  header.top { text-align:center; padding:34px 0 8px; }
+  header.top h1 { font-size:26px; letter-spacing:1px; }
+  header.top p.sub { color:var(--muted); margin-top:8px; font-size:14px; }
+  header.top a.back { display:inline-block; margin-top:10px; font-size:13px; color:var(--app); text-decoration:none; border:1px solid var(--line); background:#fff; padding:5px 14px; border-radius:20px; }
+  header.top a.back:hover { background:var(--app-bg); }
+
+  nav.chips { position:sticky; top:0; z-index:9; background:rgba(244,246,250,.94); backdrop-filter:blur(6px);
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center; padding:12px 0 14px; border-bottom:1px solid var(--line); margin-bottom:26px; }
+  nav.chips a { font-size:13px; color:#334; text-decoration:none; background:#fff; border:1px solid var(--line); padding:5px 13px; border-radius:20px; }
+  nav.chips a:hover { background:var(--app-bg); border-color:var(--app); color:var(--app); }
+
+  section { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:26px 28px; margin-bottom:30px; }
+  section h2 { font-size:20px; display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  section h2 .dot { width:12px; height:12px; border-radius:4px; flex:none; }
+  section p.intro { color:var(--muted); font-size:14px; line-height:1.7; margin-bottom:16px; }
+  .fig { text-align:center; }
+  .fig svg { max-width:100%; height:auto; background:#fbfcfe; border:1px solid #eef1f6; border-radius:10px; }
+  .fig figcaption { color:#8b95a5; font-size:12.5px; margin-top:8px; }
+  .note { background:#f6f8fb; border-left:4px solid var(--app); border-radius:0 8px 8px 0; padding:10px 16px; font-size:13.5px; color:#3a4354; line-height:1.8; margin-top:14px; }
+  .note.warn { border-color:var(--red); }
+  .note.ok   { border-color:var(--green); }
+
+  table.cmp { width:100%; border-collapse:collapse; font-size:13.5px; margin-top:14px; }
+  table.cmp th, table.cmp td { border:1px solid var(--line); padding:8px 12px; text-align:left; line-height:1.6; }
+  table.cmp th { background:#f1f4f8; font-weight:700; white-space:nowrap; }
+  table.cmp td b { font-family:Consolas,monospace; }
+
+  /* SVG 通用样式 */
+  svg text { font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  svg .hbox { fill:#fff; stroke:#cbd5e1; stroke-width:1.5; }
+  svg .hname { font-size:15px; font-weight:700; fill:#1e2530; }
+  svg .hsub { font-size:11px; fill:#7b8595; }
+  svg .life { stroke:#cbd5e1; stroke-width:1.5; stroke-dasharray:5 4; }
+  svg .ar { stroke:#64748b; stroke-width:2; fill:none; }
+  svg .albl { font-size:13px; fill:#26303f; }
+  svg .asub { font-size:11.5px; fill:#7b8595; }
+  svg .st { font-size:11px; fill:#8b95a5; }
+  svg .flowbox { fill:#fff; stroke:#94a3b8; stroke-width:1.5; rx:9; }
+  svg .ftxt { font-size:13px; fill:#26303f; font-weight:600; }
+  svg .fsub { font-size:11px; fill:#7b8595; }
+  svg .fnote { fill:#f6f8fb; stroke:#dbe2ec; }
+  svg .ntxt { font-size:12px; fill:#5b6676; }
+</style>
+</head>
+<body data-page-node-id="gL48bTTwvE0TdySISxBW1t">
+
+<!-- 全局箭头 marker 定义（跨 SVG 共用） -->
+<svg width="0" height="0" style="position:absolute" data-page-node-id="lHFFYKdgz7EXqCmkYbV44e">
+  <defs data-page-node-id="jJZznhvraFV2hBKHlWcR9D">
+    <marker id="m-gray"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="LPHROKKRKQTWvKCwDAzpEk"><path d="M0,0 L10,5 L0,10 z" fill="#64748b" data-page-node-id="SfHbl4D8ffIvgBaBdhLsZn"/></marker>
+    <marker id="m-blue"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="6xqai0sO2rPOpVsgAZNsf6"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb" data-page-node-id="vuvM89DWg1aM1aB9Gjn9Iy"/></marker>
+    <marker id="m-teal"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="JtgVde6CFG3dH187UyOxND"><path d="M0,0 L10,5 L0,10 z" fill="#0d9488" data-page-node-id="VyCgaaCnkvjM3EMmZtEpKQ"/></marker>
+    <marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="6NBW9IeEMCXeR6KiPwgIkT"><path d="M0,0 L10,5 L0,10 z" fill="#d97706" data-page-node-id="ELIHyakdTvfME0ThF9dk5U"/></marker>
+    <marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="pGZEnmhCU4st86HS68Bx1z"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed" data-page-node-id="zNtcHh9rwk6l0DBascPQWe"/></marker>
+    <marker id="m-red"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="C5XFAmKSYL970usmz2TcRL"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626" data-page-node-id="SVzDcDIdL0aP0KUj9DWQZi"/></marker>
+    <marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" data-page-node-id="w25hJYRFYGnkjjVwnVHHh6"><path d="M0,0 L10,5 L0,10 z" fill="#059669" data-page-node-id="htX6dV8CDRrLKHpaIKJJOL"/></marker>
+  </defs>
+</svg>
+
+<div class="page" data-page-node-id="TS8rXcDfuoq1OzONDIxRiN">
+
+<header class="top" data-page-node-id="ypGvDtpzoFSIdrx8lqa7ES">
+  <h1 data-page-node-id="gGDaYQDK4cdjPC7kBeQ3sM">计算机网络 · 协议流程与设备原理</h1>
+  <p class="sub" data-page-node-id="S3FiP3tamFinc906JOhGeE">思维图 · 时序流程图 · 实体拓扑图 —— 讲清楚「每个协议怎么跑、每台设备怎么转」</p>
+  <a class="back" href="计算机网络-五层模型.html" data-page-node-id="Wv6bYy9Czr1WqDL2H4cKyo">← 返回：五层模型总览页</a>
+  <a class="back" href="计算机网络-考研详解版.html">→ 进阶：考研/竞赛详解版（逐字段 · 计算例题 · ACL/AAA）</a>
+</header>
+
+<nav class="chips" data-page-node-id="dmtuI3FUW8hxNgQ8rJGSuI">
+  <a href="#s0" data-page-node-id="zvHghRNjozCN2ds24bY32R">协议全景图</a>
+  <a href="#s1" data-page-node-id="7LHDCjnqKcmm6G6KtHYpUj">TCP 握手/挥手</a>
+  <a href="#s2" data-page-node-id="oTUrFS9BJpr32ZhBQnhFKC">DHCP</a>
+  <a href="#s3" data-page-node-id="deHAlY812u9NdLC9vIvsae">ARP</a>
+  <a href="#s4" data-page-node-id="KW7FV5QB7xs6UHLyCtIFC7">DNS+HTTP</a>
+  <a href="#s5" data-page-node-id="uHu9oI1haBckxGrS5fuQy5">ICMP</a>
+  <a href="#s6" data-page-node-id="AJc0lYKluQiHt7Pi4zhulW">OSPF</a>
+  <a href="#s7" data-page-node-id="WSghGE72zTkN1SaHzE8a5G">STP</a>
+  <a href="#s8" data-page-node-id="vDP1s0KmUnmMCAOuVQ1wlf">NAT</a>
+  <a href="#s9" data-page-node-id="djgSKBMD0bTQxJEKf06qF0">设备原理</a>
+  <a href="#s10" data-page-node-id="gLkIrNKFqtZAqAUhqTmKl8">综合拓扑</a>
+  <a href="#s11" data-page-node-id="7xGPQEGGMr6fFrSxqaJPBB">附表</a>
+</nav>
+
+<!-- ================= 0 思维图 ================= -->
+<section id="s0" data-page-node-id="DfP0M2z65e5efZXuzkNsOJ">
+  <h2 data-page-node-id="cFlHwWeqCSBm63nP4QrtyS"><span class="dot" style="background:#1e2530" data-page-node-id="tSC0wHK5FOrGnu02vmB4GQ"></span>一、协议全景 · 思维图</h2>
+  <p class="intro" data-page-node-id="yySJ9vjCxQZlAJu3r5xdoy">先把知识挂到树上：五层各管一件事，下层为上层提供服务。发数据自上而下逐层「套头」，收数据自下而上逐层「剥头」。</p>
+  <figure class="fig" data-page-node-id="aXXm3aMWpDDWZkhjNp5aCq">
+    <svg viewBox="0 0 1000 565" data-page-node-id="4EULjBIZCBZBKFBltqGZCH">
+      <!-- 根 -->
+      <rect x="24" y="258" width="150" height="64" rx="12" fill="#1e2530" data-page-node-id="U0Z6xPzVckUVfk3PEZ5xFO"/>
+      <text x="99" y="285" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" data-page-node-id="3aGd9BpY43TsqkC5gJQq40">计算机网络</text>
+      <text x="99" y="306" text-anchor="middle" fill="#aab4c4" font-size="12" data-page-node-id="FiPI7RecUYzceQzAhlDHUk">协议全景</text>
+      <!-- 连线 -->
+      <path d="M174,290 C 225,290 220,82 270,82"   fill="none" stroke="#2563eb" stroke-width="2" data-page-node-id="QLveGPRhvl0kLXlyrKGPyM"/>
+      <path d="M174,290 C 225,290 220,194 270,194" fill="none" stroke="#0d9488" stroke-width="2" data-page-node-id="ZQixA4h4veoPRCXATw9XPB"/>
+      <path d="M174,290 C 225,290 220,284 270,284" fill="none" stroke="#d97706" stroke-width="2" data-page-node-id="lAIHSIcrdHJYpWsYIvRgm1"/>
+      <path d="M174,290 C 225,290 220,396 270,396" fill="none" stroke="#7c3aed" stroke-width="2" data-page-node-id="vtg8YHgRnoJF4KFjV0kRTC"/>
+      <path d="M174,290 C 225,290 220,497 270,497" fill="none" stroke="#64748b" stroke-width="2" data-page-node-id="GiO3g5AbJXATqzniAu6AAO"/>
+      <!-- 五层节点 -->
+      <g font-size="14" font-weight="700" data-page-node-id="k6R8ezn6gcDEwTeRvzoKAk">
+        <rect x="270" y="60"  width="170" height="44" rx="10" fill="#eff4ff" stroke="#2563eb" stroke-width="1.5" data-page-node-id="6vQRUMe1CdaZfyuReLYmN7"/>
+        <text x="355" y="88"  text-anchor="middle" fill="#2563eb" data-page-node-id="FRTla3G1AOEN83CC5nb1pf">应用层</text>
+        <rect x="270" y="172" width="170" height="44" rx="10" fill="#ecfdf8" stroke="#0d9488" stroke-width="1.5" data-page-node-id="PvBm2fHaJbbG98O4uqCSnJ"/>
+        <text x="355" y="200" text-anchor="middle" fill="#0d9488" data-page-node-id="evGZ9U7tyEdO1BtcO0zdLt">传输层</text>
+        <rect x="270" y="262" width="170" height="44" rx="10" fill="#fff8ec" stroke="#d97706" stroke-width="1.5" data-page-node-id="5w3fG7aLOYV6qLHvGfgpiv"/>
+        <text x="355" y="290" text-anchor="middle" fill="#d97706" data-page-node-id="slg9fAUVLEmMU2Dl1lu1sn">网络层</text>
+        <rect x="270" y="374" width="170" height="44" rx="10" fill="#f5f0ff" stroke="#7c3aed" stroke-width="1.5" data-page-node-id="S9L3tfBiJJIHCHRlVEmsfU"/>
+        <text x="355" y="402" text-anchor="middle" fill="#7c3aed" data-page-node-id="lM78LTEJsZQQrOrniECsso">数据链路层</text>
+        <rect x="270" y="475" width="170" height="44" rx="10" fill="#f1f4f8" stroke="#64748b" stroke-width="1.5" data-page-node-id="t9ACk7vuWw3UFVCLnCj5Og"/>
+        <text x="355" y="503" text-anchor="middle" fill="#64748b" data-page-node-id="0Lb9qAdw5j2omEL8hvKgLK">物理层</text>
+      </g>
+      <!-- 叶子 -->
+      <g font-size="13" fill="#33404f" data-page-node-id="Bl57TjT7BmpDSsUJXNMDsG">
+        <circle cx="474" cy="15" r="4" fill="#2563eb" data-page-node-id="IC4QGlyBwHWc1UtOCUwCac"/><text x="486" y="20" data-page-node-id="Q1LSPUKEoSpqJNpWCq5F9o">HTTP / HTTPS　网页访问</text>
+        <circle cx="474" cy="37" r="4" fill="#2563eb" data-page-node-id="W4iAEHrp99X71cBC9j9FBW"/><text x="486" y="42" data-page-node-id="bqSFV8aJCYqXrlHgdX87Z3">DNS　域名 → IP 地址</text>
+        <circle cx="474" cy="59" r="4" fill="#2563eb" data-page-node-id="BEbgEW35txcz5scAHEcidC"/><text x="486" y="64" data-page-node-id="Kgj2ozHzseWXTFmdReqDwo">DHCP　自动获取 IP 配置</text>
+        <circle cx="474" cy="81" r="4" fill="#2563eb" data-page-node-id="sAZRNY2Wehrt8FAzVCSnOf"/><text x="486" y="86" data-page-node-id="L8LdOslvOFBBU7CugYy1yJ">FTP　文件传输</text>
+        <circle cx="474" cy="103" r="4" fill="#2563eb" data-page-node-id="R0hQqaHZma82UnxAcJGsTX"/><text x="486" y="108" data-page-node-id="CNN8IzfCpmE58UNHTn8HNg">SMTP / POP3　收发邮件</text>
+        <circle cx="474" cy="125" r="4" fill="#2563eb" data-page-node-id="MNCJSuB9Ix2xRwv3SJcuzs"/><text x="486" y="130" data-page-node-id="vVA31SE8Q9xirlgH9SNfD8">Telnet / SSH　远程登录（SSH 加密）</text>
+
+        <circle cx="474" cy="189" r="4" fill="#0d9488" data-page-node-id="c9mt80oEeovz0Ic98WfeRh"/><text x="486" y="194" data-page-node-id="di4tRrcwra361daUcEuZQi">TCP　面向连接 · 可靠 · 三次握手</text>
+        <circle cx="474" cy="211" r="4" fill="#0d9488" data-page-node-id="kI8pMfFadLIK1xybJ3vHWS"/><text x="486" y="216" data-page-node-id="ROMihVLT5RTso8kEzv3ewi">UDP　无连接 · 低开销 · 快</text>
+
+        <circle cx="474" cy="257" r="4" fill="#d97706" data-page-node-id="GrHQsrZL090ZxyNAP0sCwp"/><text x="486" y="262" data-page-node-id="Te7pvOXet35xWp2wUHERsG">IPv4 / IPv6　逻辑寻址与转发</text>
+        <circle cx="474" cy="279" r="4" fill="#d97706" data-page-node-id="xTVxABLzc1cfhEmFZIVFai"/><text x="486" y="284" data-page-node-id="X1UnT3FgarFickV1ZZ64An">ICMP　报错与探测（ping）</text>
+        <circle cx="474" cy="301" r="4" fill="#d97706" data-page-node-id="xO9c89BzYv5M6FQ6tv4oBD"/><text x="486" y="306" data-page-node-id="hoAMmuihGiMEQHnEfga4VB">OSPF　链路状态动态路由</text>
+        <circle cx="474" cy="323" r="4" fill="#d97706" data-page-node-id="74gmMvfBDeLNIVODDFAZnN"/><text x="486" y="328" data-page-node-id="O6asAflUbKuZxXf4Hc5z59">ARP　IP → MAC 地址解析</text>
+
+        <circle cx="474" cy="369" r="4" fill="#7c3aed" data-page-node-id="Wy2njkTlLmfZ6RnuqhLXJi"/><text x="486" y="374" data-page-node-id="H7eGmQIJljakjCq0k1Co2R">Ethernet　以太网帧 · MAC 寻址</text>
+        <circle cx="474" cy="391" r="4" fill="#7c3aed" data-page-node-id="RFJ2o3AnEjunOmirRcwZd1"/><text x="486" y="396" data-page-node-id="34vJHETBBSfqsgCsbBXUKi">VLAN　隔离广播域</text>
+        <circle cx="474" cy="413" r="4" fill="#7c3aed" data-page-node-id="xeVyGED6yMjZf8shybVwCg"/><text x="486" y="418" data-page-node-id="cnLdJ9CHOZTW0CMdeZj8CT">STP　二层防环路</text>
+        <circle cx="474" cy="435" r="4" fill="#7c3aed" data-page-node-id="pz6jWOmbJ5qCmSBwVmaEFl"/><text x="486" y="440" data-page-node-id="oIpyPE7kitbBlbk0cMMUPB">LACP　链路聚合提带宽</text>
+
+        <circle cx="474" cy="481" r="4" fill="#64748b" data-page-node-id="GwaV337bDGuHxm0V2jSr7a"/><text x="486" y="486" data-page-node-id="boACv4ihxGloeCzbzqGkwd">双绞线 / 光纤 / 同轴电缆</text>
+        <circle cx="474" cy="503" r="4" fill="#64748b" data-page-node-id="T2J3L8ouGcZqGO7wpygwuE"/><text x="486" y="508" data-page-node-id="fQP8rq15Y0DpFpFVzm2uIU">802.11 WLAN　无线传输</text>
+        <circle cx="474" cy="525" r="4" fill="#64748b" data-page-node-id="uGJj2GuXgZN9B3vEfMqOH9"/><text x="486" y="530" data-page-node-id="WyZBz7hBSnzWuD8J1UzxiG">集线器 / 中继器（物理层设备）</text>
+      </g>
+      <text x="470" y="556" font-size="12" fill="#8b95a5" data-page-node-id="AeU0lw79AOYDEE658LcS3w">发数据：自上而下封装（加头）　｜　收数据：自下而上解封装（剥头）——下层为上层提供服务</text>
+    </svg>
+    <figcaption data-page-node-id="s8BWVUVClRRPXlVuwTGWEM">图 0 · 五层协议全景思维图</figcaption>
+  </figure>
+</section>
+
+<!-- ================= 1 TCP ================= -->
+<section id="s1" data-page-node-id="X6s18yRcqiVQhZm6hWM37L">
+  <h2 data-page-node-id="3NkSvWfDJ58qCuSrMAdFyG"><span class="dot" style="background:var(--tra)" data-page-node-id="HtbuccFBBwiyA4rKJuAAZr"></span>二、TCP：三次握手与四次挥手</h2>
+  <p class="intro" data-page-node-id="MEX0MV7RuksKiG81m17dVz">TCP 面向连接：传数据前先「握手」确认双方收发能力正常，传完再「挥手」优雅断开。以下时序图中左为客户端、右为服务端。</p>
+  <figure class="fig" data-page-node-id="6YjKNCijAQTKnYEyKg0gv7">
+    <svg viewBox="0 0 1000 330" data-page-node-id="n3gA7qDSLN9OiKLDqWO7Em">
+      <rect class="hbox" x="120" y="8" width="180" height="38" rx="9" data-page-node-id="W0KnYsG83sHMrjJNBCbsYW"/>
+      <text class="hname" x="210" y="33" text-anchor="middle" data-page-node-id="7yZKLEruHdgnKLjdXuplkd">客户端</text>
+      <rect class="hbox" x="700" y="8" width="180" height="38" rx="9" data-page-node-id="9qIPaSD3KphJI9d37Xdzvy"/>
+      <text class="hname" x="790" y="33" text-anchor="middle" data-page-node-id="igVnD3J99Q0DEADGiLgQQ3">服务端</text>
+      <line class="life" x1="210" y1="46" x2="210" y2="316" data-page-node-id="coSk3W12uxNIxAFH2yxYA3"/>
+      <line class="life" x1="790" y1="46" x2="790" y2="316" data-page-node-id="zFPUbP8FhJvePnwH1Pqjcz"/>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="214" y1="95"  x2="786" y2="95" data-page-node-id="3jUUN3YNESIMb9fsoSIxwo"/>
+      <text class="albl" x="500" y="84" text-anchor="middle" data-page-node-id="iWSc0qOo4LVUfrU0UkWwWD">① SYN（seq = x）「我想连接」</text>
+      <text class="st" x="200" y="118" text-anchor="end" data-page-node-id="jfH8TgeeRISq2TmtT2MncU">SYN_SENT</text>
+      <line class="ar" stroke="#0d9488" marker-end="url(#m-teal)" x1="786" y1="150" x2="214" y2="150" data-page-node-id="S5V49qkQBZ35XVEafzgdTx"/>
+      <text class="albl" x="500" y="139" text-anchor="middle" data-page-node-id="Xr7AmMNLMQT9CJ5YNeLcP2">② SYN + ACK（seq = y, ack = x+1）「收到，我也连」</text>
+      <text class="st" x="800" y="173" data-page-node-id="pt4EaLklhFATOOT8zzjX7D">SYN_RCVD</text>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="214" y1="205" x2="786" y2="205" data-page-node-id="y6a73VBxfzC4ZQMmwlPb1i"/>
+      <text class="albl" x="500" y="194" text-anchor="middle" data-page-node-id="bBbc3SjjRfZtR9MHznZG5U">③ ACK（ack = y+1）「都收到了，开聊」</text>
+      <rect x="150" y="238" width="120" height="30" rx="15" fill="#ecfdf8" stroke="#059669" data-page-node-id="iQMYP0iohN56AjwNanPJra"/>
+      <text x="210" y="258" text-anchor="middle" font-size="12" fill="#059669" font-weight="700" data-page-node-id="h3J4s8lHo3bZEJTT1eiBX2">ESTABLISHED</text>
+      <rect x="730" y="238" width="120" height="30" rx="15" fill="#ecfdf8" stroke="#059669" data-page-node-id="wdGajkGTz9nx5UDk5jgAqE"/>
+      <text x="790" y="258" text-anchor="middle" font-size="12" fill="#059669" font-weight="700" data-page-node-id="6H24uxh5oH8jMzBqpPbSfx">ESTABLISHED</text>
+      <text class="asub" x="500" y="300" text-anchor="middle" data-page-node-id="D4t4MpWr3ZH7FrvNYhYS5t">三次握手目的：确认「我发你能收、你发我能收」双向都通，并同步初始序号 x、y；第三次 ACK 可以携带业务数据</text>
+    </svg>
+    <figcaption data-page-node-id="eCPdTNMnAqtcA9E3f7dmsp">图 1-1 · TCP 三次握手时序图</figcaption>
+  </figure>
+  <figure class="fig" style="margin-top:18px" data-page-node-id="VVd6vQHw1V6zvtnGSNCfY3">
+    <svg viewBox="0 0 1000 350" data-page-node-id="CA2hIZ7Jtkcqev4DlHgsDG">
+      <rect class="hbox" x="120" y="8" width="180" height="38" rx="9" data-page-node-id="zzSSD4vHLxofjAcy2YGEEQ"/>
+      <text class="hname" x="210" y="33" text-anchor="middle" data-page-node-id="2aXBe6sKWodu0hkFpmQjIs">客户端（主动方）</text>
+      <rect class="hbox" x="700" y="8" width="180" height="38" rx="9" data-page-node-id="4z4odrClHgaIB2r5H1KyOi"/>
+      <text class="hname" x="790" y="33" text-anchor="middle" data-page-node-id="YGpzx7ttgXMDbGbJJMMsoI">服务端（被动方）</text>
+      <line class="life" x1="210" y1="46" x2="210" y2="336" data-page-node-id="FeiGPsGkscb0HalwGzs56n"/>
+      <line class="life" x1="790" y1="46" x2="790" y2="336" data-page-node-id="rlIC2ZgzXHaxPEQu53PVzX"/>
+      <line class="ar" stroke="#dc2626" marker-end="url(#m-red)" x1="214" y1="85" x2="786" y2="85" data-page-node-id="NprTCs1DSHpTFJ8RwW5ocL"/>
+      <text class="albl" x="500" y="74" text-anchor="middle" data-page-node-id="lepAQSBIn3UW5KQx50vTQG">① FIN（seq = m）「我的数据发完了」</text>
+      <text class="st" x="200" y="108" text-anchor="end" data-page-node-id="e2Pv5WxGHvUJCVMet2bTKn">FIN_WAIT_1</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="786" y1="135" x2="214" y2="135" data-page-node-id="o3R1rmVpX2ekFXAhEhb1FV"/>
+      <text class="albl" x="500" y="124" text-anchor="middle" data-page-node-id="JVXW7udFLEBIPntbAKrbKe">② ACK「知道了」（我可能还有数据没发完）</text>
+      <text class="st" x="200" y="158" text-anchor="end" data-page-node-id="lc5KqXYNObe97B1o6SE6nz">FIN_WAIT_2</text>
+      <text class="st" x="800" y="158" data-page-node-id="ADW3BvgBPStiLSXmRaLqui">CLOSE_WAIT</text>
+      <line class="ar" stroke="#d97706" marker-end="url(#m-amber)" x1="786" y1="195" x2="214" y2="195" data-page-node-id="8Oz81fhV2NOPNMvjSP6VBD"/>
+      <text class="albl" x="500" y="184" text-anchor="middle" data-page-node-id="AlCqMHtCN3cnKYGRbWnJsK">③ FIN（seq = n）「我也发完了」</text>
+      <text class="st" x="800" y="218" data-page-node-id="XV1v0R4FpJt9cQjyi4OgGo">LAST_ACK</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="214" y1="245" x2="786" y2="245" data-page-node-id="6pF4GTaqLCJF7rP3qQpCyI"/>
+      <text class="albl" x="500" y="234" text-anchor="middle" data-page-node-id="3BD6ssQZ3EyCesCGQOeHFB">④ ACK（ack = n+1）「拜拜」</text>
+      <text class="st" x="200" y="268" text-anchor="end" data-page-node-id="AVT0LAyi3E9l7R2kPT22Es">TIME_WAIT（等 2MSL）→ CLOSED</text>
+      <rect x="160" y="288" width="100" height="28" rx="14" fill="#f1f4f8" stroke="#94a3b8" data-page-node-id="aaAnOsc65wOJCFBPBf8kwX"/>
+      <text x="210" y="307" text-anchor="middle" font-size="12" fill="#5b6676" font-weight="700" data-page-node-id="BLuHwZS9RdSvUh5XA3DRov">CLOSED</text>
+      <rect x="740" y="288" width="100" height="28" rx="14" fill="#f1f4f8" stroke="#94a3b8" data-page-node-id="C7eCR1MdSwlnhJ9qOp3eFG"/>
+      <text x="790" y="307" text-anchor="middle" font-size="12" fill="#5b6676" font-weight="700" data-page-node-id="9uONdu1bxwgywoBw5FG5aF">CLOSED</text>
+      <text class="asub" x="500" y="336" text-anchor="middle" data-page-node-id="c6zp3MgLNEhUbeJLAAMjRe">为什么四次？ACK 和 FIN 分开发 —— 服务端收到 FIN 后可能还有数据要发；TIME_WAIT 确保最后的 ACK 丢失时对方能重传 FIN</text>
+    </svg>
+    <figcaption data-page-node-id="9rxldGnvCg4x9pB1UcbIrH">图 1-2 · TCP 四次挥手时序图</figcaption>
+  </figure>
+  <div class="note" data-page-node-id="YWjCmtPCUXXtfLArVtvEOy">TCP 可靠性三板斧：<b data-page-node-id="kCwpvIrtpD1EYZyLagXQZ6">序号 + 确认（ack）</b>保证不丢不乱；<b data-page-node-id="vVBxEamoE26M94S34PdOlE">超时重传</b>丢了就重发；<b data-page-node-id="lxHESFXqVW2w3VNU1OsfwX">滑动窗口</b>控制流量、拥塞窗口控制拥塞。UDP 全都没有 —— 所以快，适合直播、DNS 查询、DHCP。</div>
+</section>
+
+<!-- ================= 2 DHCP ================= -->
+<section id="s2" data-page-node-id="HI7CK6m1wIBih6hahRZXXc">
+  <h2 data-page-node-id="XjBqUuGUEXLR1fSBRPNXkY"><span class="dot" style="background:var(--app)" data-page-node-id="ZPUFa9Z5jO05lvh9WiG9GP"></span>三、DHCP：开机自动拿到 IP（DORA 四步）</h2>
+  <p class="intro" data-page-node-id="KIwzHC3YS3E1cMVVXoWMxE">新设备接入网络时连 IP 都没有，靠 UDP 广播完成「要地址 → 给地址 → 确认 → 成交」，四步首字母连起来叫 DORA。</p>
+  <figure class="fig" data-page-node-id="NLAMT42ZapQDX6gyKd0Dbu">
+    <svg viewBox="0 0 1000 310" data-page-node-id="h1AGa0SJvm6rp8hL3fAyaz">
+      <rect class="hbox" x="90" y="8" width="180" height="38" rx="9" data-page-node-id="lwQz9pJ6DyPCkdRdqwVSab"/>
+      <text class="hname" x="180" y="33" text-anchor="middle" data-page-node-id="2vD6OfnonpdUCGGTsYu7lh">客户端（新设备）</text>
+      <rect class="hbox" x="710" y="8" width="180" height="38" rx="9" data-page-node-id="9Ln3IH3qDU49abxhHVdPcL"/>
+      <text class="hname" x="800" y="33" text-anchor="middle" data-page-node-id="KxeTQKVWtLOyghTH5EKeUE">DHCP 服务器</text>
+      <line class="life" x1="180" y1="46" x2="180" y2="272" data-page-node-id="AkFKN003Txw1zNG01xqafk"/>
+      <line class="life" x1="800" y1="46" x2="800" y2="272" data-page-node-id="FL3ltKzpclR9Si72DPLbvH"/>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="184" y1="95" x2="796" y2="95" data-page-node-id="F3nGcdHjoCTCafCxoE1KGF"/>
+      <text class="albl" x="500" y="80" text-anchor="middle" data-page-node-id="SGuCSPLzJQYAqLdBhRGhvs">① Discover（广播）「网里有没有 DHCP 服务器？」</text>
+      <text class="asub" x="500" y="93" text-anchor="middle" data-page-node-id="v5GxjoCErDnu9yO4CkDzE8">源 0.0.0.0 → 目的 255.255.255.255　UDP 68 → 67</text>
+      <line class="ar" stroke="#0d9488" marker-end="url(#m-teal)" x1="796" y1="145" x2="184" y2="145" data-page-node-id="wbD9r1jDCq3wtNahuykV1T"/>
+      <text class="albl" x="500" y="130" text-anchor="middle" data-page-node-id="P6isxdHosPwOAizAk1ORVZ">② Offer「给你 192.168.1.100，可用」</text>
+      <text class="asub" x="500" y="143" text-anchor="middle" data-page-node-id="hwFmt09EC5QjHkWrOpsHxA">服务器从地址池挑一个空闲 IP 连同掩码/网关/DNS 一起报出</text>
+      <line class="ar" stroke="#d97706" marker-end="url(#m-amber)" x1="184" y1="195" x2="796" y2="195" data-page-node-id="Gx81wSswgDQq47IsgGvNd8"/>
+      <text class="albl" x="500" y="180" text-anchor="middle" data-page-node-id="sZ1auQISU3DtXHVwAJsj6K">③ Request（仍广播）「我要 192.168.1.100 这个」</text>
+      <text class="asub" x="500" y="193" text-anchor="middle" data-page-node-id="uvxCgBR1z73anhjNCBouNH">广播是为了让其他 DHCP 服务器知道「你报的我没用上」</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="796" y1="245" x2="184" y2="245" data-page-node-id="zHAWJ4ReZDkcmvtaxiHYXs"/>
+      <text class="albl" x="500" y="230" text-anchor="middle" data-page-node-id="LYssaeX25BlPgNCSwzAvWH">④ ACK「成交」</text>
+      <text class="asub" x="500" y="243" text-anchor="middle" data-page-node-id="il32SiHLJ7vCSE0MT9UQ1W">客户端正式配置 IP，开始计时租期</text>
+      <text class="asub" x="500" y="292" text-anchor="middle" data-page-node-id="5VNDeIkAMaFjmGWmkTkq8D">租期到 50% 时客户端单播 Request 续租；网络里防「私接 DHCP」用 DHCP Snooping</text>
+    </svg>
+    <figcaption data-page-node-id="Lvy9eQfKhDxBsYZAjYChcE">图 2 · DHCP DORA 四步流程（全部走 UDP 广播）</figcaption>
+  </figure>
+</section>
+
+<!-- ================= 3 ARP ================= -->
+<section id="s3" data-page-node-id="qqzwaGROIbArUDJOssyvHs">
+  <h2 data-page-node-id="YenumB076vhczXSOOvq0GF"><span class="dot" style="background:var(--net)" data-page-node-id="RvfXRGrjdi9mcOSVrkJQy4"></span>四、ARP：知道 IP，怎么找到 MAC？</h2>
+  <p class="intro" data-page-node-id="C9tMeIuK0H39sv9VSucAQp">同一网段内真正收发帧靠的是 MAC 地址。ARP 用「喊话」的方式问：<b data-page-node-id="eZblYhSmYssA83bGMqZUNv">谁是这个 IP 的，把 MAC 告诉我</b>。</p>
+  <figure class="fig" data-page-node-id="3vTMBKnLUXaAxNtFYyaQRl">
+    <svg viewBox="0 0 1000 340" data-page-node-id="6kCPt1W2ZfQb4bzBVIwb60">
+      <rect class="hbox" x="60" y="8" width="180" height="46" rx="9" data-page-node-id="etJWwgNAOiG2cevzNv6y8J"/>
+      <text class="hname" x="150" y="28" text-anchor="middle" data-page-node-id="lEeqiCGNY8t7KGxqTBl7bT">主机 A</text>
+      <text class="hsub" x="150" y="45" text-anchor="middle" data-page-node-id="0oSTLP6FZQ9AFD4ieNz6ot">192.168.1.10　MAC=AA</text>
+      <rect class="hbox" x="390" y="8" width="180" height="46" rx="9" data-page-node-id="A6ZfGR79FA61Z8zVEJsC3H"/>
+      <text class="hname" x="480" y="28" text-anchor="middle" data-page-node-id="xCeJy7nygbamX6vIcfoRaa">交换机</text>
+      <text class="hsub" x="480" y="45" text-anchor="middle" data-page-node-id="ZEkCIFDDLQCb7QAoy3KneE">按 MAC 表转发</text>
+      <rect class="hbox" x="720" y="8" width="200" height="46" rx="9" data-page-node-id="SSNeio0awImC1v9P8ULdia"/>
+      <text class="hname" x="820" y="28" text-anchor="middle" data-page-node-id="VaqaqxVUxLoEYKDIP8MR3l">主机 B（及同网段其他主机）</text>
+      <text class="hsub" x="820" y="45" text-anchor="middle" data-page-node-id="sbEx6HRHMB9Gdbxrbivrsx">192.168.1.20　MAC=BB</text>
+      <line class="life" x1="150" y1="54" x2="150" y2="326" data-page-node-id="3zd0EkVFH8bKZqSHc3EIS8"/>
+      <line class="life" x1="480" y1="54" x2="480" y2="326" data-page-node-id="l7Dt33FjUOh7iARzMnSPdC"/>
+      <line class="life" x1="820" y1="54" x2="820" y2="326" data-page-node-id="sVlbuIAJueL8P1NU7PLaxz"/>
+      <rect class="fnote" x="230" y="66" width="270" height="30" rx="8" data-page-node-id="pdgfyhzs06cH3NOaIj6nMl"/>
+      <text class="ntxt" x="365" y="86" text-anchor="middle" data-page-node-id="OGceIvqnlJUAy7y3rh4YsR">A 要发包给 B：查 ARP 缓存 → 没有 B 的 MAC</text>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="154" y1="128" x2="476" y2="128" data-page-node-id="71WHg6HHVp7Ak6IHIbOMG1"/>
+      <text class="albl" x="315" y="117" text-anchor="middle" data-page-node-id="4E13aRiQ28J8YPvgvEuMY6">① 广播 ARP Request「谁是 192.168.1.20？」</text>
+      <text class="asub" x="315" y="141" text-anchor="middle" data-page-node-id="PCQLpKgQQJIZYDMbXbYJ7t">目的 MAC = FF:FF:FF:FF:FF:FF</text>
+      <line class="ar" stroke="#7c3aed" marker-end="url(#m-violet)" x1="484" y1="170" x2="816" y2="170" data-page-node-id="GTyhLSTAQBIbhFz95tFOCz"/>
+      <text class="albl" x="650" y="159" text-anchor="middle" data-page-node-id="ASyrLtiyn2T754rxErH9d1">交换机泛洪：从除入端口外的所有端口发出</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="816" y1="228" x2="154" y2="228" data-page-node-id="Rupa9mWCFKJfKkKtDCCHRw"/>
+      <text class="albl" x="485" y="217" text-anchor="middle" data-page-node-id="cpt0xnKzubJgpZNrO8FKDn">② B 单播 ARP Reply「我是 .20，MAC = BB」</text>
+      <text class="asub" x="485" y="241" text-anchor="middle" data-page-node-id="nobbFc2ePA7bYIjt5IUyCz">只有 B 应答；其他主机丢弃</text>
+      <rect class="fnote" x="60" y="272" width="270" height="40" rx="8" data-page-node-id="QDSgQZB8IMBizd0i1cpsnF"/>
+      <text class="ntxt" x="195" y="289" text-anchor="middle" data-page-node-id="uGSrEQvXEQ1iAzdWALJcIy">A 写入缓存：192.168.1.20 ↔ BB</text>
+      <text class="ntxt" x="195" y="305" text-anchor="middle" data-page-node-id="W29PE4GLQpWgI6Pjc6lPAY">（老化时间约 120s）</text>
+      <rect class="fnote" x="700" y="272" width="220" height="40" rx="8" data-page-node-id="lGkhbBgGNEXJu3ghq6Cozp"/>
+      <text class="ntxt" x="810" y="289" text-anchor="middle" data-page-node-id="CJCK9tsSScYBHUmbi99i8p">B 也顺带记下 A 的 MAC</text>
+      <text class="ntxt" x="810" y="305" text-anchor="middle" data-page-node-id="HF83Y4GavpBf3SNyvrreS0">（Request 里有源 MAC）</text>
+    </svg>
+    <figcaption data-page-node-id="xqHkFdx1cHyYbT0KgSOr3b">图 3 · ARP 请求-应答流程</figcaption>
+  </figure>
+  <div class="note warn" data-page-node-id="5HsqYn2UuwtfQTBPAgIh6u">跨网段时不 ARP 对方主机，而是 ARP <b data-page-node-id="fqHaGnFG5DIwk6v2ezRaUj">默认网关</b>的 MAC —— 出网关就是路由器的事了。免费 ARP（gratuitous ARP）用于主机上线时声明「这个 IP 是我」，兼查 IP 冲突。</div>
+</section>
+
+<!-- ================= 4 DNS+HTTP ================= -->
+<section id="s4" data-page-node-id="frhhqQIfDJpVeVxEjsOUOb">
+  <h2 data-page-node-id="5LgwydaLcTTd83muVm0ByT"><span class="dot" style="background:var(--app)" data-page-node-id="2eHmYMgJvwmPOq0L3LQiRM"></span>五、一次网页访问全流程：DNS + TCP + HTTP</h2>
+  <p class="intro" data-page-node-id="84HLuOJgSfTWuEYmPpK2vq">浏览器地址栏敲下 <b data-page-node-id="8YxNPYrler7cExSF6I54eE">www.example.com</b> 回车后发生了什么 —— 域名换 IP、建 TCP 连接、发 HTTP 请求、收页面，一条链走完。</p>
+  <figure class="fig" data-page-node-id="SuRfMiTlsNYSgXrCcslm5R">
+    <svg viewBox="0 0 1000 470" data-page-node-id="sLcFUjl4MjAG5nsvRMeIk9">
+      <rect class="hbox" x="25" y="8" width="170" height="38" rx="9" data-page-node-id="rGi1AarIDIPkAESN1Eop6E"/>
+      <text class="hname" x="110" y="32" text-anchor="middle" data-page-node-id="NcRPYRfTHXQHtyLT4b2QeR">浏览器 / 主机</text>
+      <rect class="hbox" x="295" y="8" width="170" height="38" rx="9" data-page-node-id="xbzEpx1L7FE3YL8mQM16nP"/>
+      <text class="hname" x="380" y="32" text-anchor="middle" data-page-node-id="rHVDIWeIFKGykB4RP4kee7">本地 DNS 服务器</text>
+      <rect class="hbox" x="545" y="8" width="170" height="38" rx="9" data-page-node-id="AXU6NHXXycEXQh44sZD3UU"/>
+      <text class="hname" x="630" y="32" text-anchor="middle" data-page-node-id="wBoOl2BIprgLfF3y1Np4oj">根→顶级→权威 DNS</text>
+      <rect class="hbox" x="815" y="8" width="170" height="38" rx="9" data-page-node-id="3emEe4PYz4RCAjPOJCPbB7"/>
+      <text class="hname" x="900" y="32" text-anchor="middle" data-page-node-id="INHaEEowuTkDB3JQA2Edft">Web 服务器</text>
+      <line class="life" x1="110" y1="46" x2="110" y2="400" data-page-node-id="otB75F790KUZlXpM8yd4m1"/>
+      <line class="life" x1="380" y1="46" x2="380" y2="400" data-page-node-id="XzBqrO9tgoFFcOsV8vEBKp"/>
+      <line class="life" x1="630" y1="46" x2="630" y2="400" data-page-node-id="RyL3bsc7MWXM3jmmadb0cI"/>
+      <line class="life" x1="900" y1="46" x2="900" y2="400" data-page-node-id="EnOWr4j9uw5orCRFjgIJhM"/>
+      <rect class="fnote" x="130" y="62" width="230" height="30" rx="8" data-page-node-id="qYX15FEGNmIXzcPbbePCRo"/>
+      <text class="ntxt" x="245" y="82" text-anchor="middle" data-page-node-id="vEJO9ecOMaa2BSChlQ5alC">① 查缓存：浏览器 → 系统 → hosts 文件</text>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="114" y1="125" x2="376" y2="125" data-page-node-id="xMyxrxTKHRGy6VqLphF1fD"/>
+      <text class="albl" x="245" y="114" text-anchor="middle" data-page-node-id="xHQyG313T2mUw2FDXfaqy7">② 递归查询「www.example.com 的 IP？」</text>
+      <text class="asub" x="245" y="138" text-anchor="middle" data-page-node-id="2EorTgj6FLcVecsglhra1i">「你直接帮我查到底」</text>
+      <line class="ar" stroke="#d97706" marker-end="url(#m-amber)" x1="384" y1="168" x2="626" y2="168" data-page-node-id="0Czn7KspN3rjGa6LY1Hk6Y"/>
+      <text class="albl" x="505" y="157" text-anchor="middle" data-page-node-id="Od6iaHr7L0Vgr2cpXDqLRu">③ 迭代查询：先问根 DNS</text>
+      <text class="asub" x="505" y="181" text-anchor="middle" data-page-node-id="1JaHCGfAjFf3Ef8ONo7MVA">根：「去问 .com 顶级 DNS」</text>
+      <line class="ar" stroke="#d97706" marker-end="url(#m-amber)" x1="384" y1="212" x2="626" y2="212" data-page-node-id="CbacKSnUzQfQ1pRV320SbQ"/>
+      <text class="albl" x="505" y="201" text-anchor="middle" data-page-node-id="BcyuaE7DeC9E7RSOyLiWah">④ 问 .com → 得到权威服务器地址</text>
+      <text class="asub" x="505" y="225" text-anchor="middle" data-page-node-id="kYRpG2pH8pLAQUp4chghut">问权威 → 拿到 A 记录（IP）</text>
+      <line class="ar" stroke="#0d9488" marker-end="url(#m-teal)" x1="376" y1="256" x2="114" y2="256" data-page-node-id="v7mdEBNE0x0apSeFCR4iAy"/>
+      <text class="albl" x="245" y="245" text-anchor="middle" data-page-node-id="IGSesYAfLqcoLNCYBfWn8E">⑤ 返回 IP（自己缓存一份，下次免查）</text>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="114" y1="296" x2="896" y2="296" data-page-node-id="V31FPSZKOVEKTezQzmkimD"/>
+      <text class="albl" x="505" y="285" text-anchor="middle" data-page-node-id="hDSsz5f2hmJ7FiKVm6TRYX">⑥ TCP 三次握手连上服务器（80 / 443 端口）</text>
+      <text class="asub" x="505" y="309" text-anchor="middle" data-page-node-id="QO3AiMUPXPBZII0zqDvAYf">HTTPS 的话握手后还要做 TLS 握手</text>
+      <line class="ar" stroke="#7c3aed" marker-end="url(#m-violet)" x1="114" y1="336" x2="896" y2="336" data-page-node-id="cJxLRWAi7ykXGi0DKyHWjj"/>
+      <text class="albl" x="505" y="325" text-anchor="middle" data-page-node-id="sQGRJRau3lGErakFGPHWrk">⑦ HTTP GET / —— 请求首页</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="896" y1="372" x2="114" y2="372" data-page-node-id="YymrpBfakmAMjt2QLFGM5A"/>
+      <text class="albl" x="505" y="361" text-anchor="middle" data-page-node-id="YL2wNpSMwlwMU3vKeoAhEv">⑧ 200 OK + HTML / CSS / JS</text>
+      <text class="asub" x="505" y="428" text-anchor="middle" data-page-node-id="20XFqmNaKHvC9irmMLyi7L">浏览器解析 HTML 渲染页面 → 对每个静态资源再走 ⑦⑧；keep-alive 长连接可复用 TCP，不必每次重新握手</text>
+    </svg>
+    <figcaption data-page-node-id="AiO82GaJFpOASg3YnTss7v">图 4 · 从敲网址到看见页面的完整链路（DNS 部分 ①-⑤，网页部分 ⑥-⑧）</figcaption>
+  </figure>
+  <div class="note" data-page-node-id="IGPigozZo14r2q0cgq30Ad"><b data-page-node-id="ZZFl6S7LcjJpguf921dFTR">递归 vs 迭代</b>：主机 → 本地 DNS 是<b data-page-node-id="lDVqR3F2tDvYjN38tHudM5">递归</b>（结果必须给到底）；本地 DNS → 根/顶级/权威是<b data-page-node-id="VY2ZoFD3DoOb9uIJpVCyMi">迭代</b>（一级级问、一级级被指路）。DNS 走 UDP 53 端口（区域传送才用 TCP 53）。</div>
+</section>
+
+<!-- ================= 5 ICMP ================= -->
+<section id="s5" data-page-node-id="RHPwttGD3ESxx6vJLjnCHc">
+  <h2 data-page-node-id="IDuRFJUT5pG4ALBu1CiMuZ"><span class="dot" style="background:var(--net)" data-page-node-id="5Ay2mb6ThKIseqMlpWQYPc"></span>六、ICMP：ping 背后的报错与探测机制</h2>
+  <p class="intro" data-page-node-id="g7YHPjz5ROJoj1JAQGEPZw">ICMP 是网络层的「传令兵」：不传业务数据，专职报告网络状况 —— ping 测连通性、TTL 超时、目的不可达都是它。</p>
+  <figure class="fig" data-page-node-id="eJzYjC43Zl7iD0CKIAqCOL">
+    <svg viewBox="0 0 1000 240" data-page-node-id="SWMh2QBA8XAxivuBs9Gshm">
+      <rect class="hbox" x="90" y="8" width="180" height="38" rx="9" data-page-node-id="T4GfT6tQIJuWCLlHiSPVOC"/>
+      <text class="hname" x="180" y="32" text-anchor="middle" data-page-node-id="XHQbCtPy260x2dsz3ro1jf">主机 A</text>
+      <rect class="hbox" x="730" y="8" width="180" height="38" rx="9" data-page-node-id="9ntz275cemAb4401QPd337"/>
+      <text class="hname" x="820" y="32" text-anchor="middle" data-page-node-id="H8rjYBEbau3Brsbd6nTsbI">主机 B</text>
+      <line class="life" x1="180" y1="46" x2="180" y2="176" data-page-node-id="Dyi2xF1DcF7odsnFQc1NT6"/>
+      <line class="life" x1="820" y1="46" x2="820" y2="176" data-page-node-id="WFC3AqIsGHDQp5sYc9pKQj"/>
+      <line class="ar" stroke="#2563eb" marker-end="url(#m-blue)" x1="184" y1="85" x2="816" y2="85" data-page-node-id="6DCIR0uki76QHgbIuZSvO6"/>
+      <text class="albl" x="500" y="74" text-anchor="middle" data-page-node-id="byfLGrTl6U6lTWXjRlV0cx">① Echo Request（Type = 8）「在吗？」</text>
+      <text class="asub" x="500" y="98" text-anchor="middle" data-page-node-id="KGmAOwRbfJ6jcm47CEJR7D">封装在 IP 包里（协议号 = 1），没有端口号</text>
+      <line class="ar" stroke="#059669" marker-end="url(#m-green)" x1="816" y1="140" x2="184" y2="140" data-page-node-id="BtS5i17HAhaW3m6N5sGWjM"/>
+      <text class="albl" x="500" y="129" text-anchor="middle" data-page-node-id="0Gg3wEjJsbztw7VDrsAEaG">② Echo Reply（Type = 0）「在」</text>
+      <text class="asub" x="500" y="153" text-anchor="middle" data-page-node-id="IV1qD2CCoKR10WjiSeewVc">原样带回序号，A 据此算 RTT 往返时延</text>
+      <text class="asub" x="500" y="208" text-anchor="middle" data-page-node-id="X2UsfYI0sQEy0DW9MGBvZs">TTL 每过一个路由器减 1，减到 0 丢弃并回 Type=11 超时（traceroute 就靠这个逐跳探测）｜目标不可达回 Type=3</text>
+    </svg>
+    <figcaption data-page-node-id="jB3UUJElgebD4aSLhSiRL0">图 5 · ICMP Echo 请求 / 应答</figcaption>
+  </figure>
+  <div class="note warn" data-page-node-id="POE0lo7jauXD1wyw6sUDPU">ping 不通 ≠ 服务不可用：对方防火墙可能只禁了 ICMP 而放行业务端口。反过来 ping 通也只代表网络层可达，应用服务挂了照样打不开网页。</div>
+</section>
+
+<!-- ================= 6 OSPF ================= -->
+<section id="s6" data-page-node-id="HJFQ0Q3Ct3rPgQPDvBJm9C">
+  <h2 data-page-node-id="RRqhjSy4ERF6cvByPF7E7r"><span class="dot" style="background:var(--net)" data-page-node-id="nEQoqG6TxAKY3qjJS8TM6K"></span>七、OSPF：路由器之间如何互相认识并算路</h2>
+  <p class="intro" data-page-node-id="13unVIB79BEGdiDIW5Se02">OSPF 是链路状态路由协议：路由器互相发 Hello 交朋友，交换链路状态数据库（LSDB），各自用 SPF（Dijkstra）算法独立算出最短路径树。</p>
+  <figure class="fig" data-page-node-id="dwLWmlEuc7TeKGNr3E32Zb">
+    <svg viewBox="0 0 1000 250" data-page-node-id="HWeFwQ2xAL9NyGvZuFFh6P">
+      <g font-size="13" font-weight="700" text-anchor="middle" data-page-node-id="pD4rrMRusrC5LZsAUx9UmS">
+        <rect x="18"  y="40" width="112" height="40" rx="9" fill="#f1f4f8" stroke="#94a3b8" data-page-node-id="JdVtimH1HIzettTr80dlZG"/><text x="74"  y="65" fill="#475569" data-page-node-id="WD9gPofgjHPSe5YMhxTbbs">Down</text>
+        <rect x="156" y="40" width="112" height="40" rx="9" fill="#f1f4f8" stroke="#94a3b8" data-page-node-id="MEjRAtYDEeIq0eALFenYPJ"/><text x="212" y="65" fill="#475569" data-page-node-id="ITwDlHGaB3CH00idVE8ANa">Init</text>
+        <rect x="294" y="40" width="112" height="40" rx="9" fill="#fff8ec" stroke="#d97706" data-page-node-id="cxcmjbarnBvfLDdgXlFwEw"/><text x="350" y="65" fill="#d97706" data-page-node-id="JvsXGW3BizoH02UrYMvzDt">2-Way</text>
+        <rect x="432" y="40" width="112" height="40" rx="9" fill="#fff8ec" stroke="#d97706" data-page-node-id="kCVErT0tOoitvIg74DjW68"/><text x="488" y="65" fill="#d97706" data-page-node-id="IoSPYJIYvKnmN5pNDSSAHj">ExStart</text>
+        <rect x="570" y="40" width="112" height="40" rx="9" fill="#fff8ec" stroke="#d97706" data-page-node-id="mKapzyQMuK1TlQaQz3jWEI"/><text x="626" y="65" fill="#d97706" data-page-node-id="d2bdYSfSWjS7eDIA71i4xi">Exchange</text>
+        <rect x="708" y="40" width="112" height="40" rx="9" fill="#ecfdf8" stroke="#0d9488" data-page-node-id="ZceWYs4mfhbwN7hAaWIcWX"/><text x="764" y="65" fill="#0d9488" data-page-node-id="J4CtcT9fKZeBTDiOxTmF6j">Loading</text>
+        <rect x="846" y="40" width="120" height="40" rx="9" fill="#ecfdf8" stroke="#059669" data-page-node-id="X1xkEAJSVGkHouAjGQ1sH8"/><text x="906" y="65" fill="#059669" data-page-node-id="BY8bbvVjnypYJm9AyUKsUd">Full</text>
+      </g>
+      <g stroke="#64748b" stroke-width="2" fill="none" data-page-node-id="33zr2rEhe1WiXnp6nQJh7z">
+        <line x1="130" y1="60" x2="152" y2="60" marker-end="url(#m-gray)" data-page-node-id="NssDDH2OXFTHysNPyHtGGr"/>
+        <line x1="268" y1="60" x2="290" y2="60" marker-end="url(#m-gray)" data-page-node-id="4VaMkBnSTKKIw2gBf8VBGd"/>
+        <line x1="406" y1="60" x2="428" y2="60" marker-end="url(#m-gray)" data-page-node-id="P10k1UKRLljTg5TALWLCJy"/>
+        <line x1="544" y1="60" x2="566" y2="60" marker-end="url(#m-gray)" data-page-node-id="yuolLXWnScPUHsRFSsOniW"/>
+        <line x1="682" y1="60" x2="704" y2="60" marker-end="url(#m-gray)" data-page-node-id="RtuzOqBr0G2AIE4EWfWtqP"/>
+        <line x1="820" y1="60" x2="842" y2="60" marker-end="url(#m-gray)" data-page-node-id="0gRgsZ3fEmnAYONoRUIxwA"/>
+      </g>
+      <g class="fsub" text-anchor="middle" data-page-node-id="JIToK6tszTs5u2Y9kf1guz">
+        <text x="74"  y="104" data-page-node-id="h5lu1bS8iTfMrpjRmQ7SkS">未启动</text>
+        <text x="212" y="104" data-page-node-id="9GDh1kfMef0eYgLw6iNwAp">收到对方 Hello</text>
+        <text x="350" y="118" data-page-node-id="ovRxCzEDqBYjLopfHL4Q8q">邻居确认</text><text x="350" y="133" data-page-node-id="Dmd9fPc1CcADDtSNsa7Ovf">（此后选 DR/BDR）</text>
+        <text x="488" y="118" data-page-node-id="EyLtZFlqW7gxpkSKsig5II">协商主从</text><text x="488" y="133" data-page-node-id="Cdo8gUSCKb0hwzi4ycAUOM">主从交换 DBD</text>
+        <text x="626" y="118" data-page-node-id="00YBjdG3xsphrG0joEJGKQ">交换链路状态</text><text x="626" y="133" data-page-node-id="c2r0HY1FjDezfiUA6AJHPF">摘要（DBD）</text>
+        <text x="764" y="118" data-page-node-id="SwnnNURCuL3YhVRM2BfGrl">LSR / LSU</text><text x="764" y="133" data-page-node-id="OuCW30g7xkldl62PwxCq8J">拉取缺失明细</text>
+        <text x="906" y="104" data-page-node-id="9efFGBy3VfthWUXVLrqQd3">LSDB 同步完成</text><text x="906" y="119" data-page-node-id="8G75XhRLcZcC9BzdCMhGPW">开始 SPF 算路</text>
+      </g>
+      <text class="asub" x="500" y="180" text-anchor="middle" data-page-node-id="fCax6jFc6A4Rrs6OADMCr4">Hello 报文每 10s 一次（组播 224.0.0.5），40s 收不到就拆除邻居 ｜ DR/BDR：多路访问网段里选一个「班长」减少邻接数量</text>
+      <text class="asub" x="500" y="204" text-anchor="middle" data-page-node-id="ZF4WnMffVJEMfv9hUMDEmT">每个路由器都有全网拓扑 → 各自独立跑 SPF 最短路径算法 → 与 RIP 相比：无跳数限制、收敛快、按带宽算开销</text>
+      <text class="asub" x="500" y="228" text-anchor="middle" data-page-node-id="O3dAQ9frntFXwgovDD0EwX">路由器 ID 取值：手工配置 &gt; 最大 Loopback IP &gt; 最大物理接口 IP</text>
+    </svg>
+    <figcaption data-page-node-id="2BtM1AXRcPrTdoOZHIad29">图 6 · OSPF 邻居状态机（七状态）</figcaption>
+  </figure>
+</section>
+
+<!-- ================= 7 STP ================= -->
+<section id="s7" data-page-node-id="jFSbKfSRssE6YVJ09h0Dxk">
+  <h2 data-page-node-id="5coFyvGVGRzVx8fJYMWUf3"><span class="dot" style="background:var(--lnk)" data-page-node-id="M3h0ZHaG66gbQpGgcAIor3"></span>八、STP：交换网络如何避免广播风暴</h2>
+  <p class="intro" data-page-node-id="MuGXcdhLXpPdMuVfslKZIU">交换机之间连两条线做冗余，帧就会绕圈繁殖（广播风暴）。STP 用「逻辑断开一条」的方式保住冗余又不绕圈。</p>
+  <figure class="fig" data-page-node-id="HP0KssfiCgWtlFehh8N8dw">
+    <svg viewBox="0 0 1000 380" data-page-node-id="HKObaAMz1Kh4jMLKFApuQl">
+      <!-- 左：流程 -->
+      <g text-anchor="middle" data-page-node-id="OPgmKvpDbrP9ZJB3pJO5jV">
+        <rect class="flowbox" x="40" y="16" width="380" height="44" rx="9" fill="#f5f0ff" stroke="#7c3aed" data-page-node-id="fZX5bvK7bfLwTHTbdQF6tj"/>
+        <text class="ftxt" x="230" y="34" data-page-node-id="ZkuhIGDoXg3hChYsarB5KD">① 选根桥（Root Bridge）</text>
+        <text class="fsub" x="230" y="51" data-page-node-id="JD4QBc5yUXP8oIYqLMMuJO">比较桥 ID（优先级 + MAC），最小者胜出 —— 全网唯一</text>
+        <rect class="flowbox" x="40" y="88" width="380" height="44" rx="9" data-page-node-id="GQfWOk36LDPlXNLjaDmmte"/>
+        <text class="ftxt" x="230" y="106" data-page-node-id="VNXTHNcApcjY3fysfHpyPv">② 非根桥上选根端口（RP）</text>
+        <text class="fsub" x="230" y="123" data-page-node-id="GBAauLKzUDHMtglBO1Ou4U">到根桥「路径开销最小」的那个口，负责收发</text>
+        <rect class="flowbox" x="40" y="160" width="380" height="44" rx="9" data-page-node-id="Fbr5QgHC2qbZH88qGTeCtk"/>
+        <text class="ftxt" x="230" y="178" data-page-node-id="zSLl7sllS3kMwGVNV7DiNB">③ 每个网段选指定端口（DP）</text>
+        <text class="fsub" x="230" y="195" data-page-node-id="jfBNfzE39fiUjvn9xKj5MO">每个网段一个转发口，一般根桥的口全是 DP</text>
+        <rect class="flowbox" x="40" y="232" width="380" height="44" rx="9" data-page-node-id="PfrpWOvfKFcsHS0Tus5uLA"/>
+        <text class="ftxt" x="230" y="250" data-page-node-id="JBlcLCbDPAoG65CIXgVCHO">④ 其余端口阻塞（AP）</text>
+        <text class="fsub" x="230" y="267" data-page-node-id="eTCwKArdJ7Jy0vL9g61EXy">只收 BPDU 不转发 —— 逻辑上剪掉环路</text>
+        <rect class="flowbox" x="40" y="304" width="380" height="44" rx="9" fill="#ecfdf8" stroke="#059669" data-page-node-id="rB46rhoGeFSyin88nDHfcW"/>
+        <text class="ftxt" x="230" y="322" data-page-node-id="niWAdIzu4GkegbQ593Pm7h">⑤ 链路故障 → 重新选举</text>
+        <text class="fsub" x="230" y="339" data-page-node-id="pifV9zq7oA79yHD07vp7we">阻塞口自动启用，收敛耗时 30 ~ 50 秒</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="2" fill="none" data-page-node-id="7ZO9UDvaV5G5qFzySj4Ddn">
+        <line x1="230" y1="60"  x2="230" y2="84"  marker-end="url(#m-gray)" data-page-node-id="32RyiAKxbcZeadGR85tPqO"/>
+        <line x1="230" y1="132" x2="230" y2="156" marker-end="url(#m-gray)" data-page-node-id="MCCT5QJTlULEWmQgC7uRZc"/>
+        <line x1="230" y1="204" x2="230" y2="228" marker-end="url(#m-gray)" data-page-node-id="76jAMxoQ7Psylcq0jYrET9"/>
+        <line x1="230" y1="276" x2="230" y2="300" marker-end="url(#m-gray)" data-page-node-id="D7tRqYajnqFayPhnBBxOMd"/>
+      </g>
+      <!-- 右：实体图 -->
+      <g data-page-node-id="kcFEUC0LiGX7oIz8NrfLHJ">
+        <rect x="700" y="30" width="130" height="46" rx="10" fill="#f5f0ff" stroke="#7c3aed" stroke-width="2" data-page-node-id="RJ8DZIO0r5QNVoryZRTCRb"/>
+        <text x="765" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#7c3aed" data-page-node-id="kjCMNGn4XSVOpEKC70x4jQ">SW1（根桥）</text>
+        <text class="fsub" x="765" y="67" text-anchor="middle" data-page-node-id="j6LxqutUU0vmAOpQ2wMkUz">优先级最小</text>
+        <rect x="560" y="250" width="130" height="46" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5" data-page-node-id="qcOFRsmVaDs3201yYRaLbh"/>
+        <text x="625" y="278" text-anchor="middle" font-size="13" font-weight="700" fill="#334" data-page-node-id="s6laqRL4xeM7eRdZGHGsBe">SW2</text>
+        <rect x="840" y="250" width="130" height="46" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5" data-page-node-id="xKUbAXHjreQwAjiJGFJT3c"/>
+        <text x="905" y="278" text-anchor="middle" font-size="13" font-weight="700" fill="#334" data-page-node-id="uQkQUYiP2TDfOKpb0GwVza">SW3</text>
+        <line x1="745" y1="76" x2="640" y2="248" stroke="#7c3aed" stroke-width="2.5" data-page-node-id="ZZbrPhZNqy4QdFUGowJZww"/>
+        <line x1="785" y1="76" x2="890" y2="248" stroke="#7c3aed" stroke-width="2.5" data-page-node-id="aukEEq7dbJ8p84lzxJ40mp"/>
+        <line x1="692" y1="272" x2="838" y2="272" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="7 5" data-page-node-id="UgRfVXvmLb3CaGYzWvrBFl"/>
+        <text class="fsub" x="765" y="120" text-anchor="middle" data-page-node-id="bCXKCTHIIZqAhOZqLGgAbF">RP</text>
+        <text class="fsub" x="730" y="120" text-anchor="end" data-page-node-id="jmZYJJeSfCKP8GZHXymWut"></text>
+        <text class="fsub" x="612" y="200" text-anchor="end" data-page-node-id="TBZiMZ6TWe2Kj4uvj0aCpS">RP（开销最小）</text>
+        <text class="fsub" x="918" y="200" data-page-node-id="EsY2J3yb6q5CuuTNsYEJXI">RP（开销最小）</text>
+        <text class="fsub" x="700" y="228" text-anchor="end" data-page-node-id="GAbXr8Csv50TOPZPKaSg9x">DP</text>
+        <text class="fsub" x="830" y="228" data-page-node-id="4mL98pbQiDsGcMEfVae71A">DP</text>
+        <circle cx="765" cy="272" r="13" fill="#dc2626" data-page-node-id="yl7w5M9tQRDNQ0BsS3Lz6d"/>
+        <text x="765" y="277" text-anchor="middle" fill="#fff" font-size="14" font-weight="700" data-page-node-id="FcnSZsPyRNrMf4iZhVrZSp">✕</text>
+        <text class="fsub" x="765" y="320" text-anchor="middle" data-page-node-id="CP8vVh3aGMavoefOkD5YQX">SW2–SW3 之间：两端口都是 DP 会冲突，</text>
+        <text class="fsub" x="765" y="336" text-anchor="middle" data-page-node-id="7FgPRyhYdrWpC3vswD0blC">BID 大的那端阻塞 —— 帧不再绕圈，冗余仍在</text>
+      </g>
+    </svg>
+    <figcaption data-page-node-id="dWg5wLJmHhWSnCeDehOkiw">图 7 · STP 选举流程 + 三交换机冗余拓扑示例</figcaption>
+  </figure>
+</section>
+
+<!-- ================= 8 NAT ================= -->
+<section id="s8" data-page-node-id="Xhg37Mup6rMH91yWj9WNoz">
+  <h2 data-page-node-id="KtXLjvHAJYzpFU0BpIZs2e"><span class="dot" style="background:var(--net)" data-page-node-id="ykWTNTVzdl9J1gQVvxRsBx"></span>九、NAT：一屋私网地址怎么共享一个公网 IP</h2>
+  <p class="intro" data-page-node-id="cEm19Qn5aT4h7fjhJWEFQY">192.168.x.x 这类私网地址不能在公网跑。NAT 网关在出口处「改写地址」，并对每条连接记一笔账（NAPT 转换表）。</p>
+  <figure class="fig" data-page-node-id="u9tIItRbjnXvS6snCleGjQ">
+    <svg viewBox="0 0 1000 310" data-page-node-id="sH5Yku1gTLGZDpIhe3fYBV">
+      <rect x="40" y="46" width="210" height="70" rx="12" fill="#eff4ff" stroke="#2563eb" stroke-width="2" data-page-node-id="RUQ6JazobrnWuXpkyAtlEN"/>
+      <text class="hname" x="145" y="74" text-anchor="middle" data-page-node-id="yDzFL0OybyshLaQ4gCupJL">内网 PC</text>
+      <text class="hsub" x="145" y="94" text-anchor="middle" data-page-node-id="TOgDYwpIMlH6cLGZdkJEAv">192.168.1.10 : 5000</text>
+      <rect x="395" y="36" width="230" height="90" rx="12" fill="#fff8ec" stroke="#d97706" stroke-width="2" data-page-node-id="BGwh2qgvRFzlUYetjrA5IO"/>
+      <text class="hname" x="510" y="64" text-anchor="middle" data-page-node-id="zSjLyCFZvxUJhhkuCDzy2X">NAT 网关（家用路由器）</text>
+      <text class="hsub" x="510" y="86" text-anchor="middle" data-page-node-id="CCu39nNIXmpDUXB64wBIay">内口 192.168.1.1</text>
+      <text class="hsub" x="510" y="104" text-anchor="middle" data-page-node-id="8RSX8o7ypM5HHPWvOUZvqd">公口 202.100.1.5（运营商分配）</text>
+      <rect x="780" y="46" width="190" height="70" rx="12" fill="#f1f4f8" stroke="#64748b" stroke-width="2" data-page-node-id="g0fFInAPOD1PufM61aZSVc"/>
+      <text class="hname" x="875" y="74" text-anchor="middle" data-page-node-id="EWg477InYKXnXzBXHwp65d">Web 服务器</text>
+      <text class="hsub" x="875" y="94" text-anchor="middle" data-page-node-id="gHM2AklZtYSO9eJWve2FkL">88.88.88.88 : 80</text>
+      <line x1="250" y1="81" x2="391" y2="81" stroke="#64748b" stroke-width="1.5" data-page-node-id="KrOPfh2DoVDgo240vHaB6q"/>
+      <line x1="625" y1="81" x2="776" y2="81" stroke="#64748b" stroke-width="1.5" data-page-node-id="AmDQEV4qD59nccVLgrwRTB"/>
+      <!-- 去程 -->
+      <path d="M145,170 C 350,140 650,140 871,166" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#m-blue)" data-page-node-id="JZEF1OnAbHAjBC8ZjHEjO9"/>
+      <text class="albl" x="290" y="152" data-page-node-id="sV2YhOqW94jYmrEftG3tOh">去程：源 192.168.1.10:5000</text>
+      <text class="albl" x="640" y="146" fill="#d97706" font-weight="700" data-page-node-id="z8sJGskEWlkIgqttWno8rO">改写为 202.100.1.5:4001</text>
+      <!-- 回程 -->
+      <path d="M871,240 C 650,268 350,268 149,244" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#m-green)" data-page-node-id="HF7fZkFYHBzg88Ra25sJb5"/>
+      <text class="albl" x="655" y="258" data-page-node-id="mKOivzBAIXvGwIViIMsyPT">回程：目的 202.100.1.5:4001</text>
+      <text class="albl" x="250" y="262" data-page-node-id="N8RelFX6HAiqT1T31ML3qQ">查表改回 192.168.1.10:5000</text>
+      <text class="asub" x="500" y="300" text-anchor="middle" data-page-node-id="wn9BgInRZL21umz2sWYflx">NAPT 同时改「IP + 端口」→ 几百台设备共享一个公网 IP ｜ 转换表条目有存活时间，连接断开即回收</text>
+    </svg>
+    <figcaption data-page-node-id="DQSw00eTnYtRmQqFTCXxQt">图 8 · NAT（NAPT）地址转换示意</figcaption>
+  </figure>
+  <table class="cmp" data-page-node-id="hBVwr05ivZmIgrENCxIcW7">
+    <tr data-page-node-id="o05EDhobEVWPHETFcMHztF"><th colspan="2" data-page-node-id="nNDcdCNdPUhR1ovDg4S2QA">NAT 网关里的转换表（示意）</th></tr>
+    <tr data-page-node-id="3TjJD0827fdGHnIlhVTAU0"><th data-page-node-id="ngaYHUl9sV5sLGHbQarAFy">内部地址 : 端口</th><th data-page-node-id="EzPGSbDtOHF6dbLhUjlWZG">公网地址 : 端口</th></tr>
+    <tr data-page-node-id="vzKxkIZxF1cEHc5fsKW6Fu"><td data-page-node-id="eJ71DMOPy7WIhKEEavDhTD"><b data-page-node-id="aU30nU2N9ji73LlQE3Xm2B">192.168.1.10 : 5000</b></td><td data-page-node-id="jQLr6KqCoHf5Sm1ShonsFf"><b data-page-node-id="JzqcGtugpvyRUvSlFvYIju">202.100.1.5 : 4001</b></td></tr>
+    <tr data-page-node-id="Gn0Bo1AEzwQegMyVb4bgGr"><td data-page-node-id="gaLAs98PAltHdw3dW91tce"><b data-page-node-id="u5eiZKHoLVBUlm1NFKerfA">192.168.1.11 : 5100</b></td><td data-page-node-id="tlQpn6NBjznnSpaRamDKxg"><b data-page-node-id="wzK74egdrh9mJE1J43menJ">202.100.1.5 : 4002</b></td></tr>
+    <tr data-page-node-id="JMuHh1ZWdSFxQCeDJuYlaW"><td data-page-node-id="LTnVFyvOtjNlyUbRZQ7yiq"><b data-page-node-id="bXCfx3BaahcJgvMvlvc2U0">192.168.1.12 : 5050</b></td><td data-page-node-id="qqAR3aoox65VVm93QckiCD"><b data-page-node-id="Y3yspgfXxAa3xR8E9dHKzy">202.100.1.5 : 4003</b></td></tr>
+  </table>
+  <div class="note" data-page-node-id="Srg3q16LWcJMtTOtBbKlqT">源 NAT（上网）把<b data-page-node-id="rXRcCH12wRGDA0Aeqwo3d9">内网源地址</b>改成公网；目的 NAT（端口映射）反过来把<b data-page-node-id="ilouIzud5MrQkpFkJiFc9Q">公网目的地址</b>映射进来，让外网能访问内网服务器；双向 NAT 两者都做。</div>
+</section>
+
+<!-- ================= 9 设备原理 ================= -->
+<section id="s9" data-page-node-id="VKxlETWdB0siE0VjTbR7G5">
+  <h2 data-page-node-id="DzEYL9ofB9wzcDpETtw10X"><span class="dot" style="background:var(--lnk)" data-page-node-id="YBRk2st1Y1ytz2A26QExDH"></span>十、设备原理：交换机、路由器、集线器</h2>
+  <p class="intro" data-page-node-id="JXc6A3JtyLH5B0pX8iFVa7">三台设备的本质区别：<b data-page-node-id="do0mcg2GH8dq8z9XYyyPG3">集线器</b>只放大信号（物理层）、<b data-page-node-id="gPt3GeIhy6jHGUnWOeax4z">交换机</b>按 MAC 表转发帧（链路层）、<b data-page-node-id="KYEFqYoN7ux2XLLtSFW0ne">路由器</b>按路由表转发包（网络层）。</p>
+
+  <h3 style="font-size:16px; margin:14px 0 4px; color:var(--lnk)" data-page-node-id="MvlS8ipW6Kl3RU0H4DjXel">10.1 交换机：MAC 地址学习 + 转发/过滤</h3>
+  <figure class="fig" data-page-node-id="Tx3K0wJHYj9cxeGvzAvqLL">
+    <svg viewBox="0 0 1000 500" data-page-node-id="i6HodDbjmghpMwfIdFmEKV">
+      <!-- 左：流程图 -->
+      <g text-anchor="middle" data-page-node-id="CfaXoA7DRIWWYQIQffYWLh">
+        <rect class="flowbox" x="30" y="14" width="400" height="40" rx="9" data-page-node-id="L6BoR015Gkmwrpmglmlklt"/>
+        <text class="ftxt" x="230" y="40" data-page-node-id="GdXWFXwTiCo2XxoWtObtRw">从某端口收到一个帧</text>
+        <rect class="flowbox" x="30" y="84" width="400" height="44" rx="9" fill="#f5f0ff" stroke="#7c3aed" data-page-node-id="7jgVBzUc7QWz6KjiDbmcf1"/>
+        <text class="ftxt" x="230" y="102" data-page-node-id="urunFbEDojo7OxlxqUQSfk">学习：把「源 MAC + 入端口」写进 MAC 地址表</text>
+        <text class="fsub" x="230" y="119" data-page-node-id="H36NG2lzFyjIHeP9VySdE5">表里已有则刷新老化计时（默认 300s）</text>
+        <polygon points="230,158 380,208 230,258 80,208" fill="#fff8ec" stroke="#d97706" stroke-width="1.5" data-page-node-id="uyEGrjJwnS1w5t3WkTX2eP"/>
+        <text class="ftxt" x="230" y="204" font-size="12.5" data-page-node-id="kU7MgeBF3hPEqG4BubAGUe">目的 MAC 在地址</text>
+        <text class="ftxt" x="230" y="221" font-size="12.5" data-page-node-id="LHZxUTwM9zHA8gvwhiYO81">表里吗？</text>
+        <rect class="flowbox" x="30" y="292" width="185" height="48" rx="9" fill="#ecfdf8" stroke="#059669" data-page-node-id="4f8cMcszglItySrIaRW81T"/>
+        <text class="ftxt" x="122" y="312" font-size="12.5" data-page-node-id="OGiDzkK7F4GUFi4kAjCDts">已知单播：</text>
+        <text class="fsub" x="122" y="329" data-page-node-id="qoPsIzZcqh5AQkl3h9HgyH">只从对应端口转发（过滤）</text>
+        <rect class="flowbox" x="245" y="292" width="185" height="48" rx="9" fill="#eff4ff" stroke="#2563eb" data-page-node-id="CL4Kpi93Sjvn2Jhr0C5YXB"/>
+        <text class="ftxt" x="337" y="312" font-size="12.5" data-page-node-id="N0QwoLoNMPlhRPfsY0EfGS">未知 / 广播帧：</text>
+        <text class="fsub" x="337" y="329" data-page-node-id="hBhMRPpkBEaNpr6furQoD5">泛洪到除入端口外所有口</text>
+        <rect class="flowbox" x="30" y="384" width="400" height="40" rx="9" fill="#f1f4f8" stroke="#94a3b8" data-page-node-id="VDIbkkGXjOb2Ths27RB3lX"/>
+        <text class="ftxt" x="230" y="410" font-size="12.5" data-page-node-id="Vrv2Z8lRCQSpT9Pad8uQgy">交换机自己收下：帧的目的 MAC 就是网关地址 / 广播</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="2" fill="none" data-page-node-id="iEuP2fMf5KId19nOEQ6l3L">
+        <line x1="230" y1="54"  x2="230" y2="80"  marker-end="url(#m-gray)" data-page-node-id="BgG95TJOIVTWm9WrYnxrfk"/>
+        <line x1="230" y1="128" x2="230" y2="154" marker-end="url(#m-gray)" data-page-node-id="H18hPJ44NrRqvwAulgpOjF"/>
+        <line x1="122" y1="240" x2="122" y2="288" marker-end="url(#m-gray)" data-page-node-id="PtwQzF2sfgUWbtRNKAGM9p"/>
+        <text class="fsub" x="104" y="270" data-page-node-id="jtUpRJaQqn7t2T1rdcU1MC">是</text>
+        <line x1="337" y1="240" x2="337" y2="288" marker-end="url(#m-gray)" data-page-node-id="czNkLIapZZXtNwmmjsglr1"/>
+        <text class="fsub" x="352" y="270" data-page-node-id="PCIjD0xEOEO1N9GvCGihBj">否</text>
+        <line x1="122" y1="340" x2="150" y2="380" marker-end="url(#m-gray)" data-page-node-id="2uus4IjCuMJPKDPegLAWM3"/>
+        <line x1="337" y1="340" x2="309" y2="380" marker-end="url(#m-gray)" data-page-node-id="Vs24MJcSX72DlGjFBlPAEu"/>
+      </g>
+      <!-- 右：实体图 -->
+      <g data-page-node-id="NrcF9zpVzFAlKOcpQ1jbtP">
+        <text class="ftxt" x="770" y="30" text-anchor="middle" font-size="14" fill="#7c3aed" data-page-node-id="lGBFBfitwle8IO3awPeHv6">三台 PC 接一台交换机</text>
+        <rect x="600" y="52" width="110" height="40" rx="9" fill="#eff4ff" stroke="#2563eb" data-page-node-id="PbQGfizv3Egm5wNfsgmnbE"/>
+        <text x="655" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb" data-page-node-id="BTaQyRSbgGBF6pDtAhnYZj">PC1</text>
+        <text class="fsub" x="655" y="86" text-anchor="middle" data-page-node-id="TvxtZCYwb7yyOX4vGHJVxy">MAC AA</text>
+        <rect x="760" y="52" width="110" height="40" rx="9" fill="#eff4ff" stroke="#2563eb" data-page-node-id="PNVedlurgNQdrChhD2B7s7"/>
+        <text x="815" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb" data-page-node-id="TmU6Gzo9LjL4B9o1bhX93D">PC2</text>
+        <text class="fsub" x="815" y="86" text-anchor="middle" data-page-node-id="yfQ3K92yeSoCd899YAoqqu">MAC BB</text>
+        <rect x="680" y="52" width="110" height="40" rx="9" fill="#fff" stroke="#cbd5e1" stroke-width="0" opacity="0" data-page-node-id="Jfs5qqmHzuSfH5WS8sYgbr"/>
+        <rect x="900" y="52" width="90" height="40" rx="9" fill="#eff4ff" stroke="#2563eb" data-page-node-id="wrvBxdFDMzEDIP6SLUaFOb"/>
+        <text x="945" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#2563eb" data-page-node-id="1Xqk44HlGbocv037pBABEK">PC3</text>
+        <text class="fsub" x="945" y="86" text-anchor="middle" data-page-node-id="99Q4eRhlHfYO7Llc16W6vP">MAC CC</text>
+        <line x1="655" y1="92" x2="720" y2="180" stroke="#94a3b8" stroke-width="2" data-page-node-id="OwYmpEQW9oCrRZSbeVaIYH"/>
+        <line x1="815" y1="92" x2="780" y2="180" stroke="#94a3b8" stroke-width="2" data-page-node-id="VuUHCBmaUEDPDHSwApDZJB"/>
+        <line x1="945" y1="92" x2="850" y2="180" stroke="#94a3b8" stroke-width="2" data-page-node-id="IcFfuvcWzMjSKlm19pi2Uh"/>
+        <rect x="680" y="180" width="180" height="44" rx="10" fill="#f5f0ff" stroke="#7c3aed" stroke-width="2" data-page-node-id="GvvhUa7sb62LikclQGh5PO"/>
+        <text x="770" y="207" text-anchor="middle" font-size="14" font-weight="700" fill="#7c3aed" data-page-node-id="J7cS3JcOkLIjR5ZFxPgwWY">交换机</text>
+        <text class="fsub" x="770" y="219" text-anchor="middle" data-page-node-id="JOG5SSA4F583frDDPGvTFL">端口1↔AA　端口2↔BB　端口3↔CC</text>
+        <rect class="fnote" x="580" y="252" width="420" height="76" rx="9" data-page-node-id="zBM78F5K19AOnbES6q2AW4"/>
+        <text class="ntxt" x="790" y="276" text-anchor="middle" data-page-node-id="Ng5xG5S0q9kCnljnwGGCxR">场景 1：PC1 → PC2（AA → BB）</text>
+        <text class="ntxt" x="790" y="296" text-anchor="middle" data-page-node-id="AcXBFdmbWBHUdkOKlObLAR">查表命中端口 2 → <tspan fill="#059669" font-weight="700" data-page-node-id="y8imFFHLunZow6PlQZu7LA">只从端口 2 转发</tspan>，PC3 完全收不到</text>
+        <text class="ntxt" x="790" y="314" text-anchor="middle" data-page-node-id="ArwOJFiYSrZEQfft92fUGD">（这就是「过滤」：和集线器的本质区别）</text>
+        <rect class="fnote" x="580" y="344" width="420" height="76" rx="9" data-page-node-id="kTpGwEZUsdataPcqLJyREr"/>
+        <text class="ntxt" x="790" y="368" text-anchor="middle" data-page-node-id="GajiLHQQA1LhCWbwS8c1g2">场景 2：PC1 → 目的 MAC 表里没有</text>
+        <text class="ntxt" x="790" y="388" text-anchor="middle" data-page-node-id="h0WR2pHQXFEfI50pcEqfyX"><tspan fill="#2563eb" font-weight="700" data-page-node-id="4hzuDppw99wFu1SovJblxt">泛洪</tspan>：PC2、PC3 都收到，只有真正的</text>
+        <text class="ntxt" x="790" y="406" text-anchor="middle" data-page-node-id="SE5xwhRrYFy9DlPdu1Twj1">收件者回应，交换机借机学到它挂在哪个口</text>
+        <text class="fsub" x="790" y="448" text-anchor="middle" data-page-node-id="HdRZAD2ITAFUOzU2f5l7CG">开机时 MAC 表是空的 → 全靠泛洪+学习逐步建立 ｜ MAC 表满了新条目挤掉最老的</text>
+      </g>
+    </svg>
+    <figcaption data-page-node-id="hT304lnrCPlZh9nGsGSIDN">图 9 · 交换机工作流程（左）与转发/泛洪示例（右）</figcaption>
+  </figure>
+
+  <h3 style="font-size:16px; margin:20px 0 4px; color:var(--net)" data-page-node-id="Ya205QdAsDAwhrNI4zDPOK">10.2 路由器：查表转发，最长前缀匹配</h3>
+  <figure class="fig" data-page-node-id="i26upvBiBcdlTshQFGoUiN">
+    <svg viewBox="0 0 1000 330" data-page-node-id="KONMNRVrKVxpNLUCPeCstX">
+      <g text-anchor="middle" data-page-node-id="tumXapGVUMxwMGOd4IBkM7">
+        <rect class="flowbox" x="40" y="14" width="400" height="40" rx="9" data-page-node-id="vGSb1HI5OxYcmWBO1TbqAU"/>
+        <text class="ftxt" x="240" y="40" data-page-node-id="a4veJ2pZOrLVoIgfJaPEBr">从某接口收到一个 IP 包</text>
+        <rect class="flowbox" x="40" y="84" width="400" height="44" rx="9" fill="#fff8ec" stroke="#d97706" data-page-node-id="lEPcBReAKmGL7rYiepGYBS"/>
+        <text class="ftxt" x="240" y="102" data-page-node-id="ZLI46IBPKIalSsprIZ3pv8">校验：目的 IP 是不是自己？TTL 用完没？</text>
+        <text class="fsub" x="240" y="119" data-page-node-id="xVcqR2OsM8ono49XA747xB">不是自己 → 继续转发；TTL=0 → 丢弃 + ICMP 超时</text>
+        <rect class="flowbox" x="40" y="158" width="400" height="44" rx="9" fill="#fff8ec" stroke="#d97706" data-page-node-id="LdJ4zePRF326bp1ATXArPU"/>
+        <text class="ftxt" x="240" y="176" data-page-node-id="OYBVj3rQ20KRZZFJZ12cQi">查路由表：最长前缀匹配</text>
+        <text class="fsub" x="240" y="193" data-page-node-id="B2Ckp3UHHPBsPEAm8ZvDuT">目的 IP 逐个比对网段，掩码最长（最精确）的条目胜出</text>
+        <polygon points="240,232 380,278 240,324 100,278" fill="#fff8ec" stroke="#d97706" stroke-width="1.5" data-page-node-id="YT754TRZD1Oq8OAYf0eAet"/>
+        <text class="ftxt" x="240" y="274" font-size="12.5" data-page-node-id="GmT2wwiD6iJC7dZYd8NESc">命中了吗？</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="2" fill="none" data-page-node-id="RzcehUuuz40NPA36zP3qLz">
+        <line x1="240" y1="54"  x2="240" y2="80"  marker-end="url(#m-gray)" data-page-node-id="mVyCGATGa1fqOXrjj42JXX"/>
+        <line x1="240" y1="128" x2="240" y2="154" marker-end="url(#m-gray)" data-page-node-id="IaYnygVeTThALnZ9E9te1x"/>
+        <line x1="240" y1="202" x2="240" y2="228" marker-end="url(#m-gray)" data-page-node-id="bUSX2rSw5xtpEkmMeVM1MO"/>
+      </g>
+      <g data-page-node-id="kAYlQ4msglYTysCXEhV6ZK">
+        <rect x="490" y="14" width="480" height="150" rx="10" fill="#fff" stroke="#dde3ec" data-page-node-id="a5brfXjjYrcwWL8rYs9FvG"/>
+        <text class="ftxt" x="730" y="40" text-anchor="middle" fill="#d97706" data-page-node-id="DsazELzvDOIBMulf0TrRKx">路由表示例</text>
+        <g font-size="12.5" fill="#33404f" data-page-node-id="mIFAHPcZW7bXNGERFynf7C">
+          <text x="515" y="68" font-family="Consolas,monospace" data-page-node-id="Kt6phI2mQXHs7uG8F05KLn">192.168.1.0/24</text><text x="680" y="68" data-page-node-id="Cr7MFEFprhGXBP1eKyVdLz">直连路由</text><text x="800" y="68" fill="#7b8595" data-page-node-id="Bj91spoRgiLMRx2tGZzX4a">接口 G0/0/1</text>
+          <text x="515" y="92" font-family="Consolas,monospace" data-page-node-id="MwTBptaEr3BKNGdCpukZif">10.1.0.0/16</text><text x="680" y="92" data-page-node-id="aDHaWexHgVbmzxoqu6Fl2i">静态路由</text><text x="800" y="92" fill="#7b8595" data-page-node-id="wnajyiKOIrJBCO9HTDBeQp">下一跳 192.168.1.254</text>
+          <text x="515" y="116" font-family="Consolas,monospace" data-page-node-id="AUpGCEQozhj65U3cOMOzVJ">0.0.0.0/0</text><text x="680" y="116" data-page-node-id="kodqgJVeYIlnzULPOWJ0as">默认路由</text><text x="800" y="116" fill="#7b8595" data-page-node-id="Kt1fTeqvrIM8VQ0K3VajIu">下一跳 202.100.1.1（出口）</text>
+          <text x="515" y="140" font-family="Consolas,monospace" data-page-node-id="MvNyuZCDQORh6iXNOha0Fs">172.16.0.0/16</text><text x="680" y="140" data-page-node-id="2KEDC02bfldDPUHYan7BJv">OSPF 学习</text><text x="800" y="140" fill="#7b8595" data-page-node-id="gALNxTOFM1tVTqrETdecBg">开销 = 带宽倒数</text>
+        </g>
+        <text class="fsub" x="730" y="158" text-anchor="middle" data-page-node-id="RXRZnSEiuzWemjDzE9NkKl">直连 &gt; 静态 &gt; 动态（OSPF）；去 10.1.5.8 时 /16 比 /0 更精确 → 走静态那条</text>
+      </g>
+      <g text-anchor="middle" data-page-node-id="CRErhu8h6mgZ4R395QeEqV">
+        <rect x="80" y="290" width="160" height="34" rx="9" fill="#ecfdf8" stroke="#059669" data-page-node-id="Fhm5Lt6bAYM6jemedKdrSI"/>
+        <text class="ftxt" x="160" y="312" font-size="12.5" data-page-node-id="17BMWDBazEyKA265vKhHiW">命中：TTL-1，重写帧头，从出接口发</text>
+        <rect x="270" y="290" width="180" height="34" rx="9" fill="#fef2f2" stroke="#dc2626" data-page-node-id="1xbQqq4wa4ATcVZKEZMqgD"/>
+        <text class="ftxt" x="360" y="312" font-size="12.5" data-page-node-id="MRyVhQAkHhlMEp8PFGFSsB">未命中：丢弃 + 回 ICMP 不可达</text>
+      </g>
+      <line x1="130" y1="300" x2="94" y2="286" stroke="#94a3b8" stroke-width="2" marker-end="url(#m-gray)" data-page-node-id="FXKAHpHfvMDRBFvplZBttD"/>
+      <line x1="310" y1="300" x2="350" y2="286" stroke="#94a3b8" stroke-width="2" marker-end="url(#m-gray)" data-page-node-id="h6pEuKgodWJK8wL6ZtVYFN"/>
+    </svg>
+    <figcaption data-page-node-id="TElJqLAMdOm0O8hYYDsgm4">图 10 · 路由器转发流程与路由表示例</figcaption>
+  </figure>
+  <div class="note ok" data-page-node-id="PbAjNRrCM7F61g6Sf3UYkk"><b data-page-node-id="B1p01B6r0t2Tm1aTubD6Cj">「IP 不变、MAC 每段重写」</b>：包跨过路由器时源/目的 IP 始终不变（NAT 除外），但帧头每经过一条链路就重写一次 —— 每段链路的源/目的 MAC 都换成该段两端的接口地址。</div>
+</section>
+
+<!-- ================= 10 综合拓扑 ================= -->
+<section id="s10" data-page-node-id="SGlrgpskVv1RSSzmP1FYhB">
+  <h2 data-page-node-id="uQVtK1o3n7N9AmbcOoEePc"><span class="dot" style="background:#1e2530" data-page-node-id="LeR3ll9UhrTXm4ISDdHM45"></span>十一、综合拓扑：一次完整的跨网络通信</h2>
+  <p class="intro" data-page-node-id="zYC95d5ANnGp0Lrl4ATSYc">把前面所有协议串到一张图里：PC 开机（DHCP）→ 问网关（ARP）→ 查域名（DNS）→ 建连接（TCP）→ 发请求（HTTP）→ 出口（NAT）。</p>
+  <figure class="fig" data-page-node-id="mqCG5PD8V57jl8ClH8a18c">
+    <svg viewBox="0 0 1000 350" data-page-node-id="6t9EU3oAAIvC3kBjEY623r">
+      <rect x="24" y="120" width="150" height="64" rx="12" fill="#eff4ff" stroke="#2563eb" stroke-width="2" data-page-node-id="qVncWlpk304IQLXC6aqIPn"/>
+      <text class="hname" x="99" y="148" text-anchor="middle" data-page-node-id="VSvizOKdv6AS9zzfT2K2AD">PC 主机</text>
+      <text class="hsub" x="99" y="168" text-anchor="middle" data-page-node-id="MjLKppU9AXDi3OuwmJ987A">192.168.1.10</text>
+      <rect x="234" y="120" width="160" height="64" rx="12" fill="#f5f0ff" stroke="#7c3aed" stroke-width="2" data-page-node-id="LtmxUOLjPKvnvYQnEp5nCb"/>
+      <text class="hname" x="314" y="148" text-anchor="middle" data-page-node-id="SXRvet86KF1gS6WHRDAqK5">接入交换机</text>
+      <text class="hsub" x="314" y="168" text-anchor="middle" data-page-node-id="sazNdRPFkR4Fi2FFjZKMGF">二层 · MAC 寻址</text>
+      <rect x="454" y="120" width="170" height="64" rx="12" fill="#fff8ec" stroke="#d97706" stroke-width="2" data-page-node-id="EFm68UhmVQrZEygJ0ub2Dr"/>
+      <text class="hname" x="539" y="144" text-anchor="middle" data-page-node-id="JyQB6AsQnMRCiCmOw5vKkR">出口路由器</text>
+      <text class="hsub" x="539" y="160" text-anchor="middle" data-page-node-id="f102sz1joAH3OcF3pRkJzz">三层 · 路由选择</text>
+      <text class="hsub" x="539" y="176" text-anchor="middle" data-page-node-id="uyp8t99wSCRbT7duvyZUT4">+ NAT 网关</text>
+      <ellipse cx="730" cy="152" rx="62" ry="36" fill="#f1f4f8" stroke="#64748b" stroke-width="2" data-page-node-id="3CzR0gNqN2YxPWh18xPmd8"/>
+      <text class="hname" x="730" y="157" text-anchor="middle" data-page-node-id="IzyO368PHGp3HwJBcjD5Mh">Internet</text>
+      <rect x="830" y="120" width="150" height="64" rx="12" fill="#f1f4f8" stroke="#64748b" stroke-width="2" data-page-node-id="wIkzYT6fF6IPBK7sjBgtIg"/>
+      <text class="hname" x="905" y="148" text-anchor="middle" data-page-node-id="Px3cSSMcZL2pbgv4AjZJft">Web 服务器</text>
+      <text class="hsub" x="905" y="168" text-anchor="middle" data-page-node-id="qa1DsCGFlGSVqV3Z9TiuCl">88.88.88.88</text>
+      <g stroke="#94a3b8" stroke-width="2.5" data-page-node-id="Zw3eZIUkyyBRLkiBsSm8Fr">
+        <line x1="174" y1="152" x2="230" y2="152" data-page-node-id="VLda50n9fwBEyABPJJi5yk"/>
+        <line x1="394" y1="152" x2="450" y2="152" data-page-node-id="sPGJT2mMmo5fjPvn3A47fC"/>
+        <line x1="624" y1="152" x2="664" y2="152" data-page-node-id="Sf3GEsBeiCrOORArs6jEER"/>
+        <line x1="796" y1="152" x2="826" y2="152" data-page-node-id="kFPqBNEPWoa95sGB59Xr8K"/>
+      </g>
+      <rect class="fnote" x="24" y="222" width="952" height="104" rx="10" data-page-node-id="bSMvBniJJOkQuby23osb3A"/>
+      <g font-size="12.5" fill="#3a4354" data-page-node-id="spPqm7EoZO7gcEGz4oucjD">
+        <text x="45" y="248" data-page-node-id="EhB10vrAgzBMcPWoZoSHUC"><tspan font-weight="700" fill="#2563eb" data-page-node-id="wYDu4OLLKQdkhCOOCe0YcA">① 开机</tspan>：DHCP DORA 四步 → 拿到 IP 192.168.1.10 / 掩码 / 网关 / DNS 服务器地址</text>
+        <text x="45" y="272" data-page-node-id="KRCaHDUVYqM6fbYsnoMGZO"><tspan font-weight="700" fill="#2563eb" data-page-node-id="KdOmNwFnaAvjVprBpUjplx">② 访问网页</tspan>：DNS 查到服务器 IP → 目的不在同网段 → ARP 请求网关 192.168.1.1 的 MAC</text>
+        <text x="45" y="296" data-page-node-id="YlqP7w2ATen80yvPliESrZ"><tspan font-weight="700" fill="#0d9488" data-page-node-id="mk39mZVUpc1VopqsCdaEEH">③ 发数据</tspan>：帧发往网关 MAC → 交换机查 MAC 表转到路由器口 → 路由器查路由表 + NAT 改写 → 源变成 202.100.1.5</text>
+        <text x="45" y="318" data-page-node-id="KwoASnLt9AEPFaFhmWzgNv"><tspan font-weight="700" fill="#7c3aed" data-page-node-id="gb94Am3W5uRKEte26QHpLk">④ 关键规律</tspan>：全程 IP 不变（NAT 点除外）、<tspan font-weight="700" data-page-node-id="VaupHBJaNI8fvBFbZSHCVB">MAC 每过一个路由器重写一次</tspan>；TCP/HTTP 内容加密与否与应用层有关，网络层不管</text>
+      </g>
+    </svg>
+    <figcaption data-page-node-id="YK2EslmYFJgR3p40GL3RPr">图 11 · 家庭/园区网络典型拓扑与一次完整通信</figcaption>
+  </figure>
+</section>
+
+<!-- ================= 11 附表 ================= -->
+<section id="s11" data-page-node-id="hxBtClojSIQonRZdzDYA5c">
+  <h2 data-page-node-id="7Cv9LoTFsSnBGtCtMzFgQc"><span class="dot" style="background:#1e2530" data-page-node-id="Csy9l39vEQ3OJTKHt5Lwkt"></span>十二、附表：端口号与协议对比</h2>
+  <table class="cmp" data-page-node-id="wR8B2bKCDZalsCq0WcxGrC">
+    <tr data-page-node-id="Rw4MlxG5BqwEH5jAfnH1FH"><th data-page-node-id="3MRL16E6fwt7m1JVcgJzOD">端口号</th><th data-page-node-id="jFXdhSuzkFuKGhAtIhcOrQ">协议</th><th data-page-node-id="5Z6Z3tIdjDTWAUrEeEgosc">传输层</th><th data-page-node-id="CTlk4r3GRqJUEFCwB3owQB">一句话</th></tr>
+    <tr data-page-node-id="ZXtBxC8bQUQeWI92wmkVkH"><td data-page-node-id="wTT5bWrFS8KxT3MiyHBdgQ"><b data-page-node-id="2l5GAcBayPO7UjYmmumzGq">20 / 21</b></td><td data-page-node-id="s2bY3gZRYSoAbDAYHD3gJO">FTP</td><td data-page-node-id="7HVSHBlx5P2UGLU4qasoiu">TCP</td><td data-page-node-id="pAyP1T8fSOFl1NWN4BZPF2">数据 / 控制双通道传文件</td></tr>
+    <tr data-page-node-id="opOP4bvccC15G9S3Rertvg"><td data-page-node-id="c2QxtAjT3cCXnK1wXHzsVi"><b data-page-node-id="LCFObiLe8iZ8QLqRC4AFGd">22</b></td><td data-page-node-id="C4x2NFJXwvtBTesBEbs2x0">SSH</td><td data-page-node-id="zrX8nHB4FgAqtlihy0jCIL">TCP</td><td data-page-node-id="YC467AvvFnlhjrF2NAlqB6">加密远程登录（替代 Telnet）</td></tr>
+    <tr data-page-node-id="ExpcpoEomzGfdcaLWieajx"><td data-page-node-id="W8EWnLGtgQE0Ro48iX13hy"><b data-page-node-id="vYQLPbbjt4GcMk1NmH37A0">23</b></td><td data-page-node-id="vt6OHxjETAxYcVhpACD1ys">Telnet</td><td data-page-node-id="H6UYVGUx17fXofqRQSu4as">TCP</td><td data-page-node-id="ZPLkOofKccppazLogLbRCs">明文远程登录 —— 生产环境禁用</td></tr>
+    <tr data-page-node-id="H9O3aWIZbE2UgU0jQMK9Nc"><td data-page-node-id="wEnKmfzfOnmejsbn17D1UL"><b data-page-node-id="8K7yM0tHAnpYHfM1AcGpPl">25</b></td><td data-page-node-id="idZlCxyYXlsvh8nt85sdrf">SMTP</td><td data-page-node-id="gdFBXOhuiF5duDB0w9fdKf">TCP</td><td data-page-node-id="jehFqb7c2gNk8gffZmR3qc">发邮件</td></tr>
+    <tr data-page-node-id="wkbohtWFCVjI1xnZmeOBpR"><td data-page-node-id="jjStACgSEjMqmsGGspFEme"><b data-page-node-id="SWoN5AQGvJR7rdtQuYo320">53</b></td><td data-page-node-id="Dgd2CCKfgfHxdg8Ag1HeYo">DNS</td><td data-page-node-id="AW0btp7a0ksQOSCEXCKjMu">UDP / TCP</td><td data-page-node-id="gaODz2d0ODdU9E0uHudhPD">域名解析；区域传送才用 TCP</td></tr>
+    <tr data-page-node-id="T2ZDY49Zc4CQFhXKPfEQFt"><td data-page-node-id="kgZk8oJltCql6xZYFdEOoB"><b data-page-node-id="rqLximGCeBiDDZ0iRTWZD9">67 / 68</b></td><td data-page-node-id="2sLVpKJBLiGEguBOC5lPAB">DHCP</td><td data-page-node-id="qVm5kC4UPXKx4ebGwCQnuq">UDP</td><td data-page-node-id="TsvOQ6jv26vVECursjVXHp">服务器 67 / 客户端 68</td></tr>
+    <tr data-page-node-id="YgXpRWAzWOHFWRTNB9KoiR"><td data-page-node-id="Um17oSr1tApyCmbzcRAUup"><b data-page-node-id="pBdVkgC9f2E0W3qTMIsv7H">80 / 443</b></td><td data-page-node-id="Jt4LCcGJD8BV3YVchUpbEl">HTTP / HTTPS</td><td data-page-node-id="5I2221rb82uyjNBp8BxhWl">TCP</td><td data-page-node-id="0eiaD6MZIyExIoYbAlakne">网页；443 = HTTP over TLS</td></tr>
+    <tr data-page-node-id="7TvuFL8anUtbWdRD0aFzKV"><td data-page-node-id="Cu6CKvRdgmixQWzeiSmXvy"><b data-page-node-id="p276FgfrbFuQow2uCyNmK7">110</b></td><td data-page-node-id="G5yvf8nn00dJg77SFlGGHA">POP3</td><td data-page-node-id="GkkzSh8BCt9FA1r73b6OjR">TCP</td><td data-page-node-id="6fdRMMwSE1xPNIPkkfdzXG">收邮件</td></tr>
+  </table>
+
+  <table class="cmp" style="margin-top:22px" data-page-node-id="2sByWCxC4iveeQ6gdKvTig">
+    <tr data-page-node-id="4JyG8LTfYQqBPSdCmgrLAu"><th style="width:120px" data-page-node-id="LzdrKgJkJOsa1FFsxtbpxr">对比项</th><th data-page-node-id="q13SyMzKXqCyi641eupfru">TCP</th><th data-page-node-id="rdimjrYsVfDGlAxubHGnpI">UDP</th></tr>
+    <tr data-page-node-id="MclApS8QrW2sLxtrvQ3ZZi"><td data-page-node-id="NXHiRToTshE0pILCGrq3ml">连接</td><td data-page-node-id="HQpcEgtrabBP4J6l5XA63K">面向连接（先三次握手）</td><td data-page-node-id="Ohkc1KXAV3rfNzLjc5qQHv">无连接，拿到就发</td></tr>
+    <tr data-page-node-id="DqlPnylG3Sp7XCAiimohgg"><td data-page-node-id="iXpcry7RYC3AgajHW6lePt">可靠性</td><td data-page-node-id="vkLK8XMqmfo72AikuKVcog">确认 + 重传 + 排序，不丢不乱</td><td data-page-node-id="8L32cZGo5jTNf98biKFmxL">尽力而为，丢了就丢了</td></tr>
+    <tr data-page-node-id="FpXTZARtR7i54WlIQznihT"><td data-page-node-id="ZXh7TsS7zncsz6S6D4t80x">速度/开销</td><td data-page-node-id="3jU8J3VGboDDubpWzHauU3">慢，头部 20 字节起</td><td data-page-node-id="UPbQraupju1I0iKn3LZVCv">快，头部固定 8 字节</td></tr>
+    <tr data-page-node-id="rEp3qC1srHdzCE3RsN2OSz"><td data-page-node-id="crnmCAyLhJ1L19GOZ4FHpz">典型场景</td><td data-page-node-id="onbT9inU6WS4T67joDuYwt">网页、文件传输、邮件、SSH</td><td data-page-node-id="iuuAaSVZXMqmeEXvsmScAr">DNS、DHCP、语音视频直播、ICMP 类探测</td></tr>
+  </table>
+
+  <table class="cmp" style="margin-top:22px" data-page-node-id="R8CojgLDGDqQND1PmQukDE">
+    <tr data-page-node-id="LJh4hsPSdn5DCMwY36bkhc"><th style="width:120px" data-page-node-id="QU98onZF9p5IImgLszp9Fu">对比项</th><th data-page-node-id="Mju41Dfy3RYVbR1qOtTvzN">集线器 Hub</th><th data-page-node-id="B0lRQFAoIuszXXC0Hh6F9w">交换机 Switch</th><th data-page-node-id="StVTBu4pZZGu0TcMR1tlDv">路由器 Router</th></tr>
+    <tr data-page-node-id="YBQb4fCSU2nefPKDTa5Ec1"><td data-page-node-id="4nt5UD3AAL4AtX5U59IjQW">工作层次</td><td data-page-node-id="e1NhhQO5p123VXixz0nD43">物理层</td><td data-page-node-id="ZEuaid7gBTzli6rAZFGEJT">数据链路层</td><td data-page-node-id="wwIP34l5Y1CZrD2mEFikTP">网络层</td></tr>
+    <tr data-page-node-id="tMMIYrNlFaEm4jXKt2HOQe"><td data-page-node-id="1tZBDM48byKvBGForCcnQp">依据地址</td><td data-page-node-id="BXaFzGVVmkp8eJnyV9ZGan">无（电信号）</td><td data-page-node-id="oEnt0OpNxaXKL7gUzgn1wL">MAC 地址表</td><td data-page-node-id="HA8ERBs1g9EueLq8jVwGRE">路由表（IP）</td></tr>
+    <tr data-page-node-id="kMQAMiG8s5pDgTerCzw5Jd"><td data-page-node-id="e60kEQAPKiTg8WEUm63zQJ">转发方式</td><td data-page-node-id="DIoM9SpSh9UPoTGsqCrUaa">向所有口广播复制</td><td data-page-node-id="zbMrssbaKIxcKXA8vIBOey">精确转发 / 未知才泛洪</td><td data-page-node-id="kYRBGV6HkOPLBf7h8g7T4D">最长前缀匹配逐跳转发</td></tr>
+    <tr data-page-node-id="knzTGCzlb7kmUhPOuyYDXB"><td data-page-node-id="f1A9PlSzao54lqZNoAD1H8">冲突域</td><td data-page-node-id="DWClcIOvjwJbLH2fAGogjK">所有口同属一个（易碰撞）</td><td data-page-node-id="GQRytciPd4Yv8u7Mxab5jf">每口一个（隔离冲突域）</td><td data-page-node-id="LQjVxP8kRIs8RqvEiqxczv">每口一个</td></tr>
+    <tr data-page-node-id="UGzYOyGODcU3ZibseIB0Dq"><td data-page-node-id="EDrkzEEKM3PHWi4xzPfIBg">广播域</td><td data-page-node-id="v0PtrvfFr9MWecYFDMr9rl">整个设备一个</td><td data-page-node-id="mAUNDKrwCoBIK30ZF5subZ">默认一个（VLAN 可切分）</td><td data-page-node-id="y2OhADNaICAU3PGZ7DjZaC">每口一个（隔离广播域）</td></tr>
+  </table>
+
+  <div class="note" data-page-node-id="6DoOUcAAv4tpi81R4Yb7gx">考试高频记忆点：三次握手 SYN→SYN+ACK→ACK；DHCP 四步 DORA；ARP 广播请求、单播应答；DNS 递归+迭代；ping 用 ICMP Type 8/0；OSPF Hello 10s/Dead 40s；STP 选 BID 最小当根桥；NAT 出去改源、回来查表改目的。</div>
+</section>
+
+</div>
+</body>
+</html>

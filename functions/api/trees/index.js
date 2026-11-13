@@ -12,7 +12,6 @@ import { experienceEventStatement } from "../../../server/experience.js";
 import {
   PRIVATE_VISIBILITY,
   normalizeVisibility,
-  reservePrivateWorkSlotStatement,
   throwPrivateWorkDatabaseError,
 } from "../../../server/privateWorks.js";
 
@@ -132,9 +131,7 @@ export const onRequestPost = withApi(async ({ request, env }) => {
   const mediaHashes = managedMediaHashesFromTree(document);
   await validateManagedMedia(env.DB, mediaHashes);
   const statements = [
-    ...(isPrivate
-      ? [reservePrivateWorkSlotStatement(env.DB, user.id, "TREE", id, now)]
-      : []),
+    // 私密作品已不设槽位上限（2026-10-12）：不再往 private_work_slots 里占位。
     env.DB.prepare(
       `INSERT INTO published_trees
         (id, creator_id, kind, title, description, document_json, node_count, license,

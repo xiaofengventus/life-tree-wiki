@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="s0unDf3AyC42UWaIkFtvWf">
+<head data-page-node-id="HpWEQXCFaN5R8669Xijtme">
+<meta charset="UTF-8" data-page-node-id="rbqIpIkkJcndXveGAyibBE">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="owbk8dHWaldQ2dAlzw5V7y">
+<title>计算机网络 · 五层模型 — 发送与接收全过程</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1e2530;
+    --muted: #5b6676;
+    --line: #dde3ec;
+    --app:  #2563eb;  --app-bg:  #eff4ff;
+    --tra:  #0d9488;  --tra-bg:  #ecfdf8;
+    --net:  #d97706;  --net-bg:  #fff8ec;
+    --lnk:  #7c3aed;  --lnk-bg:  #f5f0ff;
+    --phy:  #64748b;  --phy-bg:  #f1f4f8;
+    --send: #dc2626;
+    --recv: #059669;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 28px 16px 60px;
+  }
+  .page { max-width: 1360px; margin: 0 auto; }
+
+  header.top { text-align: center; margin-bottom: 20px; }
+  header.top h1 { font-size: 26px; letter-spacing: 1px; }
+  header.top p.sub { color: var(--muted); margin-top: 6px; font-size: 14px; }
+
+  .controls {
+    display: flex; justify-content: center; align-items: center; gap: 14px;
+    margin-bottom: 22px; flex-wrap: wrap;
+  }
+  .controls button {
+    padding: 9px 22px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 15px; font-weight: 600; color: #fff;
+    background: var(--app); transition: opacity .15s;
+  }
+  .controls button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .controls button:hover { opacity: .88; }
+  #stepDesc {
+    min-width: 340px; padding: 9px 16px; border-radius: 8px;
+    background: var(--card); border: 1px solid var(--line); font-size: 14px; color: var(--muted);
+  }
+  #stepDesc b { color: var(--ink); }
+
+  /* ===== 主舞台 ===== */
+  .stage {
+    display: grid;
+    grid-template-columns: 250px 1fr 250px;
+    gap: 14px;
+    align-items: stretch;
+  }
+  .col-head {
+    text-align: center; font-weight: 700; font-size: 16px; padding: 10px 0 14px;
+  }
+  .col-head.send { color: var(--send); }
+  .col-head.mid  { color: var(--ink); }
+  .col-head.recv { color: var(--recv); }
+
+  .sendcol, .recvcol { display: flex; flex-direction: column; }
+  .midcol { display: flex; flex-direction: column; }
+
+  /* 行高对齐：中间层卡 与 两侧步骤框 同高 */
+  .row { display: contents; }
+
+  .stepbox {
+    flex: 1; border-radius: 10px; padding: 12px 12px 14px; position: relative;
+    background: var(--card); border: 1px solid var(--line);
+    transition: box-shadow .25s, border-color .25s, transform .25s;
+    margin-bottom: 26px;
+  }
+  .stepbox:last-child { margin-bottom: 0; }
+  .stepbox .tag {
+    position: absolute; top: -11px; left: 12px;
+    font-size: 12px; font-weight: 700; color: #fff;
+    padding: 2px 10px; border-radius: 20px;
+  }
+  .sendcol .tag { background: var(--send); }
+  .recvcol .tag { background: var(--recv); }
+  .stepbox h4 { font-size: 14px; margin: 6px 0 6px; }
+  .stepbox p { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+  .stepbox .pdu-mini {
+    display: inline-block; margin-top: 8px; font-family: Consolas, monospace;
+    font-size: 12px; padding: 3px 8px; border-radius: 5px;
+    background: #f1f4f8; border: 1px dashed #c4cdd9; color: #334;
+  }
+  .stepbox.lit {
+    border-color: currentColor;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.15), 0 4px 14px rgba(30,40,60,.10);
+    transform: translateY(-1px);
+  }
+  .sendcol .stepbox.lit { border-color: var(--send); }
+  .recvcol .stepbox.lit { border-color: var(--recv); }
+
+  /* 中间层卡片 */
+  .layercard {
+    border-radius: 12px; padding: 14px 16px 14px; margin-bottom: 26px;
+    border: 1px solid var(--line); background: var(--card);
+    transition: box-shadow .25s, border-color .25s, transform .25s;
+    position: relative; overflow: hidden;
+  }
+  .layercard:last-child { margin-bottom: 0; }
+  .layercard .ribbon {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+  }
+  .layercard h3 {
+    font-size: 17px; display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+  }
+  .layercard h3 .en { font-size: 12px; color: var(--muted); font-weight: 400; letter-spacing: .5px; }
+  .pdu-badge {
+    margin-left: auto; font-size: 13px; font-weight: 700;
+    padding: 3px 12px; border-radius: 20px; color: #fff;
+  }
+  .layercard .fn { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+  .kv { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; }
+  .kv .k {
+    flex: none; font-size: 12px; font-weight: 700; color: var(--muted);
+    width: 40px; text-align: right;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 12.5px; padding: 3px 10px; border-radius: 6px;
+    background: #f1f4f8; border: 1px solid var(--line); color: #2a3242;
+    font-family: Consolas, "Microsoft YaHei", monospace;
+  }
+  .layercard.lit {
+    border-color: var(--lc);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lc) 18%, transparent), 0 6px 16px rgba(30,40,60,.12);
+    transform: translateY(-1px);
+  }
+
+  /* 各层配色 */
+  .l-app  { --lc: var(--app); }  .l-app  .ribbon, .l-app  .pdu-badge { background: var(--app); }
+  .l-app  { background: linear-gradient(180deg, var(--app-bg), #fff 55%); }
+  .l-tra  { --lc: var(--tra); }  .l-tra  .ribbon, .l-tra  .pdu-badge { background: var(--tra); }
+  .l-tra  { background: linear-gradient(180deg, var(--tra-bg), #fff 55%); }
+  .l-net  { --lc: var(--net); }  .l-net  .ribbon, .l-net  .pdu-badge { background: var(--net); }
+  .l-net  { background: linear-gradient(180deg, var(--net-bg), #fff 55%); }
+  .l-lnk  { --lc: var(--lnk); }  .l-lnk  .ribbon, .l-lnk  .pdu-badge { background: var(--lnk); }
+  .l-lnk  { background: linear-gradient(180deg, var(--lnk-bg), #fff 55%); }
+  .l-phy  { --lc: var(--phy); }  .l-phy  .ribbon, .l-phy  .pdu-badge { background: var(--phy); }
+  .l-phy  { background: linear-gradient(180deg, var(--phy-bg), #fff 55%); }
+
+  /* 侧栏方向箭头 */
+  .arrow-down, .arrow-up {
+    text-align: center; font-size: 13px; color: var(--muted); padding: 2px 0 6px;
+    letter-spacing: 2px;
+  }
+  .arrow-down b { color: var(--send); }
+  .arrow-up b { color: var(--recv); }
+
+  /* ===== 底部物理传输线 ===== */
+  .wireband {
+    margin-top: 18px; display: grid; grid-template-columns: 250px 1fr 250px; gap: 14px;
+  }
+  .wire {
+    grid-column: 1 / 4; border-radius: 10px; padding: 14px 18px;
+    background: repeating-linear-gradient(45deg, #1e2530, #1e2530 10px, #2a3242 10px, #2a3242 20px);
+    color: #e8edf5; display: flex; align-items: center; gap: 16px;
+    border: 1px solid #0f141d;
+  }
+  .wire .wl { flex: none; font-weight: 700; font-size: 14px; }
+  .wire .wl small { display: block; font-weight: 400; color: #aab4c4; font-size: 11.5px; margin-top: 2px; }
+  .wire-track { flex: 1; position: relative; height: 22px; }
+  .wire-track .bits {
+    position: absolute; inset: 6px 0; border-radius: 4px;
+    background: repeating-linear-gradient(90deg, #64748b 0 6px, transparent 6px 14px);
+    opacity: .55;
+  }
+  .bitdot {
+    position: absolute; top: 50%; left: 0; width: 14px; height: 14px; margin-top: -7px;
+    border-radius: 50%; background: #ffd200; box-shadow: 0 0 10px #ffd200;
+    opacity: 0; transition: opacity .2s;
+  }
+  .bitdot.on { opacity: 1; }
+  .wire-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px; grid-column: 1/4; padding: 0 6px; }
+
+  /* ===== 当前数据单元可视化 ===== */
+  .packetviz-wrap {
+    max-width: 1360px; margin: 26px auto 0;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .packetviz-wrap h3 { font-size: 15px; margin-bottom: 12px; }
+  .packetviz { display: flex; gap: 4px; flex-wrap: wrap; align-items: stretch; min-height: 54px; }
+  .pblk {
+    padding: 10px 18px; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 700;
+    display: flex; flex-direction: column; justify-content: center; text-align: center;
+    min-width: 84px; transition: opacity .3s, transform .3s;
+  }
+  .pblk small { font-weight: 400; font-size: 11px; opacity: .85; margin-top: 2px; }
+  .pblk.off { opacity: .12; transform: scale(.92); }
+  .pb-eth { background: var(--lnk); border-radius: 8px 3px 3px 8px; }
+  .pb-ip  { background: var(--net); }
+  .pb-tcp { background: var(--tra); }
+  .pb-dat { background: var(--app); min-width: 160px; flex: 1; }
+  .pb-fcs { background: #94a3b8; border-radius: 3px 8px 8px 3px; font-size: 12px; }
+  .viz-note { color: var(--muted); font-size: 12.5px; margin-top: 10px; line-height: 1.6; }
+
+  /* ===== 图例 ===== */
+  .legend {
+    max-width: 1360px; margin: 20px auto 0; display: flex; gap: 18px; flex-wrap: wrap;
+    justify-content: center; color: var(--muted); font-size: 13px;
+  }
+  .legend span i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  footer { text-align: center; color: #9aa5b5; font-size: 12px; margin-top: 34px; line-height: 1.8; }
+
+  @media (max-width: 1100px) {
+    .stage, .wireband { grid-template-columns: 200px 1fr 200px; }
+  }
+</style>
+</head>
+<body data-page-node-id="MMDYsSZ0VedUz5xJ25tTSe">
+<div class="page" data-page-node-id="g2BiHaAOUiSpkh4lUqMoTi">
+
+  <header class="top" data-page-node-id="db4OHWs9CFlPBxFiiXHZ6V">
+    <h1 data-page-node-id="Q59xedXjG0bU6aV8OYiupo">计算机网络 · 五层模型</h1>
+    <p class="sub" data-page-node-id="pU1ExjANZCzjBfIoTZFQ2Y">数据类型（PDU） · 协议 · 设备 · 工作流 —— 依据《HCIA-Datacom V2.0 考试大纲》知识体系整理</p>
+    <p class="sub"><a href="计算机网络-协议流程与设备原理.html" style="color:#2563eb">→ 进阶页：协议流程与设备原理图解（时序图 / 流程图 / 拓扑图）</a></p>
+  </header>
+
+  <div class="controls" data-page-node-id="FFMdZhcE2cEm4ycAyFT8D6">
+    <button id="playBtn" data-page-node-id="NBsLbbtxZ4kM8VsiE6dt4m">▶ 播放通信过程</button>
+    <button id="resetBtn" class="ghost" data-page-node-id="HAYYWY5WhHUaQ8FCcCdhqG">重置</button>
+    <div id="stepDesc" data-page-node-id="Kvv0c5xpQrEHqCKLJDFAKR">点击「播放」逐步演示：<b data-page-node-id="T0Q6oPPmkzqYKQYqvqUpnz">发送方封装 → 物理层传输 → 接收方解封装</b></div>
+  </div>
+
+  <div class="stage" data-page-node-id="hF00PuPtTjJKEAZeVBNtEW">
+    <div class="col-head send" data-page-node-id="5OA5pncD4Gw1uF6roX8TPE">发送方（主机 A）<div class="arrow-down" data-page-node-id="rfjjQ3mpViMjLJ7Jvx7O7P"><b data-page-node-id="yUmR4udS7Ruz87XEoH7MgT">▼ 封装 Encapsulation</b></div></div>
+    <div class="col-head mid" data-page-node-id="97KnIEc9JGexKrwDXwCvEu">五层参考模型（TCP/IP 体系）</div>
+    <div class="col-head recv" data-page-node-id="gQ7jmQ474NBstkxvHk3QEm">接收方（主机 B）<div class="arrow-up" data-page-node-id="VHj2hsIC6418gWTjsfJk8M"><b data-page-node-id="eLrk8i8YLYsXeVMZ6s9e84">▲ 解封装 De-encapsulation</b></div></div>
+
+    <!-- ========== 应用层 ========== -->
+    <div class="row" data-page-node-id="KvzAFXnXNXE9iHveqXzobD">
+      <div class="sendcol" data-page-node-id="wo6rYkHhosF0Gs9bCtvI8n">
+        <div class="stepbox" id="s1" data-page-node-id="5QGiVfmjXvkPQqhOvaMxAc">
+          <span class="tag" data-page-node-id="O9yqbk4mp9OHgsJRq2DceR">① 产生数据</span>
+          <h4 data-page-node-id="uAzJ96KxDU4tDLpjnp5YBM">应用程序生成原始数据</h4>
+          <p data-page-node-id="BPLS3O3eSlRPDgr4noKuMu">浏览器发起 HTTP 请求 / FTP 上传文件 / SSH 远程登录 / DNS 查询域名 / DHCP 申请地址</p>
+          <span class="pdu-mini" data-page-node-id="FwSm6ZttpqAEzTRfNsQf7Y">数据 Data</span>
+        </div>
+      </div>
+      <div class="midcol" data-page-node-id="WNCiPSF3MRj8bH3U1q2g7b">
+        <div class="layercard l-app" id="m1" data-page-node-id="5Rf15Dll6eKOE0l5aRjInS">
+          <div class="ribbon" data-page-node-id="Z5KwimRo8xmSiLFiJ93Lk8"></div>
+          <h3 data-page-node-id="wKW9503iaPDQKBNRmtoUpV">应用层 <span class="en" data-page-node-id="4GhhdLOZKva6QxGD47TH0O">Application</span>
+            <span class="pdu-badge" data-page-node-id="9j4SMfE30Bp2M6hBc4Ls4K">报文 / 数据 Data</span></h3>
+          <p class="fn" data-page-node-id="7fS7ibKRB0f61Se5l0k6Rk">为应用程序提供网络服务接口，负责产生与解析用户数据，是用户与网络交互的入口。</p>
+          <div class="kv" data-page-node-id="8TLDbQVb5kZ5O6VFGKV2UD"><span class="k" data-page-node-id="GvvXRVBG1LSqzSreJ2WNTo">协议</span>
+            <div class="chips" data-page-node-id="YuPmsvk5NjQcrrbvGdBuWn">
+              <span class="chip" data-page-node-id="2DLgBmRg26x4CPKkQ09YXb">HTTP / HTTPS</span><span class="chip" data-page-node-id="mmwMbb1wK2s8eRWjNS2eKa">DNS</span>
+              <span class="chip" data-page-node-id="S6j6urCCV8KOPfk4PLskQO">FTP</span><span class="chip" data-page-node-id="tHbvkiOouRJKDTRoPNiXFs">SMTP</span>
+              <span class="chip" data-page-node-id="SDnElE2zvKZ7tycvQhkO0t">DHCP</span><span class="chip" data-page-node-id="HvuopT1224XVUER4zJFyHJ">Telnet</span><span class="chip" data-page-node-id="0qqEs50znTP6MspiEB8UBU">SSH</span>
+            </div></div>
+          <div class="kv" data-page-node-id="vhEVDa93021GQN9U04A0y2"><span class="k" data-page-node-id="WPRc0T4gAFxYebtJ7olxON">设备</span>
+            <div class="chips" data-page-node-id="AaivL13ylZwAK9UOurBGx2"><span class="chip" data-page-node-id="tZ1D5TkC3riV9vn8qmF9zn">应用网关 / 代理服务器</span><span class="chip" data-page-node-id="66r0RjCpnc1D4LnrFtPAyn">终端主机</span></div></div>
+        </div>
+      </div>
+      <div class="recvcol" data-page-node-id="gPPEuzsBik57pTJ0syCuz7">
+        <div class="stepbox" id="r1" data-page-node-id="THW8XA7568D22yhOBH7kGV">
+          <span class="tag" data-page-node-id="vumGzcRmceTkqraSK4kIFh">⑤ 交付数据</span>
+          <h4 data-page-node-id="VybS0J1PT7ZSZs1HyMZ3Nr">交给对应应用程序</h4>
+          <p data-page-node-id="TNO7U1bAjeZE0EcGCT4CUp">按目的端口号分用（如 80→Web 服务、21→FTP），应用进程收到原始数据并展示/处理</p>
+          <span class="pdu-mini" data-page-node-id="FN6gukPpr3X8VOu4s9CpAG">数据 Data</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 传输层 ========== -->
+    <div class="row" data-page-node-id="NzNger1RrMFKEsulbmRT5h">
+      <div class="sendcol" data-page-node-id="xBAWkPTMO1QMezPTOKUx0X">
+        <div class="stepbox" id="s2" data-page-node-id="G21jt9fATlOg4H34xgibnL">
+          <span class="tag" data-page-node-id="eoAb7u2Q84p66lt100fiPq">② 加传输头</span>
+          <h4 data-page-node-id="sYVPEimS7RvBDxP2RWfQlh">添加 TCP / UDP 头部</h4>
+          <p data-page-node-id="QfXno6vAM7zPdOTFBNWQuo">写上源端口、目的端口；TCP 还做三次握手、分段、确认与重传</p>
+          <span class="pdu-mini" data-page-node-id="oGCVoZB8gjJ6z4mA4aZora">TCP头 | 数据 → 段 Segment</span>
+        </div>
+      </div>
+      <div class="midcol" data-page-node-id="DNhi8yYfE6n0vnAVDzIWe4">
+        <div class="layercard l-tra" id="m2" data-page-node-id="FjyW7j9pInLmiIHaOsp3rT">
+          <div class="ribbon" data-page-node-id="f66UfcSmIatmVJ3AfcBIZ0"></div>
+          <h3 data-page-node-id="Jz0HbvOmDtC5piWC10AOGu">传输层 <span class="en" data-page-node-id="PzsIYSLpHmZmIpu1aB4Qfj">Transport</span>
+            <span class="pdu-badge" data-page-node-id="0eA070Rn6rbHwIZMRSYr20">段 Segment</span></h3>
+          <p class="fn" data-page-node-id="r8ltnKbO6hc5FEZZK4LuJO">端到端（进程到进程）的传输：用「端口号」标识应用进程，提供可靠或不可靠两种服务。</p>
+          <div class="kv" data-page-node-id="0qjbZivDfrMEc4AWG85e9G"><span class="k" data-page-node-id="o4zoSldd22ZFZGOvfxiQ1R">协议</span>
+            <div class="chips" data-page-node-id="o9hjFvpapZVgxN76HrN1eI">
+              <span class="chip" data-page-node-id="iHpJ4UHsRLydoo5YJDRhdd">TCP（面向连接 · 可靠 · 三次握手）</span>
+              <span class="chip" data-page-node-id="1LHM2KiJ6oUPFGxizuGCjw">UDP（无连接 · 低开销）</span>
+            </div></div>
+          <div class="kv" data-page-node-id="RdWOuU7BWOCtHZBxunT6GU"><span class="k" data-page-node-id="PKGhWhEFMMt9YTSB9o99hK">设备</span>
+            <div class="chips" data-page-node-id="ybWh9rL2whmVAAJ8CfsXPq"><span class="chip" data-page-node-id="rG6qiTZEBtdEOFNca7e5Ru">主机协议栈</span><span class="chip" data-page-node-id="BmhzLN6KQcrADjVrTkslkt">（四层）防火墙</span></div></div>
+        </div>
+      </div>
+      <div class="recvcol" data-page-node-id="DvwyD7NBq3PzhCQs7v1FZ4">
+        <div class="stepbox" id="r2" data-page-node-id="xg8ugqrOhZ8Ijr7ajo8lKO">
+          <span class="tag" data-page-node-id="M9aKCFhYNTaNl6oVgqVn6m">④ 去传输头</span>
+          <h4 data-page-node-id="MyhLCpFZXXdUJkZJw9SYhE">剥离 TCP / UDP 头部</h4>
+          <p data-page-node-id="oxCt75hi4qZk3ZZUpRZlZC">校验序号与确认号，TCP 按序重组分段、回送 ACK，向上交还原始数据</p>
+          <span class="pdu-mini" data-page-node-id="fGDsJqpwC5xyVSg2HWh09X">段 → 数据</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 网络层 ========== -->
+    <div class="row" data-page-node-id="iYJvWFZaFMj9FKMDjSFcSP">
+      <div class="sendcol" data-page-node-id="kwhXszpFdrZCmRsOr1dZcz">
+        <div class="stepbox" id="s3" data-page-node-id="FGec8UIoHvAxnD3fE6TH6l">
+          <span class="tag" data-page-node-id="cCKfSR6Ew8ZmLGrM4X5dhh">③ 加 IP 头</span>
+          <h4 data-page-node-id="Pcbw066HlvfaLqayVomWPM">添加 IP 头部</h4>
+          <p data-page-node-id="Cuj32zISCnOOrMBhDoUznv">写上源 IP、目的 IP 与 TTL；查路由表决定下一跳（网关）</p>
+          <span class="pdu-mini" data-page-node-id="T5UsVlxubF9ybMNCjMfo2R">IP头 | 段 → 包 Packet</span>
+        </div>
+      </div>
+      <div class="midcol" data-page-node-id="4DUqOTKOxfmCGDcF3aboQC">
+        <div class="layercard l-net" id="m3" data-page-node-id="WmvWPmHuJY3ir0pK0MZHOR">
+          <div class="ribbon" data-page-node-id="yhammkFNzQjnLFrGPWBeWl"></div>
+          <h3 data-page-node-id="o6ifAf7dosZqUWyPvzVfVA">网络层 <span class="en" data-page-node-id="jh7HMLlEyxv0Byrh4mwmTM">Network</span>
+            <span class="pdu-badge" data-page-node-id="P1VxZuMzhrVGqjF6MmTVSz">包 Packet</span></h3>
+          <p class="fn" data-page-node-id="4EFmVvN7ntm1Ed4BFJ3bz9">逻辑编址与路径选择：跨网络把包从源主机路由到目的主机（路由器逐跳转发）。</p>
+          <div class="kv" data-page-node-id="M2LU6EESY7j9pToovoCbh5"><span class="k" data-page-node-id="Fdq5ZnWCX7407Eyrl5lYRO">协议</span>
+            <div class="chips" data-page-node-id="fb7y5RBdSVAQeoY0dnWsvr">
+              <span class="chip" data-page-node-id="xbf1ohoIQPWhHtZMtpBRO9">IPv4 / IPv6</span><span class="chip" data-page-node-id="8fdjMNabtFEeUlLVWteHxB">ICMP / ICMPv6</span>
+              <span class="chip" data-page-node-id="iO4NAmjH43qAlsFgwuRIrU">OSPF</span><span class="chip" data-page-node-id="AP8LZehdWFRA2vGbB8iMYb">静态路由</span><span class="chip" data-page-node-id="znd1KVUrIrrqDrnNCAoyZ5">ARP</span>
+            </div></div>
+          <div class="kv" data-page-node-id="5zoOwPeDTlcwyEH9GHVqIq"><span class="k" data-page-node-id="zKmLwJq3kPFy1fOkJjc8si">设备</span>
+            <div class="chips" data-page-node-id="od1V4Nq5XzX3FCZSebSGMY"><span class="chip" data-page-node-id="Pj253RcJ0fAB3GcZBhBiPx">路由器 Router</span><span class="chip" data-page-node-id="79Sn3MwTYESEClD2p5P9Qe">三层交换机</span></div></div>
+        </div>
+      </div>
+      <div class="recvcol" data-page-node-id="qOnGujVdRtBFs9aqU8MLvF">
+        <div class="stepbox" id="r3" data-page-node-id="nYnL6xpj24OpL3RmAizulq">
+          <span class="tag" data-page-node-id="2mWKBw7AsklXVRzyukCQAc">③ 去IP头</span>
+          <h4 data-page-node-id="P9H2WJzcOcDN0JAlv9boql">剥离 IP 头部</h4>
+          <p data-page-node-id="uGIoAiKhk84kAHTmeCSN9C">核对目的 IP 是否为本机，检查 TTL 与头部校验和，根据协议号上交（6=TCP / 17=UDP）</p>
+          <span class="pdu-mini" data-page-node-id="w1umCpWp35M9vuUmMjK5wi">包 → 段</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 数据链路层 ========== -->
+    <div class="row" data-page-node-id="ROTpcefDHx6wVkSqnYffrX">
+      <div class="sendcol" data-page-node-id="CA3QdriKLe0UTLrjBX5pss">
+        <div class="stepbox" id="s4" data-page-node-id="BM2At1yEStUlJvjwNUGX1n">
+          <span class="tag" data-page-node-id="4KPGJc8x9KvNCmmV8bnkfS">④ 加帧头帧尾</span>
+          <h4 data-page-node-id="qVyHEUNzCq4OIBGKoBCcNZ">添加以太网帧头 + FCS</h4>
+          <p data-page-node-id="bGiSjLUrkjeOTh7dJPjhTK">写上源 MAC、目的 MAC（ARP 解析所得），帧尾附 FCS 循环冗余校验</p>
+          <span class="pdu-mini" data-page-node-id="y626lrkhXlaXMWXzukGGH9">帧头|包|FCS → 帧 Frame</span>
+        </div>
+      </div>
+      <div class="midcol" data-page-node-id="S0xCzuNm1OB535vj8ZaOQk">
+        <div class="layercard l-lnk" id="m4" data-page-node-id="iGz8RyzWPnhDctN9U3tfk1">
+          <div class="ribbon" data-page-node-id="qiDOTYNG3vPwy24s7EC99I"></div>
+          <h3 data-page-node-id="E7iobz6j9mbWLG9KEOmbjw">数据链路层 <span class="en" data-page-node-id="P7d25vBn7NPI4CtltDtObN">Data Link</span>
+            <span class="pdu-badge" data-page-node-id="WeF7g37akrxBeDGxj5dciG">帧 Frame</span></h3>
+          <p class="fn" data-page-node-id="OIjBIVh2n1NwWS82FOVvdy">相邻节点间的可靠传输：MAC 寻址、组帧、差错检测（FCS）、介质访问控制。</p>
+          <div class="kv" data-page-node-id="Pa48zLBFHEYEWClf5m5mMr"><span class="k" data-page-node-id="YXEmLawOkAJSHcLC6tbGMc">协议</span>
+            <div class="chips" data-page-node-id="8D0WtJ1vyWSMKNgon5btZR">
+              <span class="chip" data-page-node-id="TIuf8b8ilOa5Pl6mNaRGBE">Ethernet / 802.3</span><span class="chip" data-page-node-id="UCm0Q298FfZ8T9KHo3zE1c">VLAN · 802.1Q</span>
+              <span class="chip" data-page-node-id="1MrmKJ11BoEw5QfugE7jPk">STP 生成树</span><span class="chip" data-page-node-id="radgvYy8e8pyEpLZRAjWBi">LACP 链路聚合</span><span class="chip" data-page-node-id="LmEtEhtcM5LcMh7SVGzqXE">PPP</span>
+            </div></div>
+          <div class="kv" data-page-node-id="9TYWrzRBJYpKTzaPPbWQLY"><span class="k" data-page-node-id="kDXjJsG6hpgpF23B9KP0Cx">设备</span>
+            <div class="chips" data-page-node-id="EGWf8lU4u2H15Ti7uhJ6mv"><span class="chip" data-page-node-id="p0wA94CefMBRL07uDuoRCM">交换机 Switch</span><span class="chip" data-page-node-id="qi1q3VvlzGAX8NPHqkQWxk">网桥 Bridge</span><span class="chip" data-page-node-id="CYu0wbTS0XK9KDQX4izp5F">网卡 NIC</span></div></div>
+        </div>
+      </div>
+      <div class="recvcol" data-page-node-id="Dwy5xtLBw9VTQqhR0NphY8">
+        <div class="stepbox" id="r4" data-page-node-id="BQwjMLd504whh9rKk8EAAi">
+          <span class="tag" data-page-node-id="PF2FScZJhTLVQ6cGoj6YtV">② 去帧头帧尾</span>
+          <h4 data-page-node-id="aAwOcCIVNzq8pxJrF1bgZx">剥离以太网帧头尾</h4>
+          <p data-page-node-id="4hYFnEQtbFEWTjr8NFckFE">交换机按 MAC 表转发；网卡用 FCS 校验帧完整性，帧类型字段上交（0800=IP）</p>
+          <span class="pdu-mini" data-page-node-id="uHGku7LGnJaLToxKsjWgVj">帧 → 包</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 物理层 ========== -->
+    <div class="row" data-page-node-id="xLgfAvF9HpFc0COOdYGtIM">
+      <div class="sendcol" data-page-node-id="Ou7TxSDt2RpwKbnN3f6Oz3">
+        <div class="stepbox" id="s5" data-page-node-id="N0ayB0MibEXXrB8HRF0Cra">
+          <span class="tag" data-page-node-id="h4FBADAB3yCeIqHeC3m8zv">⑤ 变比特流</span>
+          <h4 data-page-node-id="I26zBOjZFACCiddXx1tAU0">帧转为电 / 光信号</h4>
+          <p data-page-node-id="KBKlWxyGMXu6pkqcYD3Lvt">网卡把比特编码后在传输介质上发送出去</p>
+          <span class="pdu-mini" data-page-node-id="1EG3PimIBZCHJUnMtLrgI3">比特流 Bit Stream</span>
+        </div>
+      </div>
+      <div class="midcol" data-page-node-id="IS9CX1QobwroHJerjZvlxY">
+        <div class="layercard l-phy" id="m5" data-page-node-id="9DnzA8naoMiT1zPTfgf4yu">
+          <div class="ribbon" data-page-node-id="8ppxO7qfq1vkZdaZT3R5e0"></div>
+          <h3 data-page-node-id="BgqdO6kuT8hShIX0w6tbXp">物理层 <span class="en" data-page-node-id="0iIuiQuoFsH4SdMY0gshzO">Physical</span>
+            <span class="pdu-badge" data-page-node-id="HMsD4WadFL4wE3tsCbWqoe">比特 Bit</span></h3>
+          <p class="fn" data-page-node-id="wTbdYhRyBUcMonuVH0kmAH">在传输介质上透明传输比特流：规定电压、光信号、接口形状与速率等电气/物理特性。</p>
+          <div class="kv" data-page-node-id="lbucoGijTU55nIsM4tfxwK"><span class="k" data-page-node-id="6okaKIa7PqD5rFdLdAWz3S">标准</span>
+            <div class="chips" data-page-node-id="KGFDJKIGptwt6iBqB0waNh">
+              <span class="chip" data-page-node-id="EdTHiwiKo7PPypXLfIm584">RJ45 / 双绞线</span><span class="chip" data-page-node-id="ON6JNIdXwr76AMxPdCZ11e">光纤</span>
+              <span class="chip" data-page-node-id="L8lwgDERaVyZhDC24Nc5pF">802.11（WLAN 无线）</span><span class="chip" data-page-node-id="Tm7LGyg1dL25VmveLMIkx6">1000BASE-T 等</span>
+            </div></div>
+          <div class="kv" data-page-node-id="sMsg0Me6ApSqSqG8C3c4t0"><span class="k" data-page-node-id="oCu0jPA5TsTjUYNjYRoJFG">设备</span>
+            <div class="chips" data-page-node-id="QlLtf226OfBoQjMbBeIb7V"><span class="chip" data-page-node-id="JSmD6OaUg0ZzNta4aAvPud">集线器 Hub</span><span class="chip" data-page-node-id="oL19mo1IsDLLakfbyNDxxh">中继器 Repeater</span><span class="chip" data-page-node-id="HVuHweuavmYxZrpIdMBaBC">传输介质</span></div></div>
+        </div>
+      </div>
+      <div class="recvcol" data-page-node-id="uQyZPz48FCs74EcRt5XOGD">
+        <div class="stepbox" id="r5" data-page-node-id="GwwNDDASp46LP8fSwPCZK5">
+          <span class="tag" data-page-node-id="GsQtmI1O20yifT5yOPPJO0">① 收比特流</span>
+          <h4 data-page-node-id="m8CCHhjzF4EZMAmaBBoTWJ">信号还原为比特</h4>
+          <p data-page-node-id="3CzGf5LofjpxuEvKdTsA1e">接收网卡把电/光信号解码成比特流，重建出完整的帧</p>
+          <span class="pdu-mini" data-page-node-id="ZbcuTHgBultZnneAi65X2J">比特流 → 帧</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 物理传输线 -->
+  <div class="wireband" data-page-node-id="La9SDGBNGkXyHFwk6jI2AQ">
+    <div class="wire" data-page-node-id="UWIs3SqlQFZ3yZimsVGeV8">
+      <div class="wl" data-page-node-id="qGrBrksZCqG923psutmc0a">物理传输介质<small data-page-node-id="eBoHercQIJZ8O44N1A52V4">网线 / 光纤 / 无线电波（802.11）</small></div>
+      <div class="wire-track" data-page-node-id="lJfHbPs0QQI82QJ0XDYZd6">
+        <div class="bits" data-page-node-id="aYBpIe8uAfQJpanHoUBxc4"></div>
+        <div class="bitdot" id="bitdot" data-page-node-id="43QAyC6uXEzSXvUPnzfgSD"></div>
+      </div>
+      <div class="wl" style="text-align:right" data-page-node-id="cv3RZ9ewK5TT356xqCF5kC">01101…01<small data-page-node-id="SQCZEmPcmEPjEBzgFGKr4w">比特流跨网络传输</small></div>
+    </div>
+    <div class="wire-labels" data-page-node-id="PHLZqANvXs2NL2aE9Rw2FM"><span data-page-node-id="Jkm7K5LRBcPiLcjXp1nGor">← 发送方向：自上而下封装</span><span data-page-node-id="r9eEpAp0xGaZaaEqDgERSz">中间设备：交换机（二层）· 路由器（三层）逐跳转发 →</span><span data-page-node-id="ET1LJ6sCJaUoFwRLOVV6KI">接收方向：自下而上解封装 ↑</span></div>
+  </div>
+
+  <!-- 当前数据单元 -->
+  <div class="packetviz-wrap" data-page-node-id="zjfUGGovjdaqV8Spceo9DD">
+    <h3 data-page-node-id="bEYBkWbNJbknSEQjDZb8Eo">📦 封装全过程：数据如何被「套上」各层头部</h3>
+    <div class="packetviz" data-page-node-id="w7O5OjQov8bpGseDAf2TT2">
+      <div class="pblk pb-eth off" id="pb-eth" data-page-node-id="GuAKjQE7yahdWZb6U3G4M6">以太网帧头<small data-page-node-id="C5uyiebEQUmqtvrimrgXh9">源MAC | 目的MAC</small></div>
+      <div class="pblk pb-ip off"  id="pb-ip" data-page-node-id="SG36nDQeTaTOsBPjAODp9i">IP 头<small data-page-node-id="RN7ahH8glIXpfyKHhdhSrI">源IP | 目的IP</small></div>
+      <div class="pblk pb-tcp off" id="pb-tcp" data-page-node-id="EUXOdp6mDMlC2DxAVneC3U">TCP 头<small data-page-node-id="FzBd90Z1DROYTTMfzagaFw">源端口 | 目的端口</small></div>
+      <div class="pblk pb-dat"     id="pb-dat" data-page-node-id="GLxXlDi0gpo6f4BAP4DkUg">数据 Data<small data-page-node-id="Nztd49153IGl6KeQ9hk6Ur">应用层报文（HTTP / FTP…）</small></div>
+      <div class="pblk pb-fcs off" id="pb-fcs" data-page-node-id="QwPCSMoFAx9maS19lbaKHQ">FCS<small data-page-node-id="pS77GeuCeG4nTgSpmIOTe8">校验</small></div>
+    </div>
+    <p class="viz-note" id="vizNote" data-page-node-id="hXBQmyC5J5TD30OUbYmk6x">
+      发送方每经过一层就<b data-page-node-id="ezzptPX0gw2j5iuTB0K9vq">加一个头部</b>（封装）；接收方每经过一层就<b data-page-node-id="4I8XuV4KbjlEMwFAW5phNl">剥掉一个头部</b>（解封装）。
+      数据链路层同时加「帧头 + 帧尾（FCS）」。播放动画可对照观看每一步。
+    </p>
+  </div>
+
+  <div class="legend" data-page-node-id="20v8DxuZGWxwbXnM5Cwi21">
+    <span data-page-node-id="9yBGiJ2rHv001OsMPu6Zi3"><i style="background:var(--app)" data-page-node-id="yVL22jICOf6L8Wub7XDMm3"></i>应用层 · 数据</span>
+    <span data-page-node-id="hE5ydMtRYDdqhDrLUuVU1h"><i style="background:var(--tra)" data-page-node-id="dEs2dGQ24weE7pYIYZiRNV"></i>传输层 · 段</span>
+    <span data-page-node-id="R9djWFN2bZNWNujsp9D2RB"><i style="background:var(--net)" data-page-node-id="W9H2GLWWyP6dOi6kw561we"></i>网络层 · 包</span>
+    <span data-page-node-id="0wEgyX3TpQGNlp44XjU8iA"><i style="background:var(--lnk)" data-page-node-id="dpCxnEUFSCEiMMZQUBidgc"></i>数据链路层 · 帧</span>
+    <span data-page-node-id="cyByE5fnHVkkJlNBVRBTZa"><i style="background:var(--phy)" data-page-node-id="m9IpFKTX4MEvfAcwTOji2C"></i>物理层 · 比特</span>
+  </div>
+
+  <footer data-page-node-id="o0bOjtmSlJo0HGMZ0gcW3E">
+    口诀：<b data-page-node-id="tlqDv50EeqD498f6WTDlbk">数据 → 段 → 包 → 帧 → 比特</b>（发往下三层各加头，链路层加头加尾，物理层变信号）<br data-page-node-id="LXDOnzHMUZz2Nuxuyhx7bJ">
+    内容纲要参考《HCIA-Datacom V2.0 考试大纲》· 网络参考模型与数据通信过程
+  </footer>
+</div>
+
+<script>
+(function () {
+  const desc = document.getElementById('stepDesc');
+  const note = document.getElementById('vizNote');
+  const dot  = document.getElementById('bitdot');
+  const blocks = ['pb-eth','pb-ip','pb-tcp','pb-fcs'].map(id => document.getElementById(id));
+
+  // [说明, 高亮元素(id数组), 显示的封装块(pb-*数组, null=不变), 附加动作]
+  const timeline = [
+    { d:'<b>① 发送方 · 应用层</b>：应用程序（浏览器/FTP客户端…）生成原始数据 <b>Data</b>', hi:['s1','m1'], pb:['pb-dat'] },
+    { d:'<b>② 发送方 · 传输层</b>：加 TCP/UDP 头（端口号）→ 形成 <b>段 Segment</b>', hi:['s2','m2'], pb:['pb-dat','pb-tcp'] },
+    { d:'<b>③ 发送方 · 网络层</b>：加 IP 头（源/目的 IP）→ 形成 <b>包 Packet</b>', hi:['s3','m3'], pb:['pb-dat','pb-tcp','pb-ip'] },
+    { d:'<b>④ 发送方 · 数据链路层</b>：加以太网帧头（MAC）+ 帧尾 FCS → 形成 <b>帧 Frame</b>', hi:['s4','m4'], pb:['pb-dat','pb-tcp','pb-ip','pb-eth','pb-fcs'] },
+    { d:'<b>⑤ 发送方 · 物理层</b>：帧变成比特流，编码为电/光信号发出', hi:['s5','m5'], pb:null },
+    { d:'<b>⇄ 物理介质传输</b>：比特流经网线/光纤/无线跨越网络，途中由<b>交换机</b>（二层，按 MAC 转发）和<b>路由器</b>（三层，按 IP 路由）逐跳接力', hi:['m5'], wire:true },
+    { d:'<b>① 接收方 · 物理层</b>：信号被解码还原为比特流，重建出完整的帧', hi:['r5','m5'] },
+    { d:'<b>② 接收方 · 数据链路层</b>：FCS 校验通过后剥离帧头帧尾 → 还原出 <b>包 Packet</b>', hi:['r4','m4'], pb:['pb-dat','pb-tcp','pb-ip'] },
+    { d:'<b>③ 接收方 · 网络层</b>：核对目的 IP，剥离 IP 头 → 还原出 <b>段 Segment</b>', hi:['r3','m3'], pb:['pb-dat','pb-tcp'] },
+    { d:'<b>④ 接收方 · 传输层</b>：按端口号分用，TCP 重组并确认，剥离传输头 → 还原出 <b>数据 Data</b>', hi:['r2','m2'], pb:['pb-dat'] },
+    { d:'<b>⑤ 接收方 · 应用层</b>：数据交给对应应用进程处理 —— 一次完整通信结束 ✅', hi:['r1','m1'], pb:[] }
+  ];
+
+  let timer = null, idx = -1;
+
+  function clearHi() {
+    document.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+    dot.classList.remove('on');
+  }
+  function showStep(i) {
+    const t = timeline[i];
+    clearHi();
+    (t.hi || []).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('lit');
+    });
+    if (t.pb) blocks.forEach(b => {
+      b.classList.toggle('off', !t.pb.includes(b.id));
+    });
+    if (t.wire) dot.classList.add('on');
+    desc.innerHTML = t.d + '<span style="color:#9aa5b5">　(' + (i+1) + '/' + timeline.length + ')</span>';
+  }
+  function reset() {
+    clearInterval(timer); timer = null; idx = -1;
+    clearHi();
+    blocks.forEach(b => b.classList.add('off'));
+    document.getElementById('pb-dat').classList.remove('off');
+    desc.innerHTML = '点击「播放」逐步演示：<b>发送方封装 → 物理层传输 → 接收方解封装</b>';
+    document.getElementById('playBtn').textContent = '▶ 播放通信过程';
+  }
+
+  document.getElementById('playBtn').addEventListener('click', function () {
+    if (timer) {  // 播放中 → 暂停
+      clearInterval(timer); timer = null;
+      this.textContent = '▶ 继续播放';
+      return;
+    }
+    this.textContent = '⏸ 暂停';
+    if (idx >= timeline.length - 1) reset();
+    if (idx < 0) showStep(idx = 0);
+    timer = setInterval(function () {
+      idx++;
+      if (idx >= timeline.length) { reset(); return; }
+      showStep(idx);
+    }, 2200);
+  });
+  document.getElementById('resetBtn').addEventListener('click', reset);
+
+  // 悬停中间层卡 → 高亮对应两侧步骤
+  const pairs = { m1:['s1','r1'], m2:['s2','r2'], m3:['s3','r3'], m4:['s4','r4'], m5:['s5','r5'] };
+  Object.keys(pairs).forEach(mid => {
+    const card = document.getElementById(mid);
+    card.addEventListener('mouseenter', function () {
+      if (timer) return;
+      pairs[mid].forEach(id => document.getElementById(id).classList.add('lit'));
+    });
+    card.addEventListener('mouseleave', function () {
+      if (timer) return;
+      pairs[mid].forEach(id => document.getElementById(id).classList.remove('lit'));
+    });
+  });
+})();
+</script>
+</body>
+</html>

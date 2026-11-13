@@ -69,7 +69,8 @@ export function requireSameOrigin(request) {
   const path = new URL(request.url).pathname;
   const nativeClient = request.headers.get("x-life-client") === "life-sequence-android";
   const bearerToken = request.headers.get("authorization") || "";
-  const nativeLogin = path === "/api/auth/mobile-exchange";
+  const nativeLogin =
+    path === "/api/auth/mobile-exchange" || path === "/api/auth/mobile-login";
   if (nativeClient && (nativeLogin || /^Bearer [A-Za-z0-9_-]{20,100}$/.test(bearerToken))) {
     return;
   }

@@ -23,6 +23,9 @@ export function useDraftAutosave({
   let saveAgain = false;
   let savedSnapshot = "";
   let needsBaseline = true;
+  // 作废代号：discardDraft() 后，仍在途的旧保存不得把 draftId/状态写回来
+  // （否则"提交成功 → 删草稿 → 在途保存返回 → 草稿 id 复活"）
+  let epoch = 0;
 
   function currentSnapshot() {
     return createDraftSnapshot(source());
@@ -66,10 +69,12 @@ export function useDraftAutosave({
     const snapshotToSave = currentSnapshot();
     const input = await buildDraft(draftId.value);
     if (!input) return null;
+    const myEpoch = epoch;
     status.value = "saving";
     errorMessage.value = "";
     saving = saveDraft({ ...input, id: draftId.value || input.id })
       .then((saved) => {
+        if (myEpoch !== epoch) return saved;
         draftId.value = saved.id;
         lastSavedAt.value = saved.updatedAt;
         savedSnapshot = snapshotToSave;
@@ -82,6 +87,7 @@ export function useDraftAutosave({
         return saved;
       })
       .catch((error) => {
+        if (myEpoch !== epoch) throw error;
         status.value = "error";
         errorMessage.value = error.message || "草稿保存失败";
         isDirty.value = currentSnapshot() !== savedSnapshot;
@@ -123,6 +129,21 @@ export function useDraftAutosave({
     draftId.value = draft?.id || "";
     lastSavedAt.value = draft?.updatedAt || "";
     status.value = draft?.id ? "saved" : "idle";
+    errorMessage.value = "";
+    isDirty.value = false;
+    savedSnapshot = "";
+    needsBaseline = true;
+  }
+
+  // 发布成功后由页面调用：彻底断开与当前草稿的关联，且让在途保存作废。
+  // 保留 ready —— 页面停留时继续编辑会作为新草稿重新走自动保存。
+  function discardDraft() {
+    epoch += 1;
+    window.clearTimeout(timer);
+    timer = 0;
+    draftId.value = "";
+    lastSavedAt.value = "";
+    status.value = "idle";
     errorMessage.value = "";
     isDirty.value = false;
     savedSnapshot = "";
@@ -212,5 +233,6 @@ export function useDraftAutosave({
     setDraft,
     setReady,
     setSaveMode,
+    discardDraft,
   };
 }

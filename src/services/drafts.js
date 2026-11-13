@@ -62,6 +62,14 @@ function createId() {
   return `draft-${crypto.randomUUID()}`;
 }
 
+// 体裁：Laup 正文由站内路由 `/laup` 写；NOTEBOOK 正文由 `/notebook` 写（同一 Laup 渲染内核）。
+const DRAFT_CONTENT_TYPES = new Set(["ARTICLE", "TREE", "LAUP", "NOTEBOOK"]);
+
+function normalizeContentType(value) {
+  const candidate = String(value || "").trim().toUpperCase();
+  return DRAFT_CONTENT_TYPES.has(candidate) ? candidate : "ARTICLE";
+}
+
 export function guestDraftOwnerKey() {
   if (!globalThis.localStorage) return "guest:temporary";
   let installationId = localStorage.getItem(GUEST_INSTALLATION_KEY);
@@ -95,7 +103,7 @@ export async function saveDraft(input) {
     ...input,
     id,
     ownerKey: String(input.ownerKey || existing?.ownerKey || guestDraftOwnerKey()),
-    contentType: input.contentType === "TREE" ? "TREE" : "ARTICLE",
+    contentType: normalizeContentType(input.contentType ?? existing?.contentType),
     mode: String(input.mode || existing?.mode || "CREATE").toUpperCase(),
     title: String(input.title || "").trim().slice(0, 120),
     targetId: String(input.targetId || ""),
@@ -189,6 +197,18 @@ export function draftEditorLocation(draft) {
   if (draft.mode === "FORK" && draft.targetId) query.fork = draft.targetId;
   if (draft.mode === "CONTRIBUTION" && draft.targetId) {
     query.contribute = draft.targetId;
+  }
+  // 三种体裁现在**都在 Vue 路由表里**：Laup 已从 `public/laup/` 的静态页
+  // 改成站内路由 `/laup`，所以统一返回路由地址，调用方一律 `router.push` 客户端跳转。
+  if (draft.contentType === "LAUP") return { path: "/laup", query };
+  if (draft.contentType === "NOTEBOOK") return { path: "/notebook", query };
+  // 纠偏：早期版本曾把 Notebook 草稿误归为 ARTICLE（payload.cells 是 Notebook 的指纹），
+  // 不兜住的话「继续编辑」会落到 create-post 的文章编辑器里。
+  if (
+    draft.contentType === "ARTICLE" &&
+    Array.isArray(draft.payload?.cells)
+  ) {
+    return { path: "/notebook", query };
   }
   return {
     path: draft.contentType === "TREE" ? "/evolution-tree" : "/create-post",

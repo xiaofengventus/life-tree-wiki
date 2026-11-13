@@ -87,7 +87,7 @@
         <button type="button" title="收起全部分类群" @click="collapseAll">收起</button>
       </div>
 
-      <!-- 浮动工具栏开关 -->
+      <!-- 顶部悬浮工具栏：暂时屏蔽（保留代码，需要时取消注释即可）
       <div class="command-group">
         <button
           type="button"
@@ -99,6 +99,7 @@
           浮动工具栏{{ floatingToolsEnabled ? "已开启" : "已关闭" }}
         </button>
       </div>
+      -->
 
       <!-- 更多：二次选项菜单（打开/导出/新建） -->
       <div class="command-group">
@@ -148,9 +149,9 @@
         aria-label="生命进化树画布"
       ></div>
 
-      <!-- ============ 选中节点的浮动属性工具栏 ============ -->
+      <!-- ============ 选中节点的浮动属性工具栏（top）：暂时屏蔽（保留代码，需要时取消注释即可）
       <div
-        v-if="!readOnly && selectedCount && floatingToolsEnabled"
+        v-if="!readOnly && selectedCount && floatingToolsEnabled && !toolbarCollapsed"
         class="node-quick-bar"
         role="toolbar"
         aria-label="选中节点属性工具栏"
@@ -187,8 +188,9 @@
         <ColorPaletteInput v-model="inspector.color" label="文字" compact @change="applyStyle('color')" />
         <ColorPaletteInput v-model="inspector.lineColor" label="分支" compact @change="applyStyle('lineColor')" />
       </div>
+      ============ 屏蔽结束 ============ -->
 
-      <!-- 属性面板：从浮动工具栏向上弹出（替代原右侧常驻侧边卡片） -->
+      <!-- 属性面板（right）：选中节点后在画布右侧弹出（不再有顶部快捷条） -->
       <aside
         v-if="!readOnly && inspectorOpen"
         class="inspector popup"
@@ -246,31 +248,65 @@
 
           <section class="inspector-section">
             <span class="section-title">引用</span>
-            <div class="citation-row">
-              <button
-                type="button"
-                :disabled="selectedCount !== 1"
-                @click="bindExistingCitation"
-              >
-                绑定已有引用
-              </button>
-              <button
-                type="button"
-                :disabled="selectedCount !== 1"
-                @click="addAndBindCitation"
-              >
-                新建并绑定
-              </button>
-            </div>
-            <div v-if="inspector.citationNumbers.length" class="citation-numbers">
+            <div
+              v-if="inspector.citationNumbers.length"
+              class="citation-numbers"
+            >
               <button
                 v-for="citation in sortedCitations"
                 :key="citation.number"
                 type="button"
                 :class="{ bound: inspector.citationNumbers.includes(citation.number) }"
+                :title="
+                  inspector.citationNumbers.includes(citation.number)
+                    ? `点击移除引用 [${citation.number}]`
+                    : `点击绑定引用 [${citation.number}]`
+                "
                 @click="toggleNodeCitation(citation.number)"
               >
                 [{{ citation.number }}]
+              </button>
+            </div>
+            <p
+              v-else-if="!treeCitations.length"
+              class="section-empty"
+            >
+              全树还没有参考文献，用下方输入框新建第一条。
+            </p>
+            <div class="bind-citation-row">
+              <select v-model="citationToBind" :disabled="selectedCount !== 1">
+                <option value="">绑定已有引用…</option>
+                <option
+                  v-for="citation in availableNodeCitations"
+                  :key="citation.number"
+                  :value="String(citation.number)"
+                >
+                  [{{ citation.number }}] {{ citation.text }}
+                </option>
+              </select>
+              <button
+                type="button"
+                :disabled="selectedCount !== 1 || !citationToBind"
+                @click="bindExistingCitation"
+              >
+                绑定
+              </button>
+            </div>
+            <div class="new-node-citation">
+              <textarea
+                v-model="newCitationText"
+                :disabled="selectedCount !== 1"
+                rows="2"
+                placeholder="新建参考文献：作者. 标题[J]. 期刊, 年份."
+                @keydown.stop
+              ></textarea>
+              <button
+                type="button"
+                class="add-node-citation"
+                :disabled="selectedCount !== 1 || !newCitationText.trim()"
+                @click="addAndBindCitation"
+              >
+                添加并绑定 [{{ nextCitationNumber }}]
               </button>
             </div>
           </section>
@@ -304,8 +340,62 @@
               v-if="!inspector.contentLinks.length"
               class="content-links-empty"
             >
-              此节点尚未关联文章、进化树或外部链接。
+              此节点尚未关联文章、进化树或外部链接。点击上方按钮添加一条，然后在列表里选择站内内容或填写网址。
             </p>
+            <div v-else class="content-links-list">
+              <div
+                v-for="(link, index) in inspector.contentLinks"
+                :key="`${link.type}-${index}`"
+                class="content-link-row"
+              >
+                <div class="content-link-meta">
+                  <strong>{{
+                    link.type === "ARTICLE"
+                      ? "文章"
+                      : link.type === "TREE"
+                        ? "进化树"
+                        : "外部链接"
+                  }}</strong>
+                  <span
+                    v-if="link.type === 'EXTERNAL' && link.url"
+                    class="content-link-host"
+                  >{{ displayHostname(link.url) }}</span>
+                </div>
+                <select
+                  v-if="link.type !== 'EXTERNAL'"
+                  v-model="link.targetId"
+                  @change="applyContentLinks"
+                >
+                  <option value="">
+                    {{ link.type === "ARTICLE" ? "选择站内文章…" : "选择站内进化树…" }}
+                  </option>
+                  <option
+                    v-for="item in link.type === 'TREE' ? selectableTrees : availablePosts"
+                    :key="item.id || item.uid"
+                    :value="item.uid || item.id"
+                  >
+                    {{ item.title || item.id }}
+                  </option>
+                </select>
+                <input
+                  v-else
+                  v-model="link.url"
+                  type="url"
+                  placeholder="https://example.com/page"
+                  @change="applyContentLinks"
+                  @keydown.stop
+                />
+                <div class="content-link-actions">
+                  <button
+                    type="button"
+                    class="remove-content-link"
+                    @click="removeContentLink(index)"
+                  >
+                    移除
+                  </button>
+                </div>
+              </div>
+            </div>
             <small v-if="contentCatalogLoading" class="content-catalog-state">
               正在读取站内内容列表……
             </small>
@@ -415,6 +505,14 @@
         @mouseup.stop
         @click.stop
       >
+        <button
+          type="button"
+          :class="{ active: inspectorOpen }"
+          title="节点属性面板（名称/引用/关联内容/图片/颜色）"
+          @click="inspectorOpen = !inspectorOpen"
+        >
+          属性
+        </button>
         <button type="button" title="添加同级节点 Enter" @click="addSibling">同级</button>
         <button type="button" title="添加子节点 Tab" @click="addChild">子节点</button>
         <button type="button" title="在当前节点上方插入父节点" @click="addParent">父节点</button>
@@ -534,8 +632,9 @@ const newCitationText = ref("");
 const layoutMenuOpen = ref(false);
 const moreMenuOpen = ref(false);
 const buildBarCollapsed = ref(false);
-const floatingToolsEnabled = ref(true);
-// 属性弹出面板（原右侧常驻侧边卡片，现由浮动工具栏的 ☰ 按钮开关）
+// 顶部悬浮工具栏开关：暂时屏蔽（保留代码，需要时取消注释即可）
+// const floatingToolsEnabled = ref(true);
+// 属性面板（画布右侧弹出）：选中节点自动打开，取消选择自动收起
 const inspectorOpen = ref(false);
 
 // 二级下拉菜单：互斥打开；点击页面其他位置或按 Esc 关闭
@@ -635,6 +734,11 @@ const READ_ONLY_FULL_RENDER_COMMANDS = new Set([
 ]);
 
 const selectedCount = computed(() => activeNodes.value.length);
+
+// 选中节点 → 自动弹出右侧属性面板；取消选择 → 自动收起
+watch(selectedCount, (count) => {
+  inspectorOpen.value = count > 0;
+});
 const hasExtinctMarker = computed(() => /^\s*†/.test(inspector.text));
 const selectedTitle = computed(() => {
   if (!selectedCount.value) return "未选择";
@@ -653,6 +757,12 @@ const availableNodeCitations = computed(() => {
     (citation) => !selected.has(citation.number),
   );
 });
+// 站内进化树目录：排除当前树自身（不允许自关联）
+const selectableTrees = computed(() =>
+  availableTrees.value.filter(
+    (tree) => !isCurrentTreeTarget(tree.uid || tree.id),
+  ),
+);
 const nextCitationNumber = computed(() => {
   return (
     Math.max(
@@ -1311,7 +1421,10 @@ function updateSelectedNodeCitations(numbers) {
 
 function bindExistingCitation() {
   const number = Number(citationToBind.value);
-  if (!Number.isSafeInteger(number)) return;
+  if (!citationToBind.value || !Number.isSafeInteger(number) || number <= 0) {
+    statusText.value = "请先在下拉框里选择一条要绑定的参考文献";
+    return;
+  }
   updateSelectedNodeCitations([...inspector.citationNumbers, number]);
   statusText.value = `已将参考文献 [${number}] 绑定到当前节点`;
 }
@@ -1432,10 +1545,15 @@ function applyContentLinks() {
 function applyImage() {
   const node = activeNodes.value[0];
   if (!node || selectedCount.value !== 1) return;
-  const candidate = getSafeHttpUrl(inspector.image);
-  const url = candidate.startsWith("https:") ? candidate : "";
-  if (!url && inspector.image.trim())
-    statusText.value = "图片地址必须使用 HTTPS";
+  const raw = inspector.image.trim();
+  // 支持 https 外链与站内 /media/ 相对路径（发布上传后回填的地址）
+  const mediaPath = /^\/media\/[^\s]+$/.test(raw) && !raw.startsWith("//")
+    ? raw
+    : "";
+  const candidate = mediaPath ? "" : getSafeHttpUrl(raw);
+  const url = mediaPath || (candidate.startsWith("https:") ? candidate : "");
+  if (!url && raw)
+    statusText.value = "图片地址需为 https:// 外链，或站内 /media/ 路径";
   node.setImage(
     url
       ? {
@@ -1876,8 +1994,9 @@ async function loadContentCatalog() {
     fetchPostList(),
     fetchTreeList("ALL"),
   ]);
+  // 未登录或接口失败时 service 可能 resolve null，?. 兜底避免整站报错
   availablePosts.value =
-    postsResult.status === "fulfilled" ? postsResult.value.posts || [] : [];
+    postsResult.status === "fulfilled" ? postsResult.value?.posts || [] : [];
   availableTrees.value =
     treesResult.status === "fulfilled" ? treesResult.value || [] : [];
   contentCatalogLoading.value = false;
@@ -2401,20 +2520,144 @@ defineExpose({
 
 .build-bar button.danger { color: #a43b35; }
 
-/* 属性面板：从浮动工具栏向上弹出的浮层（替代原右侧常驻侧边卡片） */
+/* 属性面板：画布右上弹出浮层；顶部工具栏收起时贴上、展开时下移让位 */
 .inspector.popup {
   position: absolute;
   z-index: 12;
-  top: 104px;
+  top: 50%;
   right: 16px;
-  width: min(320px, 88vw);
-  max-height: min(62vh, 560px);
+  transform: translateY(-50%);
+  width: min(340px, 92vw);
+  max-height: min(78vh, 680px);
   min-width: 0;
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 18px 44px rgba(31, 59, 43, 0.18);
+}
+
+/* 顶部快捷条屏蔽后 below-bar 不再生效（保留样式，恢复快捷条时可用） */
+.inspector.popup.below-bar {
+  top: 104px;
+  transform: none;
+}
+
+/* 面板内小节：分组卡片 */
+.inspector-section {
+  display: grid;
+  gap: 8px;
+  margin: 14px 16px 0;
+  padding: 10px 12px;
+  border: 1px solid #dfe8e2;
+  border-radius: 9px;
+  background: #fbfdfc;
+}
+
+.section-title {
+  color: #4a5b51;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.section-empty {
+  margin: 0;
+  color: #74847a;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.citation-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.citation-row button {
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid #bfcfc4;
+  border-radius: 7px;
+  background: #fff;
+  color: #285e44;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.citation-row button:hover:not(:disabled) {
+  border-color: var(--forest-700);
+  background: #f1f7f3;
+}
+
+.citation-row button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 引用编号徽章：已绑定 = 深蓝底白字，未绑定 = 白底蓝字 */
+.citation-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.citation-numbers button {
+  min-width: 34px;
+  padding: 3px 7px;
+  border: 1px solid #a8c7e4;
+  border-radius: 999px;
+  background: #fff;
+  color: #1683d8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.citation-numbers button.bound {
+  border-color: #1683d8;
+  background: #1683d8;
+  color: #fff;
+}
+
+/* 关联内容条目列表 */
+.content-links-list {
+  display: grid;
+  gap: 9px;
+}
+
+.content-link-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.content-link-meta strong {
+  color: #294236;
+  font-size: 12px;
+}
+
+.content-link-row select,
+.content-link-row input[type="url"] {
+  min-width: 0;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #cbdbe5;
+  border-radius: 7px;
+  background: #fff;
+  color: #334e60;
+  font: inherit;
+  font-size: 11.5px;
+}
+
+/* 底部工具栏：属性开关高亮 */
+.build-bar button.active {
+  border-color: var(--forest-700);
+  background: var(--forest-700);
+  color: #fff;
 }
 
 .inspector-close {
@@ -2438,7 +2681,8 @@ defineExpose({
 }
 
 .inspector.popup.disabled {
-  display: none;
+  /* 未选中节点时保留空状态提示（不再 display:none 隐藏——否则点「属性」毫无反馈） */
+  opacity: 0.92;
 }
 
 .inspector-heading {
@@ -2876,6 +3120,7 @@ defineExpose({
     top: auto;
     right: 6px;
     bottom: 96px;
+    transform: none;
     width: min(286px, calc(100% - 12px));
     max-height: 52vh;
   }

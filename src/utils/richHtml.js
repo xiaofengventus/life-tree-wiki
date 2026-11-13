@@ -1,5 +1,10 @@
 import Prism from "prismjs";
 import { CODE_SAMPLE_LANGUAGE, codeSampleHtml } from "./codeSample.js";
+import {
+  MARKDOWN_CELL_ATTR,
+  MARKDOWN_CELL_BODY_CLASS,
+  isMarkdownCellLanguage,
+} from "./markdownCell.js";
 import "prismjs/components/prism-bash.js";
 import "prismjs/components/prism-c.js";
 import "prismjs/components/prism-cpp.js";
@@ -114,6 +119,61 @@ function attachCodeCopyButtons(documentNode) {
 }
 
 /**
+ * Markdown 单元格的渲染函数，由应用入口（src/main.js）注册。
+ *
+ * 这里刻意不 import utils/markdownCellRender.js —— 它连着 markdown.js 和 formula.js，
+ * 而 formula.js 顶部带着 katex 的 CSS，Node 原生 ESM 解析不了；本模块要被
+ * tests/markdownGfm.test.mjs 直接 import，所以必须保持零新增依赖。
+ * 未注册时 upgradeMarkdownCells 整体跳过，阅读页退化成显示源码，不会报错。
+ */
+let markdownCellRenderer = null;
+
+/**
+ * 注册「Markdown 单元格」渲染器（源码 → 正文 HTML）。
+ * 与 installCodeCopyHandler() 同一套用法：在应用入口显式调用一次，SSR / 测试环境可安全跳过。
+ */
+export function setMarkdownCellRenderer(render) {
+  markdownCellRenderer = typeof render === "function" ? render : null;
+}
+
+/**
+ * 语言标记是 `md` / `markdown` 的代码块，升级成渲染后的 Markdown 正文。
+ *
+ * 编辑器里这块内容是「Markdown 单元格」（见 utils/markdownCell.js），作者写的是源码；
+ * 到了阅读页 / 发布页，读者不该看到源码，所以这里统一替换成渲染结果。
+ * 渲染走的是和「从 Markdown 导入正文」同一条管线，表格、任务列表、公式的表现天然一致。
+ *
+ * 必须是整条流水线的第一步 —— 替换出来的内容里可能还有代码块和表格，
+ * 后面几步（Prism 高亮、代码块案例、复制按钮、表格包裹）要能接着处理它们。
+ *
+ * querySelectorAll 返回的是静态列表，替换产生的新节点不会进入本次遍历，
+ * 所以单元格里再套一个 `md` 代码块也不会无限递归。
+ */
+function upgradeMarkdownCells(documentNode) {
+  if (!markdownCellRenderer) return;
+  documentNode.body.querySelectorAll("pre > code").forEach((code) => {
+    if (!isMarkdownCellLanguage(codeLanguageFromElement(code).source)) return;
+    const pre = code.parentElement;
+    if (!pre) return;
+
+    let body = "";
+    try {
+      body = markdownCellRenderer(code.textContent || "");
+    } catch {
+      // 解析失败（超长、语法炸了）就保留原始代码块：宁可见到源码，也不要整页渲染崩掉
+      return;
+    }
+    if (!body || !body.trim()) return;
+
+    const holder = documentNode.createElement("div");
+    holder.className = MARKDOWN_CELL_BODY_CLASS;
+    holder.setAttribute(MARKDOWN_CELL_ATTR, "");
+    holder.innerHTML = body;
+    pre.replaceWith(holder);
+  });
+}
+
+/**
  * 语言标记为 `sample` 的代码块，升级成 输入 / 输出 对照卡片。
  *
  * 必须跑在 attachCodeCopyButtons 之前 —— 卡片的两栏本身就是
@@ -156,6 +216,8 @@ export function decorateRichHtml(rawHtml, { codeCopy = true } = {}) {
   const html = String(rawHtml || "");
   if (typeof DOMParser === "undefined") return html;
   const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+  // 先把 Markdown 单元格换成渲染结果，它产出的代码块 / 表格才能被下面几步接着处理
+  upgradeMarkdownCells(parsed);
   highlightCodeElements(parsed);
   // 先展开「代码块案例」，卡片内的两栏才能被下面两步处理到
   upgradeCodeSamples(parsed);

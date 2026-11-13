@@ -40,6 +40,7 @@ import {
   setToolbarMenuState,
 } from "@/utils/wangEditorToolbarMenus";
 import { CODE_SAMPLE_MENU_KEY } from "@/utils/wangEditorCodeSample";
+import { MD_CELL_MENU_KEY } from "@/utils/wangEditorMarkdownCell";
 import { CITATION_MENU_KEY } from "@/utils/wangEditorCitation";
 import { FORMULA_MENU_KEY } from "@/utils/wangEditorFormula";
 import { INSERT_MENU_KEY } from "@/utils/wangEditorInsertMenu";
@@ -76,6 +77,7 @@ const toolbarConfig = {
     "codeBlock",
     "codeSelectLang",
     CODE_SAMPLE_MENU_KEY,
+    MD_CELL_MENU_KEY,
     "insertLink",
     "uploadImage",
     INSERT_CARD_MENU_KEY,
@@ -111,6 +113,7 @@ const toolbarTooltipDefinitions = {
   codeBlock: { label: "代码块" },
   codeSelectLang: { label: "代码语言" },
   [CODE_SAMPLE_MENU_KEY]: { label: "代码块案例（输入 / 输出对照）" },
+  [MD_CELL_MENU_KEY]: { label: "插入 Markdown 单元格（Shift + Enter 预览）" },
   insertLink: { label: "插入链接" },
   uploadImage: { label: "上传图片" },
   [INSERT_CARD_MENU_KEY]: { label: "配置文章卡片（生物卡片 / 自定义卡片）" },

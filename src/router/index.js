@@ -22,10 +22,19 @@ const lifeTree = () => import("@/views/LifeTree.vue");
 const treeContributions = () => import("@/views/tree_contributions.vue");
 const columns = () => import("@/views/Columns.vue");
 const collectionDetail = () => import("@/views/collection_detail.vue");
+// Laup 写作（Vue 内置版）：编辑器内核在 src/laup/，页面为 src/views/laup_editor.vue。
+// 发布链路仍旧收 Laup 源码（contentFormat:'laup'），由 server/laup.js 用 Laup 渲染器重渲。
+const laupEditor = () => import("@/views/laup_editor.vue");
+// laup Notebook（Jupyter 式多格编辑器）：模块在 src/notebook/，与旧版 laup 写作互不影响。
+// 提交文章走同一条发布管道（contentFormat:'laup' → server/laup.js 重渲 → wiki-detail 展示）。
+const notebookView = () => import("@/notebook/NotebookView.vue");
+// 移动端登录授权：网页登录后生成 60 秒一次性 code，App 粘贴换会话
+const mobileAuthHandoff = () => import("@/views/MobileAuthHandoff.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    { path: "/ls/:id?", name: "ls-project", component: () => import("@/views/LSWorkspace.vue") },
     { path: "/", name: "home", component: homeView },
     { path: "/login", name: "login", component: loginView },
     { path: "/search", name: "search", component: searchView },
@@ -36,6 +45,8 @@ const router = createRouter({
     { path: "/columns", name: "columns", component: columns },
     { path: "/collections/:id", name: "collection-detail", component: collectionDetail },
     { path: "/create-post", name: "create-post", component: createPost },
+    { path: "/laup", name: "laup", component: laupEditor },
+    { path: "/notebook", name: "notebook", component: notebookView },
     { path: "/view-post/:id", name: "view-post", component: viewPost },
     { path: "/evolution-tree", name: "create-tree", component: createTree },
     { path: "/tree-contributions/:id?", name: "tree-contributions", component: treeContributions, meta: { requiresAuth: true } },
@@ -48,6 +59,7 @@ const router = createRouter({
     { path: "/notifications", name: "notifications", component: notifications, meta: { requiresAuth: true } },
     { path: "/media-library", name: "media-library", component: mediaLibrary, meta: { requiresAuth: true } },
     { path: "/drafts", name: "drafts", component: drafts, meta: { requiresAuth: true } },
+    { path: "/mobile-auth", name: "mobile-auth", component: mobileAuthHandoff, meta: { requiresAuth: true } },
     { path: "/admin/users", name: "admin-users", component: userManagement, meta: { requiresAuth: true, siteOwnerOnly: true } },
     { path: "/admin/deleted-posts/:id?", name: "admin-deleted-posts", component: deletedPosts, meta: { requiresAuth: true, siteOwnerOnly: true } },
     { path: "/admin/official-trees", name: "admin-official-trees", component: officialTrees, meta: { requiresAuth: true, roles: ["ADMIN"] } },

@@ -50,8 +50,20 @@ Desktop.ini
 # Local research corpus (not part of the Web application)
 /research/
 
+# Local debug scripts, agent memory, docs and tests (not for publishing)
+/.local-3d/
+/.workbuddy/
+/docs/
+/experiments/
+/tests/
+
 # Native application shells (this repository is Web-only)
+# Note: android/ stays (LifeSequece/src is imported by src/ls & server/lsProjects)
 /android/
 /ios/
 /src-tauri/
 /capacitor.config.*
+
+# Non-website content kept outside the repo (moved to E:/vue项目/)
+/xmind特色版/
+/xmind*/

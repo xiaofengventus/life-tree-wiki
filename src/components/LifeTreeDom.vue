@@ -10,13 +10,21 @@ import { computeLifeTreeLayout } from "@/utils/lifeTreeLayout";
 
 const props = defineProps({
   document: { type: Object, required: true },
+  layoutOverride: { type: Object, default: null },
+  selectable: { type: Boolean, default: false },
   // 需要定位高亮的节点 uid（如从搜索结果跳转进来）
   highlightNodeId: { type: String, default: "" },
+  // 已收起的节点 uid 集合（Set 或数组），由页面持有
+  collapsedIds: { type: Object, default: null },
 });
 
-const emit = defineEmits(["content-links"]);
+const emit = defineEmits(["content-links", "toggle-collapse", "preview-image", "node-select"]);
 
-const layout = computed(() => computeLifeTreeLayout(props.document?.root));
+const layout = computed(() =>
+  props.layoutOverride || computeLifeTreeLayout(props.document?.root, {
+    collapsed: props.collapsedIds,
+  }),
+);
 const brokenImages = ref(new Set());
 const rootEl = ref(null);
 const highlightedId = ref("");
@@ -48,6 +56,7 @@ function branchStyle(branch) {
       left: `${branch.x}px`,
       top: `${branch.y - 0.75}px`,
       width: `${branch.length}px`,
+      backgroundColor: branch.color || undefined,
       height: "1.5px",
     };
   }
@@ -56,6 +65,7 @@ function branchStyle(branch) {
     top: `${branch.y}px`,
     width: "1.5px",
     height: `${branch.length}px`,
+    backgroundColor: branch.color || undefined,
   };
 }
 
@@ -67,12 +77,28 @@ function labelStyle(node) {
 }
 
 function imageStyle(node) {
+  const box = node.imageBox;
+  if (!box) return {};
   return {
-    left: `${node.imageBox.left}px`,
-    top: `${node.imageBox.top}px`,
-    width: "72px",
-    height: "56px",
+    left: `${box.left}px`,
+    top: `${box.top}px`,
+    width: `${box.width}px`,
+    height: `${box.height}px`,
   };
+}
+
+function nodeTitle(node) {
+  return node.segments.map((segment) => segment.text).join(" ");
+}
+
+function toggleCollapse(node) {
+  if (!node.hasChildren) return;
+  emit("toggle-collapse", node.id);
+}
+
+function openImagePreview(node) {
+  if (!node.imageUrl) return;
+  emit("preview-image", { url: node.imageUrl, title: nodeTitle(node) });
 }
 
 function firstLinkUrl(node) {
@@ -111,12 +137,28 @@ function markImageBroken(node) {
 
     <template v-for="node in layout.nodes" :key="node.id">
       <span
-        v-if="node.segments.length || node.age || node.citationNumbers.length"
+        v-if="
+          node.segments.length ||
+          node.age ||
+          node.citationNumbers.length ||
+          node.hasChildren
+        "
         class="tree-label"
         :class="{ 'is-root': node.isRoot, 'is-highlight': node.id === highlightedId }"
         :data-node-id="node.id"
+        @click="props.selectable && emit('node-select', node.id)"
         :style="labelStyle(node)"
       >
+        <button
+          v-if="node.hasChildren"
+          type="button"
+          class="fold-toggle"
+          :class="{ 'is-collapsed': node.collapsed }"
+          :aria-expanded="!node.collapsed"
+          :aria-label="node.collapsed ? '展开分支' : '收起分支'"
+          :title="node.collapsed ? '展开分支' : '收起分支'"
+          @click.stop.prevent="toggleCollapse(node)"
+        ></button>
         <a
           v-if="node.contentLinks.length && firstLinkUrl(node)"
           :href="firstLinkUrl(node)"
@@ -139,15 +181,19 @@ function markImageBroken(node) {
           [{{ node.citationNumbers.join(",") }}]
         </sup>
         <small v-if="node.age" class="age">{{ node.age }}</small>
+        <span v-if="node.collapsed && node.hiddenCount" class="hidden-count"
+          >+{{ node.hiddenCount }}</span
+        >
       </span>
 
       <img
         v-if="node.hasImage && node.imageBox && !brokenImages.has(node.id)"
         class="tree-thumb"
         :src="node.imageUrl"
-        :alt="node.segments.map((segment) => segment.text).join(' ')"
+        :alt="nodeTitle(node)"
         :style="imageStyle(node)"
         loading="lazy"
+        @click="openImagePreview(node)"
         @error="markImageBroken(node)"
       />
     </template>
@@ -237,11 +283,64 @@ function markImageBroken(node) {
   font-size: 11px;
 }
 
+/* 缩略图：白底相框 + 等比完整显示（与编辑器里的观感一致） */
 .tree-thumb {
   position: absolute;
-  border: 1px solid #d0d3d8;
+  box-sizing: border-box;
+  padding: 3px;
+  border: 1px solid #ced3d9;
   border-radius: 4px;
   background: #fff;
-  object-fit: cover;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+.tree-thumb:hover {
+  border-color: #9aa3ad;
+}
+
+/* 收起 / 展开三角：默认朝下，收起后朝右 */
+.fold-toggle {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #7b838c;
+  cursor: pointer;
+  vertical-align: -1px;
+}
+
+.fold-toggle::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.fold-toggle:not(.is-collapsed)::before {
+  transform: rotate(90deg);
+}
+
+.fold-toggle:hover,
+.fold-toggle:focus-visible {
+  color: #1f2328;
+}
+
+/* 收起后提示这一支藏了多少后代 */
+.hidden-count {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #eef1f4;
+  color: #6b7280;
+  font-size: 10px;
+  vertical-align: 1px;
 }
 </style>

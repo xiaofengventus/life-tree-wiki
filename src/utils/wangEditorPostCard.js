@@ -1,4 +1,9 @@
-import { Boot, DomEditor, SlateTransforms } from "@wangeditor/editor";
+import {
+  Boot,
+  DomEditor,
+  SlateEditor,
+  SlateTransforms,
+} from "@wangeditor/editor";
 import { h } from "snabbdom";
 import { TAXONOMY_RANK_MAP } from "../../shared/taxonomyRanks.js";
 
@@ -49,45 +54,41 @@ function tintColor(color, strength = 0.84) {
     .join("")}`;
 }
 
-function normalizeRows(rows, type) {
+/**
+ * 行的形状统一为 `{ rankKey, label, value }`：
+ * - 正常走分类阶元：`rankKey` 有值，字段名由 TAXONOMY_RANK_MAP 决定；
+ * - `label` 只为兼容早期「自定义卡片」留下来的旧数据（那种卡片已不再提供创建入口），
+ *   旧行还能照原样显示，但不能再用来新建字段。
+ */
+function normalizeRows(rows) {
   return (Array.isArray(rows) ? rows : [])
     .slice(0, 60)
-    .map((row) => {
-      if (type !== "custom") {
-        const rankKey = cleanText(row?.rankKey, 80);
-        return {
-          rankKey: TAXONOMY_RANK_MAP.has(rankKey) ? rankKey : "",
-          value: cleanText(row?.value),
-        };
-      }
-      return {
-        label: cleanText(row?.label, 60),
-        value: cleanText(row?.value),
-      };
-    })
+    .map((row) => ({
+      rankKey: TAXONOMY_RANK_MAP.has(cleanText(row?.rankKey, 80))
+        ? cleanText(row?.rankKey, 80)
+        : "",
+      label: cleanText(row?.label, 60),
+      value: cleanText(row?.value),
+    }))
     .filter((row) =>
-      // Keep an empty taxonomy value while editing. A newly inserted card has
-      // its rank rows before their values are entered, and dropping those rows
-      // would leave no editable fields in the editor.
-      type === "custom" ? row.label || row.value : row.rankKey,
+      // 保留没填值的分类行：刚插入的卡片就是这样，全删掉就一个可填的字段都不剩。
+      row.rankKey || row.label,
     );
 }
 
 export function normalizePostCard(source = {}) {
-  const type = source.type === "custom" ? "custom" : "taxonomy";
   return {
     id: /^[A-Za-z0-9_-]{1,80}$/.test(String(source.id || "")) ? source.id : "",
-    type,
-    title: cleanText(
-      source.title || (type === "taxonomy" ? "科学分类" : "自定义卡片"),
-      80,
-    ),
+    // ⚠️ 数据里刻意不再有 `type` 字段：卡片节点本身用 `type` 标记元素类型
+    // （POST_CARD_TYPE = "life-post-card"），一旦数据里也有 `type`，`{...card}` 展开时
+    // 会把节点的 type 覆盖成 "taxonomy" → 渲染器匹配不上，插进去的是一个看不见的空节点。
+    title: cleanText(source.title || "科学分类", 80),
     color: safeColor(source.color),
     imageSrc: String(
       source.imageSrc || source.imageUrl || source.imagePreview || "",
     ),
     imageCaption: cleanText(source.imageCaption, 120),
-    rows: normalizeRows(source.rows, type),
+    rows: normalizeRows(source.rows),
   };
 }
 
@@ -159,13 +160,12 @@ function inputProps(editor, element, getValue, setValue, options = {}) {
   };
 }
 
-function renderPostCard(elemNode, _children, editor) {
+function renderPostCard(elemNode, children, editor) {
   const card = normalizePostCard(elemNode);
   const selected = DomEditor.isNodeSelected(editor, elemNode);
-  const isCustom = card.type === "custom";
   const rows = card.rows.length
     ? card.rows
-    : [isCustom ? { label: "", value: "" } : { rankKey: "kingdom", value: "" }];
+    : [{ rankKey: "kingdom", label: "", value: "" }];
   const cells = [
     card.imageSrc
       ? h("tr", { class: { "pdf-card-image": true } }, [
@@ -183,31 +183,18 @@ function renderPostCard(elemNode, _children, editor) {
       h("tr", [
         h(
           "th",
-          isCustom
-            ? {
-                ...inputProps(
-                  editor,
-                  elemNode,
-                  () => card.rows[index]?.label || "",
-                  (value) => {
-                    elemNode.rows = Array.isArray(elemNode.rows)
-                      ? elemNode.rows
-                      : [];
-                    if (!elemNode.rows[index]) elemNode.rows[index] = { label: "", value: "" };
-                    elemNode.rows[index].label = cleanText(value, 60);
-                  },
-                  { maximum: 60, label: "字段名称", placeholder: "字段名称" },
-                ),
-              }
-            : null,
-          isCustom
-            ? []
-            : [
+          row.rankKey
+            ? null
+            : // 没有阶元就是早期「自定义卡片」留下来的旧行，字段名原样显示
+              {},
+          row.rankKey
+            ? [
                 h("span", TAXONOMY_RANK_MAP.get(row.rankKey)?.zh || "字段"),
                 TAXONOMY_RANK_MAP.get(row.rankKey)?.en
                   ? h("small", TAXONOMY_RANK_MAP.get(row.rankKey).en)
                   : null,
-              ].filter(Boolean),
+              ].filter(Boolean)
+            : [h("span", row.label || "字段")],
         ),
         h(
           "td",
@@ -220,13 +207,15 @@ function renderPostCard(elemNode, _children, editor) {
                 ? elemNode.rows
                 : [];
               if (!elemNode.rows[index]) {
-                elemNode.rows[index] = isCustom
-                  ? { label: "", value: "" }
-                  : { rankKey: row.rankKey || "kingdom", value: "" };
+                elemNode.rows[index] = {
+                  rankKey: row.rankKey || "kingdom",
+                  label: row.label || "",
+                  value: "",
+                };
               }
               elemNode.rows[index].value = cleanText(value);
             },
-            { label: isCustom ? "字段内容" : "分类内容", placeholder: "填写内容" },
+            { label: "分类内容", placeholder: "填写内容" },
           ),
         ),
       ]),
@@ -258,7 +247,10 @@ function renderPostCard(elemNode, _children, editor) {
         "--classification-header-text": contrastColor(card.color),
       },
     },
+    // ⚠️ 即便这是 void 节点，也必须把 children 渲染进去：Slate 靠它做 DOM ↔ 节点的映射，
+    // 漏掉就会在插入时抛 "Unable to find the path for Slate node"，卡片永远渲染不出来。
     [
+      ...(Array.isArray(children) ? children : children ? [children] : []),
       h("a", {
         attrs: {
           href: `#post-card-${card.id}`,
@@ -310,10 +302,9 @@ export function postCardHtml(source) {
   const rows = card.rows
     .map((row) => {
       const rank = TAXONOMY_RANK_MAP.get(row.rankKey);
-      const label =
-        card.type === "custom"
-          ? `<span>${escapeHtml(row.label || "字段")}</span>`
-          : `<span>${escapeHtml(rank?.zh || "字段")}</span>${rank?.en ? `<small>${escapeHtml(rank.en)}</small>` : ""}`;
+      const label = rank
+        ? `<span>${escapeHtml(rank.zh || "字段")}</span>${rank.en ? `<small>${escapeHtml(rank.en)}</small>` : ""}`
+        : `<span>${escapeHtml(row.label || "字段")}</span>`;
       return `<tr><th>${label}</th><td>${escapeHtml(row.value || "—")}</td></tr>`;
     })
     .join("");
@@ -379,11 +370,12 @@ export function registerPostCardModule() {
   globalThis[REGISTRATION_FLAG] = true;
 }
 
-function walkNodes(nodes, callback) {
-  for (const node of nodes || []) {
-    if (node.type === POST_CARD_TYPE) callback(node);
-    if (Array.isArray(node.children)) walkNodes(node.children, callback);
-  }
+function walkNodes(nodes, callback, path = []) {
+  (nodes || []).forEach((node, index) => {
+    const at = [...path, index];
+    if (node.type === POST_CARD_TYPE) callback(node, at);
+    if (Array.isArray(node.children)) walkNodes(node.children, callback, at);
+  });
 }
 
 export function getPostCardNodes(editor) {
@@ -442,14 +434,10 @@ export function migrateLegacyPostCardMarkers(html, cards = []) {
 export function insertPostCardBlock(editor, source) {
   const card = normalizePostCard(source);
   if (!editor || !card.id) return false;
-  const nodes = [
-    {
-      type: POST_CARD_TYPE,
-      children: [{ text: "" }],
-      ...card,
-    },
-    DomEditor.genEmptyParagraph(),
-  ];
+  // ⚠️ `type` 必须写在展开之后：卡片数据早先带 `type: "taxonomy"`，放在最后会覆盖掉
+  // 节点自己的 type，导致渲染器匹配不上，插出来的是一个看不见的空节点。
+  const cardNode = { ...card, type: POST_CARD_TYPE, children: [{ text: "" }] };
+  const nodes = [cardNode, DomEditor.genEmptyParagraph()];
   // Try to focus and restore selection first
   if (editor.selection === null && typeof editor.focus === "function") {
     editor.focus();
@@ -457,7 +445,10 @@ export function insertPostCardBlock(editor, source) {
   if (editor.selection === null) editor.restoreSelection();
   // If we have a selection, insert at cursor
   if (editor.selection !== null) {
-    SlateTransforms.insertNodes(editor, nodes, { select: true });
+    // 不带 select：select 会让 Slate 立刻为新节点解析路径，而此时 DOM ↔ 节点映射还没建立，
+    // 会抛 "Unable to find the path for Slate node"。插完再把光标放到后面的空段落即可。
+    SlateTransforms.insertNodes(editor, nodes);
+    SlateTransforms.select(editor, SlateEditor.end(editor, []));
     return true;
   }
   // No selection: insert at end of document using explicit path
@@ -476,10 +467,18 @@ export function insertPostCardBlock(editor, source) {
 
 export function updatePostCardBlock(editor, source) {
   const card = normalizePostCard(source);
-  const node = getPostCardNodes(editor).find((item) => item.id === card.id);
-  if (!editor || !node) return false;
-  SlateTransforms.setNodes(editor, card, {
-    at: DomEditor.findPath(editor, node),
+  if (!editor || !card.id) return false;
+  // ⚠️ 这里不能用 DomEditor.findPath：本函数常被 Vue 的 deep watcher 同步调用，
+  // 那时刚插入的节点还没进 Slate 的 DOM ↔ 节点映射表（要等下一次渲染），
+  // findPath 会抛 "Unable to find the path for Slate node"，连锁把渲染打崩。
+  // 遍历时把路径一起带出来即可。
+  let target = null;
+  walkNodes(editor.children, (node, at) => {
+    if (node.id === card.id) target = at;
+  });
+  if (!target) return false;
+  SlateTransforms.setNodes(editor, { ...card, type: POST_CARD_TYPE }, {
+    at: target,
   });
   return true;
 }

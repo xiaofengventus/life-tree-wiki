@@ -13,7 +13,7 @@
  * 点击节点名上关联的本站文章/树时，复用原有的文章卡片阅读器（NodeContentReader）。
  * 树不可拖拽缩放，通过上下左右滚动查看；Ctrl +/− 缩放容器（不是页面缩放）。
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import navBar from "@/components/navBar.vue";
 import LifeTreeDom from "@/components/LifeTreeDom.vue";
@@ -42,7 +42,11 @@ const treeLoading = ref(false);
 const treeError = ref("");
 const contentSelection = ref(null);
 const pageRef = ref(null);
+const stageRef = ref(null);
 const zoom = ref(1);
+// 页面内的收起状态：只属于当前浏览会话，不回写文档
+const collapsedIds = ref(new Set());
+const previewImage = ref(null);
 
 // 悬浮面板
 const infoPanelOpen = ref(false);
@@ -125,6 +129,8 @@ async function loadTree(id) {
   contentSelection.value = null;
   infoPanelOpen.value = false;
   commentsPanelOpen.value = false;
+  previewImage.value = null;
+  collapsedIds.value = new Set();
   try {
     tree.value = await fetchTree(id);
   } catch (error) {
@@ -146,19 +152,73 @@ function backToList() {
   router.push("/life-tree");
 }
 
-function setZoom(value) {
-  zoom.value = Math.min(3, Math.max(0.4, value));
+const MIN_ZOOM = 0.4;
+const MAX_ZOOM = 3;
+
+function clampZoom(value) {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+}
+
+/**
+ * 缩放并把锚点钉在原地。
+ * 直接改 zoom 时浏览器会保持 scrollLeft/scrollTop 不变，而画布尺寸变了，
+ * 于是视口中心对应的树坐标会漂移；这里先记下锚点在画布内的归一化位置，
+ * 缩放完成后再回设滚动条把它拉回原处。
+ * 不传 clientX/clientY 时以视口中心为锚点（按钮、快捷键）。
+ */
+async function applyZoom(nextZoom, clientX, clientY) {
+  const clamped = clampZoom(nextZoom);
+  const scroller = pageRef.value;
+  const stage = stageRef.value;
+  if (!scroller || !stage || clamped === zoom.value) {
+    zoom.value = clamped;
+    return;
+  }
+  const scrollerRect = scroller.getBoundingClientRect();
+  const before = stage.getBoundingClientRect();
+  const anchorX =
+    typeof clientX === "number" ? clientX : scrollerRect.left + scroller.clientWidth / 2;
+  const anchorY =
+    typeof clientY === "number" ? clientY : scrollerRect.top + scroller.clientHeight / 2;
+  const ratioX = before.width ? (anchorX - before.left) / before.width : 0.5;
+  const ratioY = before.height ? (anchorY - before.top) / before.height : 0.5;
+
+  zoom.value = clamped;
+  await nextTick();
+
+  const after = stage.getBoundingClientRect();
+  scroller.scrollLeft += after.left + ratioX * after.width - anchorX;
+  scroller.scrollTop += after.top + ratioY * after.height - anchorY;
 }
 
 function zoomIn() {
-  setZoom(zoom.value * 1.15);
+  applyZoom(zoom.value * 1.15);
 }
 
 function zoomOut() {
-  setZoom(zoom.value / 1.15);
+  applyZoom(zoom.value / 1.15);
+}
+
+function resetZoom() {
+  applyZoom(1);
+}
+
+function toggleCollapse(nodeId) {
+  const next = new Set(collapsedIds.value);
+  if (next.has(nodeId)) next.delete(nodeId);
+  else next.add(nodeId);
+  collapsedIds.value = next;
+}
+
+function openImagePreview(payload) {
+  previewImage.value = payload;
 }
 
 function handleKeydown(event) {
+  if (event.key === "Escape" && previewImage.value) {
+    previewImage.value = null;
+    return;
+  }
   if (!event.ctrlKey || event.altKey || event.metaKey) return;
   if (event.key === "=" || event.key === "+") {
     event.preventDefault();
@@ -168,14 +228,19 @@ function handleKeydown(event) {
     zoomOut();
   } else if (event.key === "0") {
     event.preventDefault();
-    setZoom(1);
+    resetZoom();
   }
 }
 
 function handleWheel(event) {
   if (!event.ctrlKey) return;
   event.preventDefault();
-  setZoom(zoom.value * (event.deltaY < 0 ? 1.1 : 1 / 1.1));
+  // 滚轮以鼠标指着的位置为锚点，缩放手感更自然
+  applyZoom(
+    zoom.value * (event.deltaY < 0 ? 1.1 : 1 / 1.1),
+    event.clientX,
+    event.clientY,
+  );
 }
 
 onMounted(() => {
@@ -196,6 +261,7 @@ onBeforeUnmount(() => {
   <main ref="pageRef" class="life-tree-page" aria-label="生命树">
     <!-- 列表状态：识别服务器上的全部树（分页） -->
     <section v-if="!currentTreeId" class="tree-list" aria-label="进化树列表">
+      <RouterLink to="/ls" class="tree-title">LS 工程主树与协作</RouterLink>
       <p v-if="listLoading" class="state">正在加载树列表...</p>
       <p v-else-if="listError" class="state error">{{ listError }}</p>
       <p v-else-if="!treeList.length" class="state">暂无进化树。</p>
@@ -229,12 +295,15 @@ onBeforeUnmount(() => {
       <p v-else-if="treeError" class="state error">{{ treeError }}</p>
       <p v-else-if="!document" class="state">没有可显示的树内容。</p>
       <div v-else class="life-tree-scroll">
-        <div class="life-tree-stage" :style="{ zoom }">
+        <div ref="stageRef" class="life-tree-stage" :style="{ zoom }">
           <LifeTreeDom
             :key="currentTreeId"
             :document="document"
             :highlight-node-id="highlightNodeId"
+            :collapsed-ids="collapsedIds"
             @content-links="contentSelection = { ...$event, currentTreeId }"
+            @toggle-collapse="toggleCollapse"
+            @preview-image="openImagePreview"
           />
         </div>
       </div>
@@ -245,7 +314,7 @@ onBeforeUnmount(() => {
           <button type="button" aria-label="缩小" @click="zoomOut">−</button>
           <span class="zoom-value">{{ Math.round(zoom * 100) }}%</span>
           <button type="button" aria-label="放大" @click="zoomIn">＋</button>
-          <button type="button" aria-label="重置缩放" @click="setZoom(1)">⟲</button>
+          <button type="button" aria-label="重置缩放" @click="resetZoom">⟲</button>
         </div>
       </div>
 
@@ -397,6 +466,23 @@ onBeforeUnmount(() => {
         :selection="contentSelection"
         @close="contentSelection = null"
       />
+
+      <!-- 缩略图大图预览 -->
+      <Teleport to="body">
+        <div
+          v-if="previewImage"
+          class="image-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="图片预览"
+          @click="previewImage = null"
+        >
+          <figure>
+            <img :src="previewImage.url" :alt="previewImage.title || '节点图片'" />
+            <figcaption v-if="previewImage.title">{{ previewImage.title }}</figcaption>
+          </figure>
+        </div>
+      </Teleport>
     </template>
   </main>
 </template>
@@ -807,6 +893,42 @@ onBeforeUnmount(() => {
 .panel-slide-leave-to {
   transform: translateX(24px);
   opacity: 0;
+}
+
+/* 缩略图大图预览：白色相框，点任意处或按 Esc 关闭 */
+.image-lightbox {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 44px;
+  background: rgba(17, 24, 39, 0.74);
+  cursor: zoom-out;
+}
+
+.image-lightbox figure {
+  display: grid;
+  max-width: min(1100px, 92vw);
+  max-height: 100%;
+  gap: 10px;
+  margin: 0;
+  justify-items: center;
+}
+
+.image-lightbox img {
+  max-width: 100%;
+  max-height: calc(100vh - 150px);
+  border: 6px solid #fff;
+  border-radius: 6px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.image-lightbox figcaption {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  text-align: center;
 }
 
 @media (max-width: 640px) {

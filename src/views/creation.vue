@@ -89,8 +89,9 @@ function goToMakeTree() {
 }
 
 function continueEditDraft(draft) {
-  const location = draftEditorLocation(draft);
-  router.push(location);
+  // Laup / 文章 / 树 三种草稿现在都在 Vue 路由表里，一律客户端跳转。
+  // （变量名别叫 location —— 会盖住全局 window.location）
+  router.push(draftEditorLocation(draft));
 }
 
 function goToPublished(url) {
@@ -180,7 +181,7 @@ onMounted(loadData);
               class="list-item"
             >
               <span class="item-type">{{
-                draft.contentType === "TREE" ? "进化树" : "文章"
+                { TREE: "进化树", LAUP: "Laup 文章" }[draft.contentType] || "文章"
               }}</span>
               <h4>{{ draft.title || "未命名草稿" }}</h4>
               <div class="item-meta">

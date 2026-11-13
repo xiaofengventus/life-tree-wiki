@@ -1,8 +1,18 @@
 import { ApiError } from "./http.js";
+import { SITE_OWNER_PUBLIC_ID } from "./auth.js";
 
 export const PRIVATE_WORK_LIMIT = 5;
 export const PUBLIC_VISIBILITY = "PUBLIC";
 export const PRIVATE_VISIBILITY = "PRIVATE";
+
+// 站点所有者（uid==1，public_id=1）保存私密作品不限量；其余用户共用
+// PRIVATE_WORK_LIMIT 个槽位（文章 + 进化树合计）。兼容两种入参形态：
+// 数据库原始行（有 public_id）和 publicUser 对象（有 isSiteOwner 布尔值）。
+export function isPrivateWorkUnlimited(user) {
+  return (
+    Number(user?.public_id) === SITE_OWNER_PUBLIC_ID || user?.isSiteOwner === true
+  );
+}
 
 export function normalizeVisibility(value, fallback = PUBLIC_VISIBILITY) {
   const visibility = String(value || fallback).toUpperCase();
