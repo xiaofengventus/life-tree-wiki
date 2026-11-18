@@ -3,6 +3,7 @@ import {
   internalPostIdFromUrl,
   internalTreeIdFromUrl,
 } from "./articleLinks.js";
+import { normalizeTreeScience, normalizeNodeScience } from "../../shared/treeScience.js";
 
 const SUPPORTED_LAYOUTS = new Set([
   "logicalStructure",
@@ -213,7 +214,7 @@ export function normalizeNodeCitationNumbers(value, availableNumbers = null) {
 function sanitizeNodeResources(
   node,
   seenUids = new Set(),
-  availableCitations = null,
+  availableCitations = null, isRoot = true,
 ) {
   const uid = String(node.data.uid || "");
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(uid) || seenUids.has(uid)) {
@@ -232,8 +233,13 @@ function sanitizeNodeResources(
   delete node.data.hyperlinkTitle;
   node.data.image = safeResourceUrl(node.data.image, { image: true });
   if (!node.data.image) node.data.imageSize = undefined;
+  const normalizedScience = normalizeNodeScience(node.data, { isRoot, availableCitations });
+  node.data.text = normalizedScience.text;
+  node.data.taxon = normalizedScience.taxon;
+  node.data.branch = normalizedScience.branch;
+  node.data.isExtinct = normalizedScience.taxon.status === "extinct";
   node.children.forEach((child) =>
-    sanitizeNodeResources(child, seenUids, availableCitations),
+    sanitizeNodeResources(child, seenUids, availableCitations, false),
   );
 }
 
@@ -243,11 +249,16 @@ export function createMindMapNode(text = "", children = [], data = {}) {
   delete sourceData.hyperlinkTitle;
   delete sourceData.articleLinks;
   delete sourceData.contentLinks;
+  const normalizedScience = normalizeNodeScience({ ...sourceData, text: String(text ?? "") }, { isRoot: false });
   return {
     data: {
       ...sourceData,
       uid: data.uid || createUid(),
-      text: String(text ?? ""),
+     //  text: String(text ?? ""),
+     text: normalizedScience.text,
+     taxon: normalizedScience.taxon,
+     branch: normalizedScience.branch,
+     isExtinct: normalizedScience.taxon.status === "extinct",
       expand: data.expand !== false,
       contentLinks: normalizeContentLinks(
         data.contentLinks ?? data.articleLinks,
@@ -270,6 +281,7 @@ function restoreLegacyEmptyNodeLabels(node) {
 
 export function createInitialMindMapDocument() {
   return {
+    scientific: normalizeTreeScience(null),
     citations: [],
     layout: "logicalStructure",
     evolution: {
@@ -378,7 +390,8 @@ export function normalizeMindMapDocument(value) {
     document.citations.map((citation) => citation.number),
   );
   restoreLegacyEmptyNodeLabels(document.root);
-  sanitizeNodeResources(document.root, new Set(), availableCitations);
+  sanitizeNodeResources(document.root, new Set(), availableCitations, true);
+  document.scientific = normalizeTreeScience(document.scientific);
   document.layout = SUPPORTED_LAYOUTS.has(document.layout)
     ? document.layout
     : "logicalStructure";
