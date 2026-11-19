@@ -2,6 +2,7 @@ import { ApiError } from "./http.js";
 import { formatPublicId, parsePublicId } from "./publicIds.js";
 import { mediaUrl } from "./media.js";
 import { sanitizeCitations } from "./citations.js";
+import { normalizeTreeScience, normalizeNodeScience } from "../shared/treeScience.js";
 
 const MAX_TREE_BYTES = 4 * 1024 * 1024;
 const MAX_NODES = 10_000;
@@ -204,9 +205,11 @@ function sanitizeNode(source, state, depth) {
   const image = safeResourceUrl(source.data.image, { image: true });
   const shape = SAFE_SHAPES.has(source.data.shape) ? source.data.shape : "rectangle";
   const nodeText = limitedString(source.data.text, 500);
+ const normalizedScience = normalizeNodeScience({ ...source.data, text: LEGACY_EMPTY_NODE_LABELS.has(nodeText) ? "" : nodeText }, { isRoot: depth === 0, availableCitations: state.availableCitations });
   const data = {
     uid,
-    text: LEGACY_EMPTY_NODE_LABELS.has(nodeText) ? "" : nodeText,
+    text: normalizedScience.text, taxon: normalizedScience.taxon, branch: normalizedScience.branch, isExtinct: normalizedScience.taxon.status === "extinct",
+    // te// xt: LnormalizedScience.text, // EGACY_EMPTY_NODE_LABELS.has(nodeText) ? "" : nodeText,
     expand: source.data.expand !== false,
     contentLinks: safeContentLinks(
       source.data.contentLinks ?? source.data.articleLinks,
@@ -285,6 +288,7 @@ export function sanitizeTreeDocument(value) {
   };
   const config = source.theme?.config || {};
   const document = {
+    scientific: normalizeTreeScience(source.scientific),
     citations,
     layout: SUPPORTED_LAYOUTS.has(source.layout) ? source.layout : "logicalStructure",
     evolution: {
