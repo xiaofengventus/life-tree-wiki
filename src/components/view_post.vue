@@ -40,6 +40,7 @@
           <header class="post-header">
             <span class="article-kicker">LIFE SEQUENCE JOURNAL</span>
             <h1 id="post-title">{{ post.title || "未命名帖子" }}</h1>
+            <p v-if="post.articleTemplate">写作模板：{{ articleTemplateLabel(post.articleTemplate) }}</p>
             <div class="author-row">
               <RouterLink v-if="post.creatorUid" class="author-avatar" :to="`/users/${post.creatorUid}`">
                 <img
@@ -158,6 +159,7 @@ import ResearchTreeEmbed from "@/components/ResearchTreeEmbed.vue";
 import ContentInteractions from "@/components/ContentInteractions.vue";
 import PostClassificationCard from "@/components/PostClassificationCard.vue";
 import ContentSourcesDisplay from "@/components/ContentSourcesDisplay.vue";
+import { articleTemplateLabel } from "../../shared/articleTemplates.js";
 
 const route = useRoute();
 const router = useRouter();

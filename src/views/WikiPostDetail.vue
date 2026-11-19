@@ -21,6 +21,7 @@ import { renderNotebookDoc } from "@/notebook/renderer.js";
 // Laup 阅读面样式（文献列表 / 引用上标 / 图示 / sample 围栏…全部 .doc 作用域）。
 // 以前只有旧编辑器的实时预览引入了它，文章详情页的服务端渲染产物全是裸 HTML。
 import "@/laup/laup.css";
+import { articleTemplateLabel } from "../../shared/articleTemplates.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -45,9 +46,9 @@ const canDelete = computed(() => isCreator.value || userStore.isSiteOwner);
 
 function updatePost() {
   if (!isCreator.value || !post.value) return;
-  // Laup 正文回 Notebook 编辑（源码在 post.contentSource）；富文本正文才走 create-post
+  // 有文章模板的 Laup 文档回原 Laup 写作页；通用 Notebook 保持原入口。
   if (post.value.contentType === "laup") {
-    router.push(`/notebook?edit=${encodeURIComponent(post.value.id)}`);
+    router.push({ path: post.value.articleTemplate ? "/laup" : "/notebook", query: { edit: post.value.id } });
     return;
   }
   router.push(`/create-post?edit=${encodeURIComponent(post.value.id)}`);
@@ -244,12 +245,13 @@ async function rollbackTo(revision) {
       author: post.value.author || undefined,
       content: snapshot.contentType === "laup" ? snapshot.contentSource : snapshot.content,
       contentFormat: snapshot.contentType === "laup" ? "laup" : "html",
+      articleTemplate: snapshot.articleTemplate,
       tags: post.value.tags || [],
       type: post.value.type || "",
       license: post.value.license || "支持闭源",
       visibility: post.value.visibility || "PUBLIC",
-      citations: post.value.citations || [],
-      classificationCards: post.value.classificationCards || [],
+      citations: snapshot.citations || [],
+      classificationCards: snapshot.classificationCards || [],
       changeNote: `回滚到 r${revision.revisionCount}`,
     });
     window.alert(`已恢复到 r${revision.revisionCount}，本次恢复记为一次新修订。`);
@@ -385,6 +387,7 @@ function handleAnchorClick(event) {
             </div>
           </div>
           <p>{{ post.author || post.creator || "未署名" }} · {{ formatDateTime(post.updatedAt || post.submittedAt) }}</p>
+          <p v-if="post.articleTemplate">写作模板：{{ articleTemplateLabel(post.articleTemplate) }}（章节可按内容调整）</p>
         </header>
 
         <section v-if="activeTab === 'article'" ref="articleEl" class="article-content">
@@ -440,6 +443,7 @@ function handleAnchorClick(event) {
                 <span class="rev-editor">{{ r.editor || "匿名" }}</span>
                 <time>{{ formatDateTime(r.submittedAt) }}</time>
                 <span class="rev-note">{{ r.note || "" }}</span>
+                <span v-if="r.articleTemplate">{{ articleTemplateLabel(r.articleTemplate) }}</span>
                 <span class="rev-actions">
                   <button
                     v-if="r.revisionCount > 1"

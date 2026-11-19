@@ -1,6 +1,7 @@
 export const ARTICLE_TEMPLATES = Object.freeze([
   {
     id: "taxon",
+    version: 1,
     name: "生物／分类群条目",
     badge: "分类群",
     summary: "适用于物种、属、科或高阶演化支的基础百科条目，结构清晰、便于与进化树节点互相引用。",
@@ -34,6 +35,7 @@ export const ARTICLE_TEMPLATES = Object.freeze([
   },
   {
     id: "evolution-topic",
+    version: 1,
     name: "演化专题",
     badge: "专题",
     summary: "适用于跨类群演化事件、关键性状起源、宏演化假说或分类学争议的深度综述。",
@@ -67,6 +69,7 @@ export const ARTICLE_TEMPLATES = Object.freeze([
   },
   {
     id: "research-brief",
+    version: 1,
     name: "研究解读／新闻",
     badge: "研究解读",
     summary: "适用于新发表论文、化石新发现或系统发育修订的快速准确解读。",
@@ -151,7 +154,7 @@ export function validateArticleDraft({
   });
   if (!hasTitle) warnings.push("尚未填写文章标题。");
 
-  const hasHeadings = /<h[23]\b/i.test(html);
+  const hasHeadings = /<h[23]\b/i.test(html) || /^#{2,3}\s/m.test(html);
   checklist.push({
     id: "structure",
     label: "章节层级",
@@ -206,4 +209,68 @@ export function validateArticleDraft({
   }
 
   return { warnings, checklist };
+}
+
+// 持久化只记录模板 id 与版本；章节内容仍属于可编辑正文。
+export function normalizeArticleTemplate(value) {
+  if (!value || typeof value !== "object") return null;
+  const id = String(value.id || "");
+  const template = ARTICLE_TEMPLATE_MAP.get(id);
+  const version = Number(value.version);
+  if (!template || !Number.isInteger(version) || version < 1) return null;
+  return { id, version };
+}
+
+export function parseArticleTemplate(value) {
+  try {
+    return normalizeArticleTemplate(typeof value === "string" ? JSON.parse(value) : value);
+  } catch {
+    return null;
+  }
+}
+
+export function articleTemplateLabel(value) {
+  const template = ARTICLE_TEMPLATE_MAP.get(normalizeArticleTemplate(value)?.id);
+  const normalized = normalizeArticleTemplate(value);
+  return template ? `${template.name} · v${normalized.version}` : "自由写作";
+}
+
+export function articleTemplateSections(id, { automaticReferences = true } = {}) {
+  const template = getArticleTemplate(id);
+  if (!template) return [];
+  return template.sections
+    .filter((section) => !(automaticReferences && section.heading === "参考文献"))
+    .map((section) => ({ heading: section.heading, text: section.guidance }));
+}
+
+export function buildArticleTemplateLaup(templateId) {
+  const template = getArticleTemplate(templateId);
+  if (!template) return "";
+  return template.sections
+    .map((section) => `## ${section.heading}\n\n${section.guidance}`)
+    .join("\n\n");
+}
+
+// 追加而非覆盖，避免丢失正文、嵌入与引用标记。
+export function applyArticleTemplate(
+  content,
+  templateId,
+  { format = "html" } = {},
+) {
+  const template = getArticleTemplate(templateId);
+  if (!template) return { content: String(content ?? ""), articleTemplate: null };
+  const laup = format === "laup";
+  const sections = articleTemplateSections(templateId, {
+    automaticReferences: !laup,
+  });
+  const fragment = laup
+    ? sections.map(({ heading, text }) => `## ${heading}\n\n${text}`).join("\n\n")
+    : sections
+        .map(({ heading, text }) => `<h2>${escapeHtml(heading)}</h2><p>${escapeHtml(text)}</p>`)
+        .join("");
+  const original = String(content ?? "");
+  return {
+    content: original ? `${original}${laup ? "\n\n" : ""}${fragment}` : fragment,
+    articleTemplate: { id: template.id, version: template.version },
+  };
 }
