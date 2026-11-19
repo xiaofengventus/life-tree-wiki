@@ -1,9 +1,16 @@
 import {
+  XUR_FORMAT,
+  XUR_VERSION,
+  normalizeTreeScience,
+  normalizeNodeScience,
+  validateScientificTree,
+} from "../../shared/treeScience.js";
+
+import {
   internalContentUrl,
   internalPostIdFromUrl,
   internalTreeIdFromUrl,
 } from "./articleLinks.js";
-import { normalizeTreeScience, normalizeNodeScience } from "../../shared/treeScience.js";
 
 const SUPPORTED_LAYOUTS = new Set([
   "logicalStructure",
@@ -13,8 +20,7 @@ const SUPPORTED_LAYOUTS = new Set([
   "catalogOrganization",
 ]);
 
-export const XUR_FORMAT = "life-tree.xur";
-export const XUR_VERSION = 6;
+export { XUR_FORMAT, XUR_VERSION };
 const MAX_CITATIONS = 200;
 const MAX_CITATION_NUMBER = 9_999;
 const MAX_NODE_CITATIONS = 20;
@@ -217,9 +223,11 @@ function sanitizeNodeResources(
   availableCitations = null, isRoot = true,
 ) {
   const uid = String(node.data.uid || "");
-  if (!/^[A-Za-z0-9_-]{1,100}$/.test(uid) || seenUids.has(uid)) {
-    node.data.uid = createUid();
+  if (uid && seenUids.has(uid)) throw new Error(`进化树存在重复 UID：${uid}`);
+  if (uid && !/^[A-Za-z0-9_-]{1,100}$/.test(uid)) {
+    throw new Error(`进化树节点 UID 无效：${uid}`);
   }
+  if (!uid) node.data.uid = createUid();
   seenUids.add(node.data.uid);
   node.data.contentLinks = normalizeContentLinks(
     node.data.contentLinks ?? node.data.articleLinks,
@@ -254,11 +262,10 @@ export function createMindMapNode(text = "", children = [], data = {}) {
     data: {
       ...sourceData,
       uid: data.uid || createUid(),
-     //  text: String(text ?? ""),
-     text: normalizedScience.text,
-     taxon: normalizedScience.taxon,
-     branch: normalizedScience.branch,
-     isExtinct: normalizedScience.taxon.status === "extinct",
+      text: normalizedScience.text,
+      taxon: normalizedScience.taxon,
+      branch: normalizedScience.branch,
+      isExtinct: normalizedScience.taxon.status === "extinct",
       expand: data.expand !== false,
       contentLinks: normalizeContentLinks(
         data.contentLinks ?? data.articleLinks,
@@ -281,8 +288,8 @@ function restoreLegacyEmptyNodeLabels(node) {
 
 export function createInitialMindMapDocument() {
   return {
-    scientific: normalizeTreeScience(null),
     citations: [],
+    scientific: normalizeTreeScience(),
     layout: "logicalStructure",
     evolution: {
       nodeLineStyle: true,
@@ -378,6 +385,8 @@ function assertNode(node, path = "root") {
 }
 
 export function normalizeMindMapDocument(value) {
+  const validation = validateScientificTree(value);
+  if (validation.errors.length) throw new Error(validation.errors.join("；"));
   const source = value?.format === XUR_FORMAT ? value.document : value;
   if (!source?.root || !source.root.data) {
     throw new Error("仅支持新版 life-tree.xur 或 simple-mind-map 完整文档");
@@ -385,13 +394,13 @@ export function normalizeMindMapDocument(value) {
 
   const document = clone(source);
   assertNode(document.root);
+  document.scientific = normalizeTreeScience(document.scientific);
   document.citations = normalizeTreeCitations(document.citations);
   const availableCitations = new Set(
     document.citations.map((citation) => citation.number),
   );
   restoreLegacyEmptyNodeLabels(document.root);
   sanitizeNodeResources(document.root, new Set(), availableCitations, true);
-  document.scientific = normalizeTreeScience(document.scientific);
   document.layout = SUPPORTED_LAYOUTS.has(document.layout)
     ? document.layout
     : "logicalStructure";
@@ -402,40 +411,17 @@ export function normalizeMindMapDocument(value) {
     config: {
       ...defaultTheme,
       ...savedTheme,
-      backgroundColor: "#ffffff",
-      lineColor: "#000000",
-      lineWidth: 1,
-      lineStyle: "straight",
-      lineRadius: 0,
       root: {
         ...defaultTheme.root,
         ...savedTheme.root,
-        shape: "rectangle",
-        fillColor: "#ffffff",
-        color: "#000000",
-        borderColor: "#ffffff",
-        borderWidth: 0,
-        borderRadius: 0,
       },
       second: {
         ...defaultTheme.second,
         ...savedTheme.second,
-        shape: "rectangle",
-        fillColor: "#ffffff",
-        color: "#000000",
-        borderColor: "#ffffff",
-        borderWidth: 0,
-        borderRadius: 0,
       },
       node: {
         ...defaultTheme.node,
         ...savedTheme.node,
-        shape: "rectangle",
-        fillColor: "#ffffff",
-        color: "#000000",
-        borderColor: "#ffffff",
-        borderWidth: 0,
-        borderRadius: 0,
       },
     },
   };

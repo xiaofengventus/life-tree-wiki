@@ -1,3 +1,9 @@
+import { TAXONOMY_RANK_MAP } from "./taxonomyRanks.js";
+
+export const XUR_FORMAT = "life-tree.xur";
+// File schema version, independent of a published tree's revision number.
+export const XUR_VERSION = 7;
+
 export const TREE_KINDS = Object.freeze([
   {
     value: "unspecified",
@@ -83,8 +89,8 @@ export function normalizeTreeScience(value) {
   const kind = TREE_KIND_MAP.has(rawKind) ? rawKind : "unspecified";
   return {
     kind,
-    description: limitedText(source.description, 1000),
-    branchLengthUnit: limitedText(source.branchLengthUnit, 80),
+    description: limitedText(source.description, 2000),
+    branchLengthUnit: limitedText(source.branchLengthUnit, 120),
   };
 }
 
@@ -139,7 +145,7 @@ export function normalizeNodeScience(
         ),
       };
 
-  return { taxon, branch, text };
+  return { taxon, branch, text: formatTaxonDisplayText(text, taxon) };
 }
 
 export function formatTaxonDisplayText(text, taxon) {
@@ -156,6 +162,19 @@ export function validateScientificTree(document) {
   const errors = [];
   const warnings = [];
 
+  if (document?.format === XUR_FORMAT) {
+    const version = document.version;
+    if (
+      version !== undefined &&
+      (!Number.isSafeInteger(version) || version < 1 || version > XUR_VERSION)
+    ) {
+      errors.push(
+        `不支持的 .xur 文件格式版本 ${limitedText(version, 20)}（当前支持至 v${XUR_VERSION}）。`,
+      );
+    }
+    document = document.document;
+  }
+
   if (!document || typeof document !== "object" || !document.root?.data) {
     errors.push("缺少有效的进化树根节点结构。");
     return { errors, warnings };
@@ -169,6 +188,10 @@ export function validateScientificTree(document) {
       .filter((num) => Number.isInteger(num) && num > 0),
   );
 
+  const rawKind = limitedText(document.scientific?.kind, 40);
+  if (rawKind && !TREE_KIND_MAP.has(rawKind)) {
+    errors.push(`未知的树类型“${rawKind}”。`);
+  }
   if (scientific.kind === "unspecified") {
     warnings.push("尚未指定树类型：请明确区分“分类层级树”与“系统发育树 / 支序图 / 年代树”。");
   }
@@ -191,7 +214,8 @@ export function validateScientificTree(document) {
     const label = String(node.data.text || "").trim() || uid || "未命名节点";
 
     if (!uid) {
-      errors.push(`节点“${label}”缺少稳定 UID。`);
+      // 服务端保存时会生成 UID；这里只提示，不阻止旧文件导入。
+      warnings.push(`节点“${label}”缺少稳定 UID，保存时将自动生成。`);
     } else if (seenUids.has(uid)) {
       duplicateUids.add(uid);
     } else {
@@ -200,6 +224,33 @@ export function validateScientificTree(document) {
 
     const rawTaxon = node.data.taxon && typeof node.data.taxon === "object" ? node.data.taxon : {};
     const rawBranch = node.data.branch && typeof node.data.branch === "object" ? node.data.branch : {};
+
+    const rawRankKey = limitedText(rawTaxon.rankKey, 80);
+    if (rawRankKey && !TAXONOMY_RANK_MAP.has(rawRankKey)) {
+      errors.push(`节点“${label}”的分类阶元“${rawRankKey}”不受支持。`);
+    }
+    const rawStatus = limitedText(rawTaxon.status, 20);
+    if (rawStatus && !TAXON_STATUS_SET.has(rawStatus)) {
+      errors.push(`节点“${label}”的存续状态“${rawStatus}”不受支持。`);
+    }
+    if (
+      rawBranch.citationNumbers !== null &&
+      rawBranch.citationNumbers !== undefined &&
+      !Array.isArray(rawBranch.citationNumbers)
+    ) {
+      errors.push(`节点“${label}”的分支引用必须是编号数组。`);
+    }
+
+    for (const [, value, path] of [
+      ["ageMa", rawTaxon.ageMa, "年代（ageMa）"],
+      ["length", rawBranch.length, "枝长"],
+      ["support", rawBranch.support, "分支支持度"],
+    ]) {
+      if (value === null || value === undefined || value === "") continue;
+      if (!Number.isFinite(Number(value))) {
+        errors.push(`节点“${label}”的${path}必须是有限数字。`);
+      }
+    }
 
     const ageMa = optionalFiniteNumber(rawTaxon.ageMa);
     if (ageMa !== null) {
@@ -247,7 +298,10 @@ export function validateScientificTree(document) {
 
       if (Array.isArray(rawBranch.citationNumbers)) {
         for (const num of rawBranch.citationNumbers) {
-          if (!availableCitations.has(Number(num))) {
+          const number = Number(num);
+          if (!Number.isSafeInteger(number) || number < 1) {
+            errors.push(`节点“${label}”的分支引用编号“${String(num)}”无效。`);
+          } else if (!availableCitations.has(number)) {
             invalidBranchCitations += 1;
           }
         }
