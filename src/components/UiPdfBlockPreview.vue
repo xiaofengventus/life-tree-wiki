@@ -304,13 +304,16 @@ h6.ui-pdf-heading {
 }
 
 .ui-pdf-tree :deep(.research-tree-embed) {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
   margin: 0;
   border-radius: 0;
 }
 
 .ui-pdf-tree :deep(.embed-canvas) {
-  height: calc(100% - 46px);
+  min-height: 0;
+  height: auto;
 }
 
 .ui-pdf-card {

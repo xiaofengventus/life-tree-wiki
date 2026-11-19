@@ -12,9 +12,10 @@
   ============================================================================
 -->
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import evolution_mind_map from "@/components/evolution_mind_map.vue";
 import NodeContentReader from "@/components/NodeContentReader.vue";
+import { getTreeKindMeta, normalizeTreeScience } from "../../shared/treeScience.js";
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
@@ -23,6 +24,8 @@ const props = defineProps({
 });
 
 const contentSelection = ref(null);
+const treeScience = computed(() => normalizeTreeScience(props.modelValue?.scientific));
+const treeKindMeta = computed(() => getTreeKindMeta(treeScience.value.kind));
 
 watch(
   () => props.modelValue,
@@ -33,6 +36,14 @@ watch(
 </script>
 
 <template>
+  <div
+    v-if="treeScience.kind !== 'unspecified' || treeScience.description"
+    class="tree-science-banner"
+  >
+    <strong>{{ treeKindMeta.label }}</strong>
+    <span v-if="treeScience.description"> · {{ treeScience.description }}</span>
+    <span class="tree-science-note">（当前画布布局不按枝长或年代比例绘制）</span>
+  </div>
   <evolution_mind_map
     :model-value="modelValue"
     read-only
@@ -45,3 +56,15 @@ watch(
     @close="contentSelection = null"
   />
 </template>
+
+<style scoped>
+.tree-science-banner {
+  padding: 8px 14px;
+  border-bottom: 1px solid #d5dfd8;
+  background: #f7faf6;
+  color: #3d5748;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.tree-science-note { color: #6b7c71; }
+</style>

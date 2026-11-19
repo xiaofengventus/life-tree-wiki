@@ -2,6 +2,12 @@ import { ApiError } from "./http.js";
 import { formatPublicId, parsePublicId } from "./publicIds.js";
 import { mediaUrl } from "./media.js";
 import { sanitizeCitations } from "./citations.js";
+import {
+  XUR_FORMAT,
+  normalizeTreeScience,
+  normalizeNodeScience,
+  validateScientificTree,
+} from "../shared/treeScience.js";
 
 const MAX_TREE_BYTES = 4 * 1024 * 1024;
 const MAX_NODES = 10_000;
@@ -195,18 +201,32 @@ function sanitizeNode(source, state, depth) {
   state.count += 1;
   if (state.count > MAX_NODES) throw new ApiError(413, "进化树节点数量超过 10000", "TREE_TOO_LARGE");
 
-  let uid = limitedString(source.data.uid, 100);
-  if (!/^[A-Za-z0-9_-]{1,100}$/.test(uid) || state.uids.has(uid)) {
-    uid = `life-node-${crypto.randomUUID()}`;
+  let uid = String(source.data.uid ?? "");
+  if (uid && state.uids.has(uid)) {
+    throw new ApiError(400, `进化树存在重复 UID：${uid}`, "TREE_DUPLICATE_UID");
   }
+  if (uid && !/^[A-Za-z0-9_-]{1,100}$/.test(uid)) {
+    throw new ApiError(400, "进化树节点 UID 无效", "INVALID_TREE_UID");
+  }
+  if (!uid) uid = `life-node-${crypto.randomUUID()}`;
   state.uids.add(uid);
 
   const image = safeResourceUrl(source.data.image, { image: true });
   const shape = SAFE_SHAPES.has(source.data.shape) ? source.data.shape : "rectangle";
   const nodeText = limitedString(source.data.text, 500);
+  const science = normalizeNodeScience(
+    {
+      ...source.data,
+      text: LEGACY_EMPTY_NODE_LABELS.has(nodeText) ? "" : nodeText,
+    },
+    { isRoot: depth === 0, availableCitations: state.availableCitations },
+  );
   const data = {
     uid,
-    text: LEGACY_EMPTY_NODE_LABELS.has(nodeText) ? "" : nodeText,
+    text: science.text,
+    taxon: science.taxon,
+    branch: science.branch,
+    isExtinct: science.taxon.status === "extinct",
     expand: source.data.expand !== false,
     contentLinks: safeContentLinks(
       source.data.contentLinks ?? source.data.articleLinks,
@@ -264,7 +284,11 @@ export function sanitizeTreeDocument(value) {
   if (new TextEncoder().encode(serialized).byteLength > MAX_TREE_BYTES) {
     throw new ApiError(413, "进化树文件超过 4MB", "TREE_TOO_LARGE");
   }
-  const source = value?.format === "life-tree.xur" ? value.document : value;
+  const validation = validateScientificTree(value);
+  if (validation.errors.length) {
+    throw new ApiError(400, validation.errors.join("；"), "INVALID_TREE_SCIENCE");
+  }
+  const source = value?.format === XUR_FORMAT ? value.document : value;
   if (!source?.root) throw new ApiError(400, "进化树文件格式无效", "INVALID_TREE");
 
   const citations = sanitizeCitations(source.citations, {
@@ -285,6 +309,7 @@ export function sanitizeTreeDocument(value) {
   };
   const config = source.theme?.config || {};
   const document = {
+    scientific: normalizeTreeScience(source.scientific),
     citations,
     layout: SUPPORTED_LAYOUTS.has(source.layout) ? source.layout : "logicalStructure",
     evolution: {
@@ -310,7 +335,11 @@ export function sanitizeTreeDocument(value) {
     },
     view: null,
   };
-  return { document, nodeCount: state.count };
+  const result = validateScientificTree(document);
+  if (result.errors.length) {
+    throw new ApiError(400, result.errors.join("；"), "INVALID_TREE_SCIENCE");
+  }
+  return { document, nodeCount: state.count, warnings: result.warnings };
 }
 
 export function treeSummary(row) {

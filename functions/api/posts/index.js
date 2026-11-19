@@ -28,6 +28,7 @@ import {
   normalizeVisibility,
   throwPrivateWorkDatabaseError,
 } from "../../../server/privateWorks.js";
+import { normalizeArticleTemplate } from "../../../shared/articleTemplates.js";
 
 function encodeCursor(row) {
   return btoa(JSON.stringify([row.updated_at, row.id]));
@@ -180,6 +181,7 @@ export const onRequestPost = withApi(async ({ request, env }) => {
   }
   const tagsJson = JSON.stringify(validateTags(body.tags));
   const postType = normalizePostType(body.type);
+  const articleTemplateJson = JSON.stringify(normalizeArticleTemplate(body.articleTemplate));
   const classificationCards = reconcileClassificationCardPlacements(
     body.classificationCards || body.classificationCard,
     contentHtml,
@@ -222,13 +224,13 @@ export const onRequestPost = withApi(async ({ request, env }) => {
     env.DB.prepare(
       `INSERT INTO posts
         (id, creator_id, title, author, cover_media_hash, content_html, content_text,
-         content_laup,
+         content_laup, article_template_json,
          tags_json, type, classification_card_json, citations_json,
          license, revision_count, change_note, visibility,
          version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     ).bind(
-      id, user.id, title, author, coverHash, contentHtml, contentText, contentSource,
+      id, user.id, title, author, coverHash, contentHtml, contentText, contentSource, articleTemplateJson,
       tagsJson, postType, classificationCardJson, citationsJson,
       license, isPrivate ? 0 : 1, changeNote, visibility, now, now,
     ),
@@ -239,11 +241,11 @@ export const onRequestPost = withApi(async ({ request, env }) => {
       env.DB.prepare(
         `INSERT INTO post_revisions
           (post_id, revision_number, title, content_html, content_laup,
-           classification_card_json,
+           classification_card_json, article_template_json,
            citations_json, change_note, created_at, created_by)
-         VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
-        id, title, contentHtml, contentSource, classificationCardJson, citationsJson,
+        id, title, contentHtml, contentSource, classificationCardJson, articleTemplateJson, citationsJson,
         changeNote, now, user.id,
       ),
       env.DB.prepare(

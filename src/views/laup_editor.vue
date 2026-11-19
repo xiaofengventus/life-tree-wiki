@@ -15,11 +15,15 @@
 // ── 草稿
 //   与站点共用一张 IndexedDB 表，contentType: 'LAUP'；
 //   草稿箱（/drafts）能列出这一页存下的草稿并跳回来。
+// 模板只追加真实 Laup 源码（## 二级标题），模板标记随草稿和文章一起保存。
+// 引用与卡片在这里不提供编辑 UI，但编辑既有文章时必须原样往返。
 
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import navBar from "@/components/navBar.vue";
 import LaupEditor from "@/components/laup/LaupEditor.vue";
+import ArticleTemplatePicker from "@/components/ArticleTemplatePicker.vue";
+import { applyArticleTemplate, normalizeArticleTemplate } from "../../shared/articleTemplates.js";
 import { createPost, fetchPost, updatePost } from "@/services/posts";
 import {
   deleteDraft,
@@ -37,6 +41,9 @@ const userStore = useUserStore();
 
 const editorRef = ref(null);
 const source = ref("");
+const articleTemplate = ref(null);
+const citations = ref([]);
+const classificationCards = ref([]);
 const title = ref("");
 const author = ref("");
 const tagInput = ref("");
@@ -84,6 +91,7 @@ const draftAutosave = useDraftAutosave({
     content: source.value,
     tags: tags.value,
     visibility: visibility.value,
+    articleTemplate: articleTemplate.value,
   }),
   buildDraft: async (draftId) => {
     const ownerKey = userStore.user
@@ -105,6 +113,9 @@ const draftAutosave = useDraftAutosave({
         license: license.value,
         visibility: visibility.value,
         source: source.value,
+        articleTemplate: articleTemplate.value,
+        citations: citations.value,
+        classificationCards: classificationCards.value,
       },
     };
   },
@@ -113,6 +124,14 @@ const draftAutosave = useDraftAutosave({
 
 function onEditorChange(value) {
   source.value = value;
+}
+
+function applyTemplate(id) {
+  const currentSource = editorRef.value?.getSource() ?? source.value;
+  const applied = applyArticleTemplate(currentSource, id, { format: "laup" });
+  source.value = applied.content;
+  articleTemplate.value = applied.articleTemplate;
+  editorRef.value?.setSource(applied.content);
 }
 
 function addTag() {
@@ -141,6 +160,9 @@ async function loadArticle() {
       license.value = payload.license || "支持闭源";
       visibility.value = payload.visibility || "PUBLIC";
       source.value = payload.source || "";
+      articleTemplate.value = normalizeArticleTemplate(payload.articleTemplate);
+      citations.value = Array.isArray(payload.citations) ? payload.citations : [];
+      classificationCards.value = Array.isArray(payload.classificationCards) ? payload.classificationCards : [];
       if (draft.mode === "EDIT" && draft.targetId) {
         editUid.value = draft.targetId;
         editVersion.value = Number(draft.baseVersion || 1);
@@ -167,6 +189,9 @@ async function loadArticle() {
     license.value = post.license || "支持闭源";
     visibility.value = post.visibility || "PUBLIC";
     source.value = post.contentSource;
+    articleTemplate.value = normalizeArticleTemplate(post.articleTemplate);
+    citations.value = Array.isArray(post.citations) ? post.citations : [];
+    classificationCards.value = Array.isArray(post.classificationCards) ? post.classificationCards : [];
     editUid.value = post.uid || post.id || editId;
     editVersion.value = Number(post.version || 1);
     editSubmittedAt.value = post.submittedAt || "";
@@ -193,6 +218,10 @@ async function submit() {
   if (!source.value.trim()) { errorMessage.value = "正文不能为空"; return; }
 
   submitting.value = true;
+  if (draftAutosave.saveMode.value === "auto") {
+    await draftAutosave.saveNow().catch(() => {});
+  }
+  draftAutosave.setReady(false);
   try {
     const payload = {
       id: editUid.value || null,
@@ -202,6 +231,10 @@ async function submit() {
       creatorUid: userStore.user?.uid || null,
       content: source.value,
       contentFormat: "laup",
+      articleTemplate: articleTemplate.value,
+      citations: citations.value,
+      classificationCards: classificationCards.value,
+      // 不传 coverHash：Laup 没有封面编辑器，更新接口会保留现有封面。
       tags: [...tags.value],
       type: postType.value,
       license: license.value,
@@ -218,7 +251,13 @@ async function submit() {
       ? await updatePost(editUid.value, payload)
       : await createPost(payload);
 
+    // /laup 查询参数变化不会重新挂载；下次保存必须使用刚返回的 uid / version。
+    editUid.value = saved.uid || saved.id;
+    editVersion.value = Number(saved.version || 1);
+    editSubmittedAt.value = saved.submittedAt || editSubmittedAt.value;
+    editRevisionCount.value = Number(saved.revisionCount ?? editRevisionCount.value);
     const savedDraftId = draftAutosave.draftId.value;
+    draftAutosave.discardDraft();
     if (savedDraftId) await deleteDraft(savedDraftId).catch(() => {});
     await userStore.initialize({ force: true }).catch(() => {});
 
@@ -232,6 +271,7 @@ async function submit() {
     errorMessage.value = error.message || "提交失败，请检查网络后重试";
   } finally {
     submitting.value = false;
+    draftAutosave.setReady(true);
   }
 }
 
@@ -299,6 +339,18 @@ onMounted(async () => {
           required
         />
       </div>
+
+      <ArticleTemplatePicker
+        v-if="!loading"
+        :model-value="articleTemplate"
+        :automatic-references="false"
+        :title="title"
+        :content="source"
+        :citations="citations"
+        :tags="tags"
+        @apply="applyTemplate"
+        @clear="articleTemplate = null"
+      />
 
       <label class="field-label">内容</label>
       <LaupEditor ref="editorRef" @change="onEditorChange" />

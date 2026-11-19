@@ -2,6 +2,7 @@ import { formatPublicId, parsePublicId } from "./publicIds.js";
 import { mediaUrl } from "./media.js";
 import { parseClassificationCards } from "./classificationCards.js";
 import { parseCitations } from "./citations.js";
+import { parseArticleTemplate } from "../shared/articleTemplates.js";
 
 export function parseTags(value) {
   try {
@@ -62,6 +63,7 @@ export function postSummary(row) {
     classificationCards,
     classificationCard: classificationCards[0] || null,
     version: row.version,
+    articleTemplate: parseArticleTemplate(row.article_template_json),
     deletedAt: row.deleted_at || "",
   };
 }
@@ -83,6 +85,7 @@ export function postDetail(row, revisionRows = []) {
       submittedAt: revision.created_at,
       title: revision.title,
       note: revision.change_note,
+      articleTemplate: parseArticleTemplate(revision.article_template_json),
       // 谁改的：贡献者栏与历史列表靠它展示（协作痕迹的核心字段）
       editor: revision.editor_name || "",
       editorUid: revision.editor_public_id
@@ -113,7 +116,7 @@ export async function loadPost(
     .first();
   if (!row) return null;
   const revisions = await DB.prepare(
-    `SELECT r.revision_number, r.title, r.change_note, r.created_at,
+    `SELECT r.revision_number, r.title, r.change_note, r.created_at, r.article_template_json,
             u.display_name AS editor_name, u.public_id AS editor_public_id,
             u.avatar_media_hash AS editor_avatar_hash
        FROM post_revisions r LEFT JOIN users u ON u.id = r.created_by

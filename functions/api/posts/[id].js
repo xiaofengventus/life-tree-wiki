@@ -26,7 +26,7 @@ import {
   parseClassificationCards,
   reconcileClassificationCardPlacements,
 } from "../../../server/classificationCards.js";
-import { sanitizeCitations, validateCitationMarkers } from "../../../server/citations.js";
+import { parseCitations, sanitizeCitations, validateCitationMarkers } from "../../../server/citations.js";
 import { experienceEventStatement } from "../../../server/experience.js";
 import {
   PRIVATE_VISIBILITY,
@@ -35,6 +35,7 @@ import {
   releasePrivateWorkSlotStatement,
   throwPrivateWorkDatabaseError,
 } from "../../../server/privateWorks.js";
+import { normalizeArticleTemplate, parseArticleTemplate } from "../../../shared/articleTemplates.js";
 
 export const onRequestGet = withApi(async ({ request, params, env }) => {
   const viewer = await getCurrentUser(env.DB, request);
@@ -52,7 +53,8 @@ export const onRequestGet = withApi(async ({ request, params, env }) => {
     }
     const revision = await env.DB.prepare(
       `SELECT r.revision_number, r.title, r.content_html, r.content_laup,
-              r.change_note, r.created_at,
+              r.change_note, r.created_at, r.article_template_json,
+              r.citations_json, r.classification_card_json,
               u.display_name AS editor_name, u.public_id AS editor_public_id
          FROM post_revisions r LEFT JOIN users u ON u.id = r.created_by
         WHERE r.post_id = ? AND r.revision_number = ?`,
@@ -74,6 +76,9 @@ export const onRequestGet = withApi(async ({ request, params, env }) => {
           // laup 文章给源码（diff/回滚的真相）；html 文章给清洗后的 HTML
           contentSource: revision.content_laup || "",
           content: revision.content_html,
+          articleTemplate: parseArticleTemplate(revision.article_template_json),
+          citations: parseCitations(revision.citations_json),
+          classificationCards: parseClassificationCards(revision.classification_card_json),
         },
       },
       { headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=1800" } },
@@ -177,6 +182,9 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
   const postType = Object.hasOwn(body, "type")
     ? normalizePostType(body.type)
     : normalizePostType(existing.type);
+  const articleTemplateJson = JSON.stringify(Object.hasOwn(body, "articleTemplate")
+    ? normalizeArticleTemplate(body.articleTemplate)
+    : parseArticleTemplate(existing.article_template_json));
   let coverHash = existing.cover_media_hash || null;
   if (Object.hasOwn(body, "coverHash")) {
     coverHash = body.coverHash ? validMediaHash(body.coverHash) : null;
@@ -220,13 +228,13 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
   const statements = [
     env.DB.prepare(
       `UPDATE posts SET title = ?, author = ?, cover_media_hash = ?, content_html = ?, content_text = ?,
-        content_laup = ?,
+        content_laup = ?, article_template_json = ?,
         tags_json = ?, type = ?, classification_card_json = ?, citations_json = ?,
         license = ?, revision_count = ?,
         change_note = ?, visibility = ?, version = ?, updated_at = ?
        WHERE id = ? AND version = ? AND deleted_at IS NULL`,
     ).bind(
-      title, author, coverHash, contentHtml, contentText, contentSource, tagsJson, postType,
+      title, author, coverHash, contentHtml, contentText, contentSource, articleTemplateJson, tagsJson, postType,
       classificationCardJson, citationsJson,
       license, nextRevision, changeNote, visibility, nextVersion,
       now, id, expectedVersion,
@@ -237,12 +245,12 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
       env.DB.prepare(
         `INSERT INTO post_revisions
           (post_id, revision_number, title, content_html, content_laup,
-           classification_card_json,
+           classification_card_json, article_template_json,
            citations_json, change_note, created_at, created_by)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE EXISTS (SELECT 1 FROM posts WHERE id = ? AND version = ?)`,
       ).bind(
-        id, nextRevision, title, contentHtml, contentSource, classificationCardJson,
+        id, nextRevision, title, contentHtml, contentSource, classificationCardJson, articleTemplateJson,
         citationsJson, changeNote, now, user.id, id, nextVersion,
       ),
     );

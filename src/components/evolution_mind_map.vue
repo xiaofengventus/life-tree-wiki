@@ -245,6 +245,13 @@
               直线型
             </button>
           </div>
+          <NodeScienceFields
+            :model-value="inspector.science"
+            :is-root="selectedIsRoot"
+            :disabled="selectedCount !== 1"
+            :citations="treeCitations"
+            @update:model-value="applyNodeScience"
+          />
 
           <section class="inspector-section">
             <span class="section-title">引用</span>
@@ -481,6 +488,14 @@
           <p>选择一个节点后，可编辑名称、链接、图片与颜色。</p>
         </div>
       </aside>
+      <aside v-if="sciencePanelOpen" class="science-popup" aria-label="科学信息面板">
+        <button type="button" class="science-close" aria-label="关闭科学信息" @click="sciencePanelOpen = false">关闭</button>
+        <TreeSciencePanel
+          :model-value="sciencePanelDocument"
+          :read-only="readOnly"
+          @update:scientific="applyTreeScience"
+        />
+      </aside>
     </div>
 
       <!-- ============ 底部悬浮建树工具栏（可收起） ============ -->
@@ -538,6 +553,7 @@
       </div>
 
     <footer class="status-bar">
+      <button type="button" class="science-toggle" :aria-expanded="sciencePanelOpen" @click="sciencePanelOpen = !sciencePanelOpen">科学信息</button>
       <span class="status-dot" aria-hidden="true"></span>
       <span>{{ nodeCount }} 个分类群</span>
       <span v-if="fileOwner">{{ fileOwner }}</span>
@@ -570,6 +586,9 @@ import Select from "simple-mind-map/src/plugins/Select.js";
 import TouchEvent from "simple-mind-map/src/plugins/TouchEvent.js";
 import "simple-mind-map/dist/simpleMindMap.esm.css";
 import ColorPaletteInput from "@/components/ColorPaletteInput.vue";
+import NodeScienceFields from "@/components/NodeScienceFields.vue";
+import TreeSciencePanel from "@/components/TreeSciencePanel.vue";
+import { normalizeTreeScience, normalizeNodeScience } from "../../shared/treeScience.js";
 import {
   countMindMapNodes,
   createInitialMindMapDocument,
@@ -636,6 +655,13 @@ const buildBarCollapsed = ref(false);
 // const floatingToolsEnabled = ref(true);
 // 属性面板（画布右侧弹出）：选中节点自动打开，取消选择自动收起
 const inspectorOpen = ref(false);
+const sciencePanelOpen = ref(false);
+const treeScience = shallowRef(normalizeTreeScience(props.modelValue?.scientific));
+// 面板编辑后立即用本地 science 状态回显，不必等父组件回写 v-model。
+const sciencePanelDocument = computed(() => ({
+  ...props.modelValue,
+  scientific: treeScience.value,
+}));
 
 // 二级下拉菜单：互斥打开；点击页面其他位置或按 Esc 关闭
 function toggleDropdown(which) {
@@ -709,6 +735,7 @@ const alignLeavesRight = ref(
 const statusText = ref(props.readOnly ? "只读浏览" : "准备就绪");
 const inspector = reactive({
   text: "",
+  science: normalizeNodeScience({}),
   contentLinks: [],
   citationNumbers: [],
   image: "",
@@ -734,12 +761,13 @@ const READ_ONLY_FULL_RENDER_COMMANDS = new Set([
 ]);
 
 const selectedCount = computed(() => activeNodes.value.length);
+const selectedIsRoot = computed(() => Boolean(activeNodes.value[0]?.isRoot));
 
 // 选中节点 → 自动弹出右侧属性面板；取消选择 → 自动收起
 watch(selectedCount, (count) => {
   inspectorOpen.value = count > 0;
 });
-const hasExtinctMarker = computed(() => /^\s*†/.test(inspector.text));
+const hasExtinctMarker = computed(() => inspector.science.taxon.status === "extinct");
 const selectedTitle = computed(() => {
   if (!selectedCount.value) return "未选择";
   if (selectedCount.value > 1) return `${selectedCount.value} 个节点`;
@@ -794,7 +822,8 @@ function refreshInspector(nodes = activeNodes.value) {
   activeNodes.value = nodes.map((node) => markRaw(node));
   const node = activeNodes.value[0];
   const data = node?.getData?.() || {};
-  inspector.text = data.text || "";
+  inspector.science = normalizeNodeScience(data);
+  inspector.text = inspector.science.text.replace(/^\s*†+\s*/, "");
   inspector.contentLinks = normalizeContentLinks(
     data.contentLinks ?? data.articleLinks,
   ).map((link) => ({ ...link }));
@@ -819,6 +848,7 @@ function refreshInspector(nodes = activeNodes.value) {
 function currentDocument() {
   const source = mindMap.value.getData(true);
   source.citations = normalizeTreeCitations(treeCitations.value);
+  source.scientific = treeScience.value;
   const document = normalizeMindMapDocument(source);
   document.evolution = {
     nodeLineStyle: nodeLineStyle.value,
@@ -831,6 +861,7 @@ function currentDocument() {
 
 function syncEvolutionOptions(document) {
   treeCitations.value = normalizeTreeCitations(document.citations);
+  treeScience.value = normalizeTreeScience(document.scientific);
   nodeLineStyle.value = document.evolution?.nodeLineStyle !== false;
   hideInternalNames.value = Boolean(document.evolution?.hideInternalNames);
   alignLeavesRight.value = Boolean(document.evolution?.alignLeavesRight);
@@ -1386,22 +1417,39 @@ function toggleExpand() {
   });
 }
 
-function applyText() {
+function applyTreeScience(value) {
+  treeScience.value = normalizeTreeScience(value);
+  publishDocument();
+}
+
+function applyNodeScience(value = inspector.science) {
   const node = activeNodes.value[0];
-  if (node && selectedCount.value === 1)
-    node.setText(inspector.text.trim() || "未命名分类群");
+  if (!node || selectedCount.value !== 1) return;
+  const science = normalizeNodeScience({
+    ...node.getData(),
+    ...value,
+    text: inspector.text.trim() || "未命名分类群",
+  });
+  inspector.science = science;
+  mindMap.value.renderer.setNodeDataRender(node, {
+    ...science,
+    isExtinct: science.taxon.status === "extinct",
+  });
+  publishDocument();
+}
+
+function applyText() {
+  applyNodeScience();
 }
 
 function toggleExtinctMarker() {
-  const node = activeNodes.value[0];
-  if (!node || selectedCount.value !== 1) return;
-  inspector.text = hasExtinctMarker.value
-    ? inspector.text.replace(/^\s*†\s*/, "") || "未命名分类群"
-    : `†${inspector.text.trimStart() || "未命名分类群"}`;
-  node.setText(inspector.text);
-  statusText.value = hasExtinctMarker.value
-    ? "已添加灭绝标记 †"
-    : "已取消灭绝标记 †";
+  applyNodeScience({
+    ...inspector.science,
+    taxon: {
+      ...inspector.science.taxon,
+      status: hasExtinctMarker.value ? "unknown" : "extinct",
+    },
+  });
 }
 
 function updateSelectedNodeCitations(numbers) {
@@ -2116,6 +2164,39 @@ defineExpose({
   background: #f8faf7;
   color: #24342b;
   font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+}
+
+.science-popup {
+  position: absolute;
+  z-index: 30;
+  top: 24px;
+  left: 16px;
+  width: min(720px, calc(100% - 32px));
+  max-height: calc(100% - 100px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 14px 44px #183d2526;
+  background: #fff;
+}
+.science-close {
+  float: right;
+  margin: 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+.science-toggle {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--forest-800);
+  font: inherit;
+  cursor: pointer;
 }
 
 .command-bar {

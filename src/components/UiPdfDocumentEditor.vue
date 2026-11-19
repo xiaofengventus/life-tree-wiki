@@ -370,6 +370,8 @@
               <small>{{
                 treeListMessage || "文章中将显示可缩放、可折叠的只读进化树。"
               }}</small>
+              <small>树块动态引用当前版本，不固定文章发表时的快照；打开文章历史版本也可能显示更新后的树。阅读时以树块显示的本次实际加载版本号为准（可能受缓存影响）。</small>
+              <small>布局仅展示节点关系，不按分支长度或年代比例绘制，不能据图推断演化时间或遗传距离。</small>
             </div>
             <section
               v-if="insertPanelSection === 'markdown'"

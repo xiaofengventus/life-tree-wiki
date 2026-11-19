@@ -56,6 +56,16 @@
         />
       </div>
 
+      <ArticleTemplatePicker
+        :model-value="articleTemplate"
+        :title="title"
+        :content="content"
+        :citations="citations"
+        :tags="tags"
+        @apply="applyTemplate"
+        @clear="articleTemplate = null"
+      />
+
       <label>内容</label>
       <Teleport to="body">
         <div
@@ -388,6 +398,7 @@
               <small>{{
                 treeListMessage || "文章中将显示可缩放、可折叠的只读进化树。"
               }}</small>
+              <small>动态引用当前版本，不固定发表时快照；打开文章历史版本也可能显示更新后的树。布局不按分支长度或年代比例绘制。</small>
             </div>
             <section
               v-if="insertPanelSection === 'markdown'"
@@ -1231,6 +1242,8 @@ import {
 import { Editor } from "@wangeditor/editor-for-vue";
 import EditorToolbar from "@/components/EditorToolbar.vue";
 import ImageCropperDialog from "@/components/ImageCropperDialog.vue";
+import ArticleTemplatePicker from "@/components/ArticleTemplatePicker.vue";
+import { applyArticleTemplate, normalizeArticleTemplate } from "../../shared/articleTemplates.js";
 import "@wangeditor/editor/dist/css/style.css";
 import { useRoute } from "vue-router";
 import { useUserStore } from "@/stores/user";
@@ -1338,6 +1351,14 @@ const editorRef = shallowRef();
 const title = ref("");
 const author = ref("");
 const content = ref("");
+const articleTemplate = ref(null);
+
+function applyTemplate(id) {
+  const result = applyArticleTemplate(editorRef.value?.getHtml?.() ?? content.value, id);
+  content.value = result.content;
+  articleTemplate.value = result.articleTemplate;
+  editorRef.value?.setHtml(result.content);
+}
 const tagInput = ref("");
 const tags = ref([]);
 const license = ref("支持闭源");
@@ -1547,6 +1568,7 @@ const articleDraftSource = computed(() => ({
   title: title.value,
   author: author.value,
   content: content.value,
+  articleTemplate: articleTemplate.value,
   tags: tags.value,
   type: postType.value,
   citations: citations.value,
@@ -1574,6 +1596,7 @@ async function buildArticleDraft(id) {
       title: title.value,
       author: author.value,
       content: content.value,
+      articleTemplate: articleTemplate.value,
       tags: [...tags.value],
       type: postType.value,
       citations: sortedCitations.value.map((citation) => ({ ...citation })),
@@ -2618,6 +2641,7 @@ function applyPost(post) {
   title.value = post.title || "";
   author.value = post.author || "";
   content.value = normalizedContent;
+  articleTemplate.value = normalizeArticleTemplate(post.articleTemplate);
   tags.value = Array.isArray(post.tags) ? [...post.tags] : [];
   citations.value = incomingCitations;
   license.value = post.license || license.value;
@@ -2642,6 +2666,7 @@ async function applyArticleDraft(draft) {
   const payload = draft?.payload || {};
   title.value = payload.title || "";
   author.value = payload.author || "";
+  articleTemplate.value = normalizeArticleTemplate(payload.articleTemplate);
   tags.value = Array.isArray(payload.tags) ? [...payload.tags] : [];
   citations.value = Array.isArray(payload.citations)
     ? payload.citations.map((citation) => ({
@@ -2744,6 +2769,7 @@ function resetArticleEditor() {
   title.value = "";
   author.value = "";
   content.value = "";
+  articleTemplate.value = null;
   tags.value = [];
   citations.value = [];
   license.value = "支持闭源";
@@ -3054,6 +3080,7 @@ async function submitPost(targetVisibility = "PUBLIC") {
       author: author.value.trim() || creator.value,
       content: publishedContent,
       contentType: "html",
+      articleTemplate: articleTemplate.value,
       classificationCards: sidebarCardsPayload(),
       citations: sortedCitations.value.map((citation) => ({ ...citation })),
       tags: [...tags.value],
