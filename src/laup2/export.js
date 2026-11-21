@@ -163,7 +163,7 @@ export function exportBlock(node) {
       const lines = ["\\begin{card}"];
       const name = exportInline(node.attrs.name);
       if (name && name !== "分类卡片") lines.push(`[name ${name}]`);
-      if (node.attrs.color) lines.push(`[color ${node.attrs.color}]`);
+      if (node.attrs.color && node.attrs.color !== "skyblue") lines.push(`[color ${node.attrs.color}]`);
       for (const row of node.attrs.rows || []) {
         const value = exportInline(row.value);
         lines.push(row.label ? `${row.label} ${value}` : value);

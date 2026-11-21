@@ -445,8 +445,8 @@
 #notebook-page .output .laup2-todo li input { margin-top: 5px; flex: none; }
 #notebook-page .output .laup2-todo li.is-done > span { color: #8a919c; text-decoration: line-through; }
 
-#notebook-page .output .laup2-card { margin: 10px 0; border: 1px solid #a2a9b1; background: #f8f9fa; border-radius: 4px; overflow: hidden; }
-#notebook-page .output .laup2-card > header { padding: 7px 11px; background: #eaecf0; font-weight: 700; font-size: 13px; }
+#notebook-page .output .laup2-card { margin: 10px 0; border: 1px solid #a2a9b1; border-top: 3px solid var(--laup2-card-color, #a2a9b1); background: #f8f9fa; border-radius: 4px; overflow: hidden; }
+#notebook-page .output .laup2-card > header { padding: 7px 11px; background: color-mix(in srgb, var(--laup2-card-color, #eaecf0) 14%, #ffffff); font-weight: 700; font-size: 13px; }
 #notebook-page .output .laup2-card table { width: 100%; border-collapse: collapse; margin: 0; }
 #notebook-page .output .laup2-card th,
 #notebook-page .output .laup2-card td { padding: 5px 11px; border: 0; border-top: 1px solid #e4e7eb; font-size: 12.8px; text-align: left; }

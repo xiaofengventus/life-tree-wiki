@@ -55,12 +55,28 @@ export function parseCells(source) {
   const lines = String(source ?? "").replace(/\r\n?/g, "\n").split("\n");
   const groups = [[]];
   let skippingBreak = false;
+  let fence = null;
 
   for (const line of lines) {
     if (skippingBreak) {
       if (/^[ \t]*\][ \t]*$/.test(line)) skippingBreak = false;
       continue;
     }
+
+    // 围栏代码块内部不切格：代码格的正文必须原样保留
+    const open = /^[ \t]{0,3}(`{3,}|~{3,})/.exec(line);
+    const close = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+    if (fence) {
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      groups[groups.length - 1].push(line);
+      continue;
+    }
+    if (open) {
+      fence = open[1];
+      groups[groups.length - 1].push(line);
+      continue;
+    }
+
     if (CELLBREAK_START.test(line)) {
       skippingBreak = /\[[ \t]*$/.test(line);
       groups.push([]);

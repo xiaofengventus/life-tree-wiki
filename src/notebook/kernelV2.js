@@ -102,16 +102,40 @@ const V1_IN_LAUP = [
   [/^[ \t]*\\varcell[ \t]*=/m, 'v1 的 \\varcell=[…] 数据块在 v2 里要改成单独的 [var] 代码格'],
   [/^[ \t]*\\image[ \t]*[=!]/m, 'v2 用 ![说明](地址) 插图，不再用 \\image 数据块'],
   [/^[ \t]*\\tree[ \t]*=/m, 'v2 还没有 \\tree 研究树嵌入'],
-  [/^[ \t]{0,3}`{3,}[ \t]*sample\b/m, '输入/输出案例请拆成 [input] / [output] 两个代码格'],
 ];
+
+/** 去掉围栏代码块与行内代码，避免「示例代码」被误判成真的 v1 写法。 */
+function stripCodeForCheck(source) {
+  const out = [];
+  let fence = null;
+  for (const line of String(source ?? "").split("\n")) {
+    const open = /^[ \t]{0,3}(`{3,}|~{3,})/.exec(line);
+    const close = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+    if (fence) {
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (open) {
+      fence = open[1];
+      continue;
+    }
+    out.push(line.replace(/`[^`\n]*`/g, ""));
+  }
+  return out.join("\n");
+}
 
 /** 正文里残留的 v1 写法 → 给作者看的迁移提示（没有则返回 ''）。 */
 export function v1LeftoverInLaup(source) {
-  const text = String(source ?? '')
-  for (const [pattern, message] of V1_IN_LAUP) {
-    if (pattern.test(text)) return message
+  const text = String(source ?? "");
+  // 围栏本身是 v1 的 sample 语法，必须在剥代码前判断
+  if (/^[ \t]{0,3}`{3,}[ \t]*sample\b/m.test(text)) {
+    return "输入/输出案例请拆成 [input] / [output] 两个代码格";
   }
-  return ''
+  const visible = stripCodeForCheck(text);
+  for (const [pattern, message] of V1_IN_LAUP) {
+    if (pattern.test(visible)) return message;
+  }
+  return "";
 }
 
 function renderLaupCell(cell, scope, refPool, isRefDisplay) {
@@ -124,7 +148,8 @@ function renderLaupCell(cell, scope, refPool, isRefDisplay) {
   // 编辑器是一格一格渲染的，所以在这里补一个合成文献格（只有引用/展示格需要）。
   const refs = (Array.isArray(refPool) ? refPool : []).filter(Boolean)
   const hasCite = /\\cite\s*\{/.test(source)
-  const injectRefs = refs.length > 0 && (hasCite || isRefDisplay)
+  const declaresRefs = /^[ \t]*\[references\][ \t]*(?:\n|$)/i.test(source)
+  const injectRefs = refs.length > 0 && !declaresRefs && (hasCite || isRefDisplay)
   if (injectRefs) source += `\n\n\\cellbreak\n[references]\n${refs.join('\n')}`
 
   const { src, restore } = withAttachments(source, cell)
@@ -205,12 +230,23 @@ export function importNotebookV2(source) {
 export function collectV2References(cells) {
   const out = []
   for (const cell of Array.isArray(cells) ? cells : []) {
-    if (cell?.type !== 'code') continue
-    const decl = parseCodeDecl(cell.source)
-    if (decl.kind !== 'lang' || decl.raw !== 'references') continue
-    for (const line of String(decl.body ?? '').split('\n')) {
-      const text = line.trim()
-      if (text) out.push(text)
+    if (cell?.type === 'code') {
+      const decl = parseCodeDecl(cell.source)
+      if (decl.kind !== 'lang' || decl.raw !== 'references') continue
+      for (const line of String(decl.body ?? '').split('\n')) {
+        const text = line.trim()
+        if (text) out.push(text)
+      }
+      continue
+    }
+    // 直接写在 laup 格里的 [references] 段也认（格类型没切到 code 时）
+    if (cell?.type === 'laup') {
+      const match = /^[ \t]*\[references\][ \t]*\n?([\s\S]*)$/i.exec(String(cell.source ?? ''))
+      if (!match) continue
+      for (const line of match[1].split('\n')) {
+        const text = line.trim()
+        if (text) out.push(text)
+      }
     }
   }
   return out
@@ -220,6 +256,7 @@ export function collectV2References(cells) {
 export function v2ReferenceDisplayIndex(cells) {
   const list = Array.isArray(cells) ? cells : []
   const declared = list.findIndex((cell) => {
+    if (cell?.type === 'laup') return /^[ \t]*\[references\][ \t]*(?:\n|$)/i.test(String(cell.source ?? ''))
     if (cell?.type !== 'code') return false
     const decl = parseCodeDecl(cell.source)
     return decl.kind === 'lang' && decl.raw === 'references'

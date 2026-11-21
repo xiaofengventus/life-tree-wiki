@@ -322,7 +322,7 @@ function buildCard(body, ctx) {
   const parse = (text) =>
     (ctx && typeof ctx.parseInline === "function" ? ctx.parseInline(text) : [N.text(String(text ?? ""))]);
   let name = [N.text("分类卡片")];
-  let color = "";
+  let color = "skyblue";
   const rows = [];
   for (const raw of String(body ?? "").split("\n")) {
     const line = raw.trim();

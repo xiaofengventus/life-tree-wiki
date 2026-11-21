@@ -102,7 +102,9 @@ export function resolveSemantics(doc, options = {}) {
       if (valid.length !== ids.length) {
         report.warn(
           "E_CITE_RANGE",
-          `\\cite 里的序号超出参考文献范围（共 ${state.references.length} 条）`,
+          state.references.length === 0
+            ? "\\cite 还没有对应的 [references] 格（文献列表为空）"
+            : `\\cite 里的序号超出参考文献范围（共 ${state.references.length} 条）`,
         );
       }
     }
