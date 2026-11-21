@@ -63,6 +63,11 @@ export const N = {
   equation: (id, tex) => ({ type: 'Equation', id: id || null, tex, number: null }),
   eqref: (id) => ({ type: 'EqRef', id }),
 
+  // `\begin{stay}`：整块原样输出（不解析任何行内语法）
+  stay: (text) => ({ type: 'Stay', text }),
+  // `\begin{stay-line}`：只保留换行，每行的行内语法照常解析
+  stayLine: (lines) => ({ type: 'StayLine', lines }),
+
   footnote: (children) => ({ type: 'Footnote', children }),
 
   text: (value) => ({ type: 'Text', value }),

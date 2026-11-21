@@ -6,6 +6,10 @@
 
 import { render, defineExtension, listExtensions } from '@/laup/core/index.js'
 import { lifeElements, PACK_NAME } from '@/laup/extensions/life.js'
+import {
+  lifesequence, PACK_NAME as LIFETREE_PACK,
+  parseLifetree, LIFETREE_LANG,
+} from '@/laup/extensions/lifetree.js'
 import DOMPurify from 'dompurify'
 import {
   CODE_FENCE_LANG, highlightLaupCode, isDeclarable, languageOptions, parseCodeDecl, PANE_INPUT, PANE_OUTPUT,
@@ -14,6 +18,10 @@ import { parseCodeSampleText } from '@/utils/codeSample.js'
 import {
   collectVars, interpolateVars, readVarBlock, readVarStatement, varBlockText,
 } from '../../shared/notebookVars.js'
+import { computeLifeTreeLayout } from '@/utils/lifeTreeLayout.js'
+// v2 内核：阅读面与服务端发布共用同一套渲染器；内核按文档写法判定，不做跨版本翻译
+import { detectLaupKernel } from '../../shared/laupKernel.js'
+import { typesetCells } from '../laup2/index.js'
 
 // 站点扩展装载：与旧版 laup 写作页共用同一份 life 扩展包。
 // 模块加载时装一次；每次渲染前再兜底检查 —— 旧编辑器若先 uninstall 了，
@@ -21,6 +29,10 @@ import {
 function ensureLifeExtension() {
   if (!listExtensions().includes(PACK_NAME)) {
     defineExtension(lifeElements({ treeRoute: (id) => `/life-tree/${id}` }))
+  }
+  // Lifeseqence：[lifetree] 格 / ```lifetree 围栏的解析与渲染（发布走同一份扩展）
+  if (!listExtensions().includes(LIFETREE_PACK)) {
+    defineExtension(lifesequence())
   }
 }
 ensureLifeExtension()
@@ -55,9 +67,9 @@ const attToken = (i) => `__laup_att_${i}.png`
 export function preprocess(source, cell, scope, opts = {}) {
   let s = source
   const atts = []
-  // ① 声明行：import "laup" / import "cite" / … 都是宿主层特性开关，编译前全部剥掉。
+  // ① 声明行：import "laup" / import Lifeseqence / … 都是宿主层特性开关，编译前全部剥掉。
   //    剥除后留一个空行，避免把后面的 \references=[ 粘成上一行的段落续行（数据块失效）
-  s = s.replace(/^[ \t]*import\s+["'][^"']+["'][ \t]*$/gm, '')
+  s = s.replace(/^[ \t]*import(?:\s+["'][^"']+["']|\s+[A-Za-z][\w-]*)[ \t]*$/gm, '')
   // ①″ 粘连修复：手机端连续插图时，`]`、`#` 等前文可能和 \image 块挤在同一行
   //     （数据块要求 ] 与 \image= 各占一行；粘连时核心解析失败，整块按字面量输出，
   //     实测症状：⚠ 未知命令 \image）。把行中间出现的 \image![ / \image=[ 拆到新行。
@@ -432,6 +444,68 @@ export function sampleFence(inputDecl, outputDecl) {
   return ['```sample', input, '---', output, '```'].join('\n')
 }
 
+// ---------- lifetree 格：[lifetree] 声明 → 分类树预览 ----------
+// 解析用 Laup 扩展（src/laup/extensions/lifetree.js），渲染用 /life-tree 页面同一个
+// 布局函数（utils/lifeTreeLayout.js）—— 编辑器预览与站点生命树同一套矩形分支 DOM。
+// 编辑器写源码时的浅色分叉线由 lifetreeDecor.js 画（按实际缩进）；
+// 这里的树枝是布局输出的真实 DOM 矩形。只认 code 格首行 [lifetree]（落库成 ```lifetree 围栏）。
+const LIFETREE_DECL_RE = /^\[lifetree\][ \t]*(?:\r?\n|$)/
+
+/** 解析树 → 布局输入（{ data:{ uid, text, age }, children }） */
+function toLayoutTree(n) {
+  const data = { uid: `lt-${n.line}` }
+  if (n.kind === 'diverge') {
+    // 匿名分化点：图上只画分叉，不显示名字；带时间参数就标在旁边
+    data.text = ''
+    data.age = n.attrs?.时间 != null ? `${n.attrs.时间} Ma` : ''
+  } else {
+    const zh = n.zh ? `${n.extinct ? '†' : ''}${n.zh}` : ''
+    data.text = [zh, n.latin].filter(Boolean).join(' ')
+    const age = []
+    if (n.attrs?.时间 != null) age.push(`${n.attrs.时间} Ma`)
+    if (n.author && n.year != null) age.push(`${n.author}, ${n.year}`)
+    else if (n.year != null) age.push(String(n.year))
+    else if (n.author) age.push(n.author)
+    data.age = age.join(' · ')
+  }
+  return { data, children: (n.children || []).map(toLayoutTree) }
+}
+
+function renderLayoutDom(root) {
+  const layout = computeLifeTreeLayout(root)
+  const branches = layout.branches.map((b) => {
+    const style = b.dir === 'h'
+      ? `left:${b.x}px;top:${b.y - 0.75}px;width:${b.length}px;height:1.5px`
+      : `left:${b.x - 0.75}px;top:${b.y}px;width:1.5px;height:${b.length}px`
+    return `<div class="tree-branch ${b.dir === 'h' ? 'is-horizontal' : 'is-vertical'}" style="${style}" aria-hidden="true"></div>`
+  })
+  const labels = layout.nodes.map((node) => {
+    const parts = node.segments.map(
+      (seg) => `<span class="${seg.latin ? 'latin' : 'chinese'}">${esc(seg.text)}</span>`,
+    )
+    if (node.age) parts.push(`<small class="age">${esc(node.age)}</small>`)
+    if (!parts.length) return ''
+    return `<span class="tree-label${node.isRoot ? ' is-root' : ''}" data-node-id="${esc(node.id)}" style="left:${node.labelLeft}px;top:${node.labelTop}px">${parts.join('')}</span>`
+  })
+  return `<div class="life-tree-dom"><div class="life-tree-canvas" style="width:${layout.width}px;height:${layout.height}px">`
+    + branches.join('') + labels.join('')
+    + '</div></div>'
+}
+
+export function lifetreePreviewHtml(body) {
+  try {
+    const parsed = parseLifetree(body)
+    const warns = parsed.diags
+      .map((d) => `<div class="laup-warn">⚠ ${esc(d.message)}</div>`).join('')
+    if (!parsed.tree) {
+      return warns || '<div class="code-decl-hint">在下面写树：每行一个节点，每级缩进两个空格，`/` 是匿名分化点</div>'
+    }
+    return renderLayoutDom(toLayoutTree(parsed.tree)) + warns
+  } catch (e) {
+    return `<pre class="error-out">${esc(e?.message || String(e))}</pre>`
+  }
+}
+
 // ---------- 运行一个格 ----------
 // refPool：全局文献数组（条目文本数组，store 用 buildRefPool 汇总传入）
 // citedSet：全文被引序号（压制"未被引用"噪音警告）
@@ -459,8 +533,13 @@ export function runCellSource(cell, scope, refPool = [], citedSet = null, isRefD
     if (pane?.role === 'card') {
       return { outputHtml: codeSampleCardHtml(pane.input, pane.output, pane.index) }
     }
+    const decl = parseCodeDecl(cell.source)
+    // [lifetree]：分类树格，走自己的渲染路线（Laup Lifeseqence 扩展）
+    if (decl.kind === 'lang' && decl.raw === LIFETREE_LANG) {
+      return { outputHtml: lifetreePreviewHtml(decl.body) }
+    }
     // 语言格（或还没写声明）：普通代码块预览，首行声明的语言决定上什么色
-    return { outputHtml: codePreviewHtml(parseCodeDecl(cell.source)) }
+    return { outputHtml: codePreviewHtml(decl) }
   }
   // laup 格：预处理后交给 Laup 核心渲染，消毒 → 后处理恢复附件 data URL
   const { src, atts } = preprocess(cell.source, cell, scope)
@@ -502,7 +581,12 @@ export function runCellSource(cell, scope, refPool = [], citedSet = null, isRefD
 //   ── 读者侧不受影响：发布时由服务端按同一口径解析变量（server/laup.js），
 //      阅读页拿到的仍然是内联好的 HTML。
 export function exportLaupDoc(cells, scope, urlMap = null) {
-  const parts = ['import "laup"']
+  const parts = []
+  // 文档里只要有 lifetree 格，就带上 Lifeseqence 开关行（规范：可省，写了更明确）
+  if ((Array.isArray(cells) ? cells : []).some((c) => c?.type === 'code' && parseCodeDecl(c.source).raw === LIFETREE_LANG)) {
+    parts.push('import Lifeseqence')
+  }
+  parts.push('import "laup"')
   const panes = planCodePanes(cells)
   // 附件 data URL → 站点 /media 链接（导出成文件时 urlMap 为空，原样保留）
   const swapMedia = (text) => (urlMap && urlMap.size
@@ -523,6 +607,13 @@ export function exportLaupDoc(cells, scope, urlMap = null) {
       // 对照卡**继续并成一格** ` ```sample `：那张卡是阅读页的融合格式，
       // 拆成两个块读者只会看到两个孤立代码块。
       if (pane?.role === 'card') { parts.push(sampleFence(pane.input, pane.output)); continue }
+      // [lifetree] 分类树格：落库成 ```lifetree 围栏（正文里剥掉声明行），
+      // 服务端发布由 Lifeseqence 扩展渲染；重新载入时 parseLaupDoc 还原成 [lifetree] 格
+      const decl = parseCodeDecl(c.source)
+      if (decl.kind === 'lang' && decl.raw === LIFETREE_LANG) {
+        parts.push(['```' + LIFETREE_LANG, swapMedia(String(decl.body ?? '').replace(/\s+$/, '')), '```'].join('\n'))
+        continue
+      }
       // 普通代码格：整段源码原样进围栏（含首行声明），一处不转换。
       parts.push(codeFence(c.source))
       continue
@@ -570,8 +661,19 @@ export function renderLaupHtml(source, scope = {}) {
 // 返回拼接好的一段 HTML；空文档返回 ''（调用方回退到服务端入库 HTML）。
 const EDITOR_ONLY_RE = /<div class="(?:laup-warn|code-decl-hint|code-pane-warn|code-pane-merged)">[\s\S]*?<\/div>/g
 
-export function renderNotebookDoc(source) {
-  const cells = parseLaupDoc(String(source ?? ''))
+export function renderNotebookDoc(source, options = {}) {
+  // 内核优先用文章落库的 content_kernel；存量文章没有该字段时才按内容判定。
+  // 两套内核独立，互不翻译 —— v2 文档里的 v1 写法会以自己的诊断形式暴露出来。
+  const text = String(source ?? '')
+  const kernel = options.kernel === 'v1' || options.kernel === 'v2'
+    ? options.kernel
+    : detectLaupKernel(text)
+  if (kernel === 'v2') {
+    const raw = text.replace(/^[ \t]*import(?:\s+["'][^"']+["']|\s+[A-Za-z][\w-]*)[ \t]*$/gm, '')
+    return raw.trim() ? typesetCells(raw).html : ''
+  }
+
+  const cells = parseLaupDoc(text)
   if (!cells.length) return ''
   const scope = {}
   const pool = buildRefPool(cells)
@@ -635,7 +737,7 @@ export function parseLaupDoc(text) {
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
-    if (/^[ \t]*import\s+["'][^"']+["'][ \t]*$/.test(line)) { i++; continue }
+    if (/^[ \t]*import(?:\s+["'][^"']+["']|\s+[A-Za-z][\w-]*)[ \t]*$/.test(line)) { i++; continue }
     // Notebook 导出的格边界标记（life 扩展零输出块）：到这里就是一格的结束。
     // 两行形式：\cellbreak=[ 换行 ]
     if (/^[ \t]*\\cellbreak[ \t]*=[ \t]*\[[ \t]*$/.test(line)) {
@@ -658,7 +760,9 @@ export function parseLaupDoc(text) {
       flush(); i++; continue
     }
     const fence = /^```[ \t]*([A-Za-z0-9_+#-]*)[ \t]*$/.exec(line)
-    if (fence && isCodeFenceLang(fence[1])) {
+    const fenceLang = (fence?.[1] || '').toLowerCase()
+    const isFenceCell = isCodeFenceLang(fenceLang) || fenceLang === LIFETREE_LANG
+    if (fence && isFenceCell) {
       // 标记模式下，围栏只有独占一格（前面没有同格正文）时才是代码格；
       // laup 格中间出现的围栏是格内容的一部分，原样保留不切。
       if (hasMarkers && buf.some((l) => l.trim())) { buf.push(line); i++; continue }
@@ -670,7 +774,10 @@ export function parseLaupDoc(text) {
       i++ // 跳过闭合围栏
       const lang = fence[1].toLowerCase()
       const text = body.join('\n').replace(/^\n+/, '').replace(/\s+$/, '')
-      if (lang === SAMPLE_FENCE) {
+      if (lang === LIFETREE_LANG) {
+        // 分类树围栏：还原成 [lifetree] 代码格（声明行回到源码首行，作者可见）
+        cells.push({ type: 'code', source: `[${LIFETREE_LANG}]\n${text}\n` })
+      } else if (lang === SAMPLE_FENCE) {
         // 输入 / 输出对照：还原成 [input] + [output] 两格（与手写形态一一对应）
         const { input, output } = parseCodeSampleText(text)
         const inputCell = paneCell(PANE_INPUT, input)

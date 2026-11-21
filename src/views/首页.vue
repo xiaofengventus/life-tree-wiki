@@ -85,69 +85,99 @@ onBeforeUnmount(() => window.clearTimeout(suggestTimer));
   <!-- 右下角圆形悬浮用户卡片（含退出登录） -->
   <user_show />
   <main class="wiki-home">
-    <div class="search-area">
-      <form class="search-form" role="search" @submit.prevent="search">
-        <label class="sr-only" for="wiki-search">搜索知识库</label>
-        <input
-          id="wiki-search"
-          v-model="query"
-          type="search"
-          placeholder="搜索文章、树与生命树节点"
-          autocomplete="off"
-          @focus="hasSuggestions && (suggestOpen = true)"
-          @keydown="onSuggestKeydown"
-          @blur="suggestOpen = false"
-        />
-      </form>
+    <!-- 首屏：搜索框居中，占满一屏高度 -->
+    <section class="home-hero">
+      <div class="search-area">
+        <form class="search-form" role="search" @submit.prevent="search">
+          <label class="sr-only" for="wiki-search">搜索知识库</label>
+          <input
+            id="wiki-search"
+            v-model="query"
+            type="search"
+            placeholder="搜索文章、树与生命树节点"
+            autocomplete="off"
+            @focus="hasSuggestions && (suggestOpen = true)"
+            @keydown="onSuggestKeydown"
+            @blur="suggestOpen = false"
+          />
+        </form>
 
-      <!-- 搜索栏下方词条联想 -->
-      <ul
-        v-if="suggestOpen && hasSuggestions"
-        class="suggest-panel"
-        aria-label="搜索联想"
-      >
-        <li v-if="suggestions.posts.length">
-          <span class="suggest-group">文章</span>
-          <ul>
-            <li v-for="post in suggestions.posts" :key="post.id">
-              <RouterLink :to="postTarget(post)" @mousedown.prevent>
-                {{ post.title }}
-                <small v-if="typeLabel(post.type)">{{ typeLabel(post.type) }}</small>
-              </RouterLink>
-            </li>
-          </ul>
-        </li>
-        <li v-if="suggestions.trees.length">
-          <span class="suggest-group">树</span>
-          <ul>
-            <li v-for="tree in suggestions.trees" :key="tree.id">
-              <RouterLink :to="treeTarget(tree)" @mousedown.prevent>
-                {{ tree.title }}
-                <small>{{ tree.nodeCount }} 节点</small>
-              </RouterLink>
-            </li>
-          </ul>
-        </li>
-        <li v-if="suggestions.nodes.length">
-          <span class="suggest-group">生命树节点</span>
-          <ul>
-            <li v-for="node in suggestions.nodes" :key="`${node.treeUid}:${node.nodeId}`">
-              <RouterLink :to="nodeTarget(node)" @mousedown.prevent>
-                {{ node.nodeText }}
-                <small>{{ node.treeTitle }}</small>
-              </RouterLink>
-            </li>
-          </ul>
+        <!-- 搜索栏下方词条联想 -->
+        <ul
+          v-if="suggestOpen && hasSuggestions"
+          class="suggest-panel"
+          aria-label="搜索联想"
+        >
+          <li v-if="suggestions.posts.length">
+            <span class="suggest-group">文章</span>
+            <ul>
+              <li v-for="post in suggestions.posts" :key="post.id">
+                <RouterLink :to="postTarget(post)" @mousedown.prevent>
+                  {{ post.title }}
+                  <small v-if="typeLabel(post.type)">{{ typeLabel(post.type) }}</small>
+                </RouterLink>
+              </li>
+            </ul>
+          </li>
+          <li v-if="suggestions.trees.length">
+            <span class="suggest-group">树</span>
+            <ul>
+              <li v-for="tree in suggestions.trees" :key="tree.id">
+                <RouterLink :to="treeTarget(tree)" @mousedown.prevent>
+                  {{ tree.title }}
+                  <small>{{ tree.nodeCount }} 节点</small>
+                </RouterLink>
+              </li>
+            </ul>
+          </li>
+          <li v-if="suggestions.nodes.length">
+            <span class="suggest-group">生命树节点</span>
+            <ul>
+              <li v-for="node in suggestions.nodes" :key="`${node.treeUid}:${node.nodeId}`">
+                <RouterLink :to="nodeTarget(node)" @mousedown.prevent>
+                  {{ node.nodeText }}
+                  <small>{{ node.treeTitle }}</small>
+                </RouterLink>
+              </li>
+            </ul>
+          </li>
+        </ul>
+        <p v-else-if="suggestOpen && suggesting" class="suggest-state">正在搜索词条...</p>
+      </div>
+    </section>
+
+    <!-- 首屏之下的友情链接 -->
+    <section class="friend-links" aria-labelledby="friend-link-label">
+      <p id="friend-link-label" class="friend-link-label">友情链接</p>
+      <ul class="friend-link-list">
+        <li class="friend-link-item">
+          <a
+            class="friend-link"
+            href="https://ammonitebase.cn/home"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            菊石化石研究平台<span class="friend-link-arrow" aria-hidden="true">↗</span>
+          </a>
+          <span class="friend-link-site">ammonitebase.cn</span>
         </li>
       </ul>
-      <p v-else-if="suggestOpen && suggesting" class="suggest-state">正在搜索词条...</p>
-    </div>
+    </section>
   </main>
 </template>
 
 <style scoped>
-.wiki-home { display: grid; min-height: calc(100vh - 65px); place-items: center; background: #fff; }
+.wiki-home { display: flex; flex-direction: column; background: #fff; }
+.home-hero { box-sizing: border-box; display: grid; width: 100%; min-height: calc(100vh - 65px); min-height: calc(100svh - 65px); padding: 56px 0; place-items: center; }
 .search-area { position: relative; width: min(680px, calc(100% - 40px)); }
+.friend-links { box-sizing: border-box; width: min(680px, calc(100% - 40px)); margin: 0 auto; padding: 8px 0 96px; }
+.friend-link-label { margin: 0 0 10px; color: #9ca3af; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; }
+.friend-link-list { margin: 0; padding: 0; list-style: none; }
+.friend-link-item { display: flex; flex-direction: column; gap: 4px; }
+.friend-link { align-self: flex-start; padding: 0; color: #111827; font-size: 14px; text-decoration: none; }
+.friend-link:hover { color: #3366cc; }
+.friend-link-arrow { margin-left: 5px; color: #9ca3af; font-size: 12px; }
+.friend-link-site { color: #9ca3af; font-size: 12px; letter-spacing: 0.02em; }
 .search-form input { box-sizing: border-box; width: 100%; height: 56px; padding: 0 20px; border: 1px solid #cfd4dc; border-radius: 4px; outline: 0; background: #fff; color: #111827; font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif; }
 .search-form input:focus { border-color: #111827; box-shadow: 0 0 0 3px #e5e7eb; }
 .search-form input::placeholder { color: #9ca3af; }
@@ -160,4 +190,8 @@ onBeforeUnmount(() => window.clearTimeout(suggestTimer));
 .suggest-panel small { flex: none; max-width: 45%; overflow: hidden; color: #9ca3af; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .suggest-state { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; right: 0; margin: 0; padding: 12px 16px; border: 1px solid #dfe3e8; border-radius: 8px; background: #fff; color: #9ca3af; font-size: 13px; box-shadow: 0 12px 34px rgba(17, 24, 39, 0.14); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+@media (max-width: 700px) {
+  .home-hero { padding: 32px 0; }
+  .friend-links { padding: 4px 0 72px; }
+}
 </style>

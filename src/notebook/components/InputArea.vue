@@ -12,7 +12,9 @@ import { useNotebook } from '../store.js'
 import { parseCodeDecl } from '@/utils/codeLang.js'
 import {
   codeDeclCompletionSource, laupCompletionSource, pythonCompletionSources, varCompletionSource,
+  lifetreeCompletionSource,
 } from '../completions.js'
+import { lifetreeEditorExtensions } from '../lifetreeDecor.js'
 
 const props = defineProps({ cell: { type: Object, required: true } })
 const store = useNotebook()
@@ -62,6 +64,15 @@ const roComp = new Compartment()
 const edComp = new Compartment()
 const langComp = new Compartment()
 const acComp = new Compartment()
+const ltComp = new Compartment()
+
+// [lifetree] 格专属：分叉线装饰 + 光标祖先加深 + VS 式缩进键；其他格型不挂
+function ltFor(cell) {
+  if (cell.type === 'code' && parseCodeDecl(cell.source).raw === 'lifetree') {
+    return lifetreeEditorExtensions()
+  }
+  return []
+}
 
 // 代码格的源码就是它自己（首行声明 + 代码），不再从中间切一半 ——
 // 「输入 / 输出」现在是两个独立格（[input] / [output]），不靠 `---` 分割
@@ -81,6 +92,8 @@ function acFor(cell) {
   if (cell.type !== 'code') return autocompletion({ override: [laupCompletionSource(store, cell)] })
   const sources = [codeDeclCompletionSource]
   if (parseCodeDecl(cell.source).lang === 'python') sources.push(...pythonCompletionSources())
+  // [lifetree] 分类树格：行尾 [ 参数字段补全
+  if (parseCodeDecl(cell.source).raw === 'lifetree') sources.push(lifetreeCompletionSource)
   return autocompletion({ override: sources })
 }
 
@@ -107,6 +120,7 @@ onMounted(() => {
       edComp.of(EditorView.editable.of(isEditing())),
       langComp.of(langFor(cell)),
       acComp.of(acFor(cell)),
+      ltComp.of(ltFor(cell)),
       closeBrackets(), // 引号/括号自动配对（输入 " 自动补 "）
       theme,
       highlight,
@@ -195,16 +209,16 @@ onMounted(() => {
   watch(() => cell.type, () => {
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: docFor(cell) },
-      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell))],
+      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell)), ltComp.reconfigure(ltFor(cell))],
     })
   })
 
-  // 首行声明改了（cpp→python、或写成 input）→ 只换 compartment，不碰文档，
+  // 首行声明改了（cpp→python、lifetree↔其他）→ 只换 compartment，不碰文档，
   // 免得把正在打的字冲掉
-  watch(() => parseCodeDecl(cell.source).lang, () => {
+  watch(() => `${parseCodeDecl(cell.source).lang}|${parseCodeDecl(cell.source).raw}`, () => {
     if (!view || cell.type !== 'code') return
     view.dispatch({
-      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell))],
+      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell)), ltComp.reconfigure(ltFor(cell))],
     })
   })
 })

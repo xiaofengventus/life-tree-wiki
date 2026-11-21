@@ -61,6 +61,7 @@ async function submit() {
           : '提交中……'
       },
       store.editPost ? { id: store.editPost.id, version: store.editPost.version } : null,
+      store.kernel,
     )
     store.toast = store.editPost ? '文章已更新' : '文章已提交'
     // 发布成功后清理草稿（与 laup_editor 同规则：草稿箱页「发布成功后，对应草稿会自动清理」）

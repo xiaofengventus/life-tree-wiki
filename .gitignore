@@ -57,6 +57,14 @@ Desktop.ini
 /experiments/
 /tests/
 
+# Python package (python/)
+__pycache__/
+*.py[cod]
+*.egg-info/
+/python/build/
+/python/dist/
+/python/.venv/
+
 # Native application shells (this repository is Web-only)
 # Note: android/ stays (LifeSequece/src is imported by src/ls & server/lsProjects)
 /android/

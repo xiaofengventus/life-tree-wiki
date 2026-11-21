@@ -14,20 +14,14 @@ const links = computed(() => [
   { label: "首页", to: "/" },
   { label: "专栏", to: "/columns" },
   { label: "生命树", to: "/life-tree" },
-  // LS 工程：网页版协作视图（src/views/LSWorkspace.vue），消费 /api/ls/* 协作接口
-  // （上传模型、签出子树、编辑锁、提交合并）。不带 id 打开时自动跳转主树。
-  { label: "LifeSequence", to: "/ls" },
-  // Laup 写作：已是**站内 Vue 路由**（编辑器内核 src/laup/，页面 src/views/laup_editor.vue），
-  // 走 RouterLink 客户端跳转，不再是 public/laup/ 那个整页跳转的静态副本。
-  { label: "Laup 写作", to: "/laup" },
-  // laup Notebook：Jupyter 式多格编辑器（src/notebook/），与旧版 Laup 写作并存；
-  // 提交文章走同一条发布管道，文章用 wiki-detail 样式展示。
-  { label: "Notebook", to: "/notebook" },
+  // 创作入口统一收进创作中心（/create）：左侧栏列出 LifeSequence、Laup 写作、
+  // Notebook、Laup v2、创建专栏、创建树。顶栏只留一个总入口。
+  { label: "创作中心", to: "/create" },
+  // Laup v2 公测：与 Notebook 同一套编辑器，预览改由 v2 内核渲染；v1 原样保留。
+  { label: "Laup v2", to: "/laup-v2" },
   // 计算机网络图解三部曲：public/computer-network/ 下的纯静态页（不入 Vue 路由），
   // 用 external 整页跳转；站内互链全是相对路径，必须保持同目录。
   { label: "计算机网络", to: "/computer-network/", external: true },
-  { label: "创建专栏", to: "/create-post" },
-  { label: "创建树", to: "/evolution-tree" },
   { label: "个人空间", to: spaceTarget.value },
   { label: "通知", to: "/notifications" },
   // 平台树入口暂时下线（SVG 画布在大节点量下会卡顿，统一走 life-tree 的 DOM 渲染）

@@ -68,6 +68,8 @@ figcaption { margin-top: .6em; color: #57606a; font-size: .88em; text-align: cen
   background: #f6f8fa; border: 1px dashed #d8dee4; border-radius: 8px; padding: 12px;
 }
 .laup-tex-ok { background: none; border: 0; padding: 0; }
+.laup-stay { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
+.laup-stay-line { line-height: 1.85; }
 .laup-equation { display: flex; align-items: center; gap: 12px; margin: 1.4em 0; }
 .laup-equation .laup-math-display { flex: 1; margin: 0; }
 .laup-eq-no { color: #57606a; font-size: .9em; white-space: nowrap; }

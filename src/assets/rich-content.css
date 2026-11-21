@@ -95,6 +95,16 @@
   text-transform: uppercase;
 }
 
+/* `\begin{stay} … \end{stay}`：完全原样，换行 / 缩进 / 空格都不折叠 */
+.post-content [data-life-stay],
+.markdown-preview [data-life-stay],
+.article-content [data-life-stay] {
+  margin: 1.1em 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+
 /* 代码块「复制」按钮 */
 .code-copy-button {
   position: absolute;
@@ -547,3 +557,107 @@
 .life-md-cell-body > :last-child {
   margin-bottom: 0;
 }
+
+/* ---------- Lifeseqence：```lifetree 分类树（服务端渲染产物） ---------- */
+/* 与 notebook.css 的 [lifetree] 格预览同一套视觉；浅色分叉线是 CSS 装饰，源码复制不带走。 */
+.article-content .life-tree { padding: 8px 2px; font-size: 14.5px; line-height: 1.6; overflow-x: auto; }
+.article-content .life-tree ul { list-style: none; margin: 0; padding-left: 1.4em; }
+.article-content .lt-node { position: relative; padding: 1px 0; }
+.article-content .lt-node::before { content: ''; position: absolute; left: -0.75em; top: 0; height: 100%; border-left: 1.5px solid #d9d2c0; }
+.article-content .lt-node::after { content: ''; position: absolute; left: -0.75em; top: 0.85em; width: 0.75em; border-top: 1.5px solid #d9d2c0; }
+.article-content .lt-node:last-child::before { height: 0.85em; }
+.article-content .life-tree > ul > li.lt-node::before,
+.article-content .life-tree > ul > li.lt-node::after { display: none; }
+.article-content .life-tree li:has(.lt-row:hover)::before,
+.article-content .life-tree li:has(.lt-row:hover)::after { border-color: #8a9a7b; }
+.article-content .life-tree li:has(.lt-row:hover) > .lt-row { background: #f2f0e6; border-radius: 4px; }
+.article-content .lt-row { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 4px; white-space: nowrap; }
+.article-content .lt-zh { font-weight: 600; color: #27372d; }
+.article-content .lt-latin { color: #4a5d52; font-style: italic; }
+.article-content .lt-author { color: #8b9389; font-size: 12px; }
+.article-content .lt-extinct { color: #176a8b; font-weight: 700; margin-right: 2px; }
+.article-content .lt-chip { font-size: 11px; color: #6b7280; border: 1px solid #e0dccd; border-radius: 999px; padding: 0 7px; }
+.article-content .lt-time { font-size: 12px; color: #9a6b1f; font-variant-numeric: tabular-nums; }
+.article-content .lt-ref, .article-content .lt-note, .article-content .lt-img {
+  font-size: 11px; color: #6b7280; border: 1px solid #e0dccd; border-radius: 3px; padding: 0 4px;
+}
+.article-content .lt-row-diverge .lt-marker { color: transparent; }
+.article-content .lt-row-diverge:hover .lt-marker { color: #b09a5a; }
+
+/* ── 与 Laup v2 渲染对齐 ─────────────────────────────────────────
+   同一份内容不论由哪个编辑器产出，阅读端都按 v2 的视觉口径显示：
+   对照卡 / 信息卡 / 图片图注 / 研究树 / 公式，统一间距、边框与配色。 */
+
+.article-content .life-code-sample {
+  margin: 1.4em 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #d8dee4;
+  border-radius: 8px;
+  background: #fff;
+}
+.article-content .life-code-sample-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e5e9ef;
+  background: #f6f8fa;
+}
+.article-content .life-code-sample-title { color: #33475b; font-size: 0.82em; font-weight: 600; }
+.article-content .life-code-sample-title-en { color: #8a919c; font-size: 0.75em; }
+.article-content .life-code-sample-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.article-content .life-code-sample-grid.is-single { grid-template-columns: 1fr; }
+.article-content .life-code-sample-pane { padding: 0; border: 0; border-radius: 0; }
+.article-content .life-code-sample-pane + .life-code-sample-pane { border-left: 1px solid #e5e9ef; }
+.article-content .life-code-sample-pane-head { padding: 6px 12px; }
+.article-content .life-code-sample .life-code-sample-body {
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: #fbfcfd;
+}
+
+.article-content .life-post-card {
+  border: 1px solid #a2a9b1;
+  border-radius: 4px;
+  background: #f8f9fa;
+  overflow: hidden;
+}
+.article-content .life-post-card caption {
+  background: #eaecf0;
+  color: #202122;
+  font-weight: 700;
+  text-align: left;
+}
+
+.article-content .life-image-caption-block {
+  margin: 1.4em 0;
+}
+.article-content .life-image-caption-block img { border-radius: 8px; }
+.article-content .life-image-caption-block figcaption {
+  margin-top: 0.5em;
+  color: #8a919c;
+  font-size: 0.86em;
+  text-align: center;
+}
+
+.article-content .research-tree-embed {
+  border: 1px solid #cfe0d5;
+  border-radius: 8px;
+  background: #f7fbf8;
+}
+
+.article-content [data-life-math] {
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.article-content .inline-citation-link,
+.article-content .laup-cite a { color: #3366cc; text-decoration: none; }
+.article-content .inline-citation-link:hover,
+.article-content .laup-cite a:hover { text-decoration: underline; }

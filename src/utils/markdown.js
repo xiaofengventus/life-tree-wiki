@@ -3,9 +3,13 @@ import { gfm, gfmHtml } from "micromark-extension-gfm";
 import { math } from "micromark-extension-math";
 import { mathSourceHtml } from "./micromarkMathSourceHtml";
 import { normalizeLatexDelimiters, upgradeTextLatex } from "./latexScan.js";
+import { normalizeStayBlocks, restoreStayBlocks } from "./stayBlock.js";
+import { collectTemplates, collectTemplateUsages, renderTemplateUsages } from "./docTemplate.js";
 import { sanitizeHtml } from "./sanitizeHtml";
 
 const MAX_MARKDOWN_LENGTH = 500_000;
+/** 模板嵌套上限：防止「模板调用自己」无限递归 */
+const MAX_TEMPLATE_DEPTH = 4;
 
 function wrapMarkdownImages(rawHtml) {
   if (typeof DOMParser === "undefined") return rawHtml;
@@ -100,19 +104,43 @@ function upgradeLatexNodes(rawHtml) {
   return parsed.body.innerHTML;
 }
 
-export function markdownSyntaxToHtml(markdown) {
+export function markdownSyntaxToHtml(markdown, depth = 0) {
   const source = String(markdown || "");
   if (source.length > MAX_MARKDOWN_LENGTH) {
     throw new Error("Markdown 内容不能超过 50 万个字符");
   }
+  // 两种环境：`stay` 原样块先摘出来，`stay-line` 现场改写成硬换行。
+  const { source: withStay, blocks } = normalizeStayBlocks(source);
+
+  // 文档内模板：先收声明，再把调用换成占位标记（只认已声明的名字）。
+  let withTokens = withStay;
+  let usages = [];
+  if (depth < MAX_TEMPLATE_DEPTH) {
+    const collected = collectTemplates(withStay);
+    withTokens = collected.source;
+    if (collected.templates.size) {
+      const parsed = collectTemplateUsages(withTokens, collected.templates);
+      withTokens = parsed.source;
+      usages = parsed.usages;
+    }
+  }
+
   // 先归一化 LaTeX 风格定界符：CommonMark 会把 `\(` `\[` 当反斜杠转义吃掉，
   // 导致 `\(a=1\)` 变成 `(a=1)` —— 公式源码直接损坏。归一成 `$` 系再交给 micromark。
-  return micromark(normalizeLatexDelimiters(source), {
+  const html = micromark(normalizeLatexDelimiters(withTokens), {
     allowDangerousHtml: false,
     allowDangerousProtocol: false,
     extensions: [gfm(), math()],
     htmlExtensions: [gfmHtml(), mathSourceHtml()],
   });
+
+  // 小节正文回到 Markdown 渲染器（递归），嵌套调用因此天然可用。
+  const withSections = usages.length
+    ? renderTemplateUsages(html, usages, (sectionMarkdown) =>
+        markdownSyntaxToHtml(sectionMarkdown, depth + 1),
+      )
+    : html;
+  return restoreStayBlocks(withSections, blocks);
 }
 
 export function markdownToSafeHtml(markdown) {

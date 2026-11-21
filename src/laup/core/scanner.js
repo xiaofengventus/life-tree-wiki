@@ -118,7 +118,7 @@ export function scan(lines, base, ctx) {
       }
 
       // ── Laup 环境：\begin{…}
-      if (/^\s*\\begin\{[A-Za-z][A-Za-z0-9]*\}/.test(raw)) {
+      if (/^\s*\\begin\{[A-Za-z][A-Za-z0-9-]*\}/.test(raw)) {
         i = readEnv(lines, i, base, ctx, out, scan);
         continue;
       }

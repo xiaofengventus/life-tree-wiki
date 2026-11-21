@@ -50,6 +50,7 @@ function styleOf(node) {
 const CORE_BLOCK_TYPES = [
   'Heading', 'Para', 'Quote', 'Center', 'Hr', 'LineBreak', 'Toc', 'Raw', 'Broken',
   'CodeBlock', 'Image', 'Math', 'Equation', 'List', 'Table', 'Footnote',
+  'Stay', 'StayLine',
 ];
 const CORE_INLINE_TYPES = [
   'Text', 'Code', 'Strong', 'Emph', 'Del', 'Underline', 'Color', 'Size', 'Link',
@@ -167,6 +168,14 @@ function renderBlock(node, ctx) {
       return `<p>${renderMath(node, ctx, false)}</p>`;
     case 'Equation':
       return renderEquation(node, ctx);
+    case 'Stay':
+      // 原样块：整段转义后放进 pre-wrap 的容器，换行与缩进都由 CSS 保留
+      return `<div class="laup-stay">${esc(node.text)}</div>`;
+    case 'StayLine':
+      // 只保留换行：每行照常做行内解析，行与行之间插 <br>
+      return `<div class="laup-stay-line">${node.lines
+        .map((line) => renderInline(line, ctx))
+        .join('<br>')}</div>`;
     case 'List':
       return renderList(node, ctx);
     case 'Table':

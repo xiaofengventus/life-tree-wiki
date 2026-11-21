@@ -4,6 +4,7 @@ import {
   ensurePublicPostTitleAvailable,
   loadPost,
   normalizeContentFormat,
+  normalizeContentKernel,
   normalizePostType,
   postSummary,
 } from "../../../server/posts.js";
@@ -163,11 +164,15 @@ export const onRequestPost = withApi(async ({ request, env }) => {
   let contentHtml;
   let contentText;
   let contentSource = null;
+  let contentKernel = null;
   if (contentFormat === "laup") {
-    const rendered = renderLaupPost(body.content);
+    // 内核版本显式落库：客户端带 contentKernel 就用它，没带则按内容判定后一并存下
+    const requestedKernel = normalizeContentKernel(body.contentKernel);
+    const rendered = renderLaupPost(body.content, { kernel: requestedKernel || undefined });
     contentHtml = rendered.html;
     contentText = rendered.text;
     contentSource = String(body.content ?? "");
+    contentKernel = requestedKernel || rendered.kernel;
   } else {
     contentHtml = await sanitizePostHtml(body.content);
     contentText = htmlToPlainText(contentHtml);
@@ -222,13 +227,13 @@ export const onRequestPost = withApi(async ({ request, env }) => {
     env.DB.prepare(
       `INSERT INTO posts
         (id, creator_id, title, author, cover_media_hash, content_html, content_text,
-         content_laup,
+         content_laup, content_kernel,
          tags_json, type, classification_card_json, citations_json,
          license, revision_count, change_note, visibility,
          version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     ).bind(
-      id, user.id, title, author, coverHash, contentHtml, contentText, contentSource,
+      id, user.id, title, author, coverHash, contentHtml, contentText, contentSource, contentKernel,
       tagsJson, postType, classificationCardJson, citationsJson,
       license, isPrivate ? 0 : 1, changeNote, visibility, now, now,
     ),
@@ -238,12 +243,12 @@ export const onRequestPost = withApi(async ({ request, env }) => {
     statements.push(
       env.DB.prepare(
         `INSERT INTO post_revisions
-          (post_id, revision_number, title, content_html, content_laup,
+          (post_id, revision_number, title, content_html, content_laup, content_kernel,
            classification_card_json,
            citations_json, change_note, created_at, created_by)
-         VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
-        id, title, contentHtml, contentSource, classificationCardJson, citationsJson,
+        id, title, contentHtml, contentSource, contentKernel, classificationCardJson, citationsJson,
         changeNote, now, user.id,
       ),
       env.DB.prepare(

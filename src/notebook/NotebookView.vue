@@ -9,6 +9,8 @@ import { useDraftAutosave } from '@/composables/useDraftAutosave'
 import { getDraft, saveDraft, userDraftOwnerKey } from '@/services/drafts'
 import { fetchPost } from '@/services/posts'
 import { useUserStore } from '@/stores/user'
+import { detectLaupKernel } from '../../shared/laupKernel.js'
+import { importNotebookV2 } from './kernelV2.js'
 import NavBar from '@/components/navBar.vue'
 import MenuBar from './components/MenuBar.vue'
 import CellCard from './components/CellCard.vue'
@@ -19,6 +21,10 @@ import './notebook.css'
 const route = useRoute()
 const store = useNotebook()
 const userStore = useUserStore()
+
+// 渲染内核由路由决定：/notebook = v1（旧版），/laup-v2 = v2（公测）。
+// 编辑器、快捷键、草稿、提交链路完全共用，只有预览走不同的内核。
+const props = defineProps({ kernel: { type: String, default: 'v1' } })
 
 const showHelp = ref(false)
 const showSubmit = ref(false)
@@ -32,6 +38,8 @@ function draftBody() {
     execCounter: store.execCounter,
     // 渲染位置（下方/原地/折叠）跟草稿一起走：换台机器继续编辑时观感一致
     renderMode: store.renderMode,
+    // 内核标记：草稿箱据此把「继续编辑」送回 /notebook 或 /laup-v2
+    kernel: store.kernel,
   }
 }
 
@@ -64,6 +72,7 @@ watch([draftAutosave.draftId, draftAutosave.status, draftAutosave.lastSavedAt, d
 }, { immediate: true })
 
 onMounted(async () => {
+  store.setKernel(props.kernel)
   store.ensureLoaded()
   // ?draft=<id>：从草稿箱「继续编辑」跳回来
   const draftId = String(route.query.draft || '')
@@ -82,7 +91,11 @@ onMounted(async () => {
         store.applyDraft(draft.payload || {})
         store.editPost = draft.payload?.editPost || null
         draftAutosave.setDraft(draft)
-        store.toast = '已载入本机草稿'
+        // 草稿带着内核标记：跨页打开时提示一下，避免"v2 稿子在 v1 页面里看着不对"被当成渲染 bug
+        const draftKernel = draft.payload?.kernel === 'v2' ? 'v2' : 'v1'
+        store.toast = draftKernel === props.kernel
+          ? '已载入本机草稿'
+          : `这份草稿是用 ${draftKernel} 内核保存的，当前是 ${props.kernel} 内核，建议回草稿箱重新打开`
       } else {
         store.toast = '没找到这份草稿（可能已被删除或换过浏览器）'
       }
@@ -99,7 +112,17 @@ onMounted(async () => {
       if (post?.contentType !== 'laup' || !post.contentSource) {
         store.toast = '这篇不是 Laup 正文，无法在 Notebook 中编辑'
       } else {
-        store.applyDraft({ cells: parseLaupDoc(post.contentSource), scope: {}, execCounter: 0 })
+        // 文档由哪套内核写的，就用哪套解析器装回格（v2 的格标记 v1 解析器不认）
+        const docKernel = post.contentKernel === 'v1' || post.contentKernel === 'v2'
+          ? post.contentKernel
+          : detectLaupKernel(post.contentSource)
+        const cells = docKernel === 'v2'
+          ? importNotebookV2(post.contentSource)
+          : parseLaupDoc(post.contentSource)
+        store.applyDraft({ cells, scope: {}, execCounter: 0 })
+        store.toast = docKernel === props.kernel
+          ? `正在编辑文章「${post.title}」`
+          : `这篇是用 ${docKernel} 内核写的，当前是 ${props.kernel} 页面 —— 建议到对应入口编辑`
         store.editPost = {
           id: post.id,
           version: Number(post.version) || 1,
@@ -110,7 +133,6 @@ onMounted(async () => {
           license: post.license || '支持闭源',
           visibility: post.visibility || 'PUBLIC',
         }
-        store.toast = `正在编辑文章「${post.title}」`
       }
     } catch (e) {
       store.toast = `文章载入失败：${e?.message || '未知错误'}`

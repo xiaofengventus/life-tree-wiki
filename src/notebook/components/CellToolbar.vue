@@ -29,6 +29,25 @@ async function onPickFiles(ev) {
   }
 }
 
+// [lifetree] 格：新窗口打开全局预览（时序图 + 地质年代轴）。
+// 数据经 localStorage 传递 —— 新窗口是独立的 Vue 实例，跨窗口传 props 不可行，
+// localStorage 是最轻的桥（预览页读取后按同一条解析+渲染链路出图）。
+function openGlobalPreview() {
+  try {
+    localStorage.setItem(
+      'lifetree-preview-source',
+      JSON.stringify({ source: props.cell.source, ts: Date.now() }),
+    )
+    window.open('/lifetree-preview', '_blank')
+  } catch (e) {
+    store.toast?.(`打开预览失败：${e?.message || e}`)
+  }
+}
+
+const isLifetree = computed(
+  () => props.cell.type === 'code' && parseCodeDecl(props.cell.source).raw === 'lifetree',
+)
+
 const icons = {
   run: '<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 2l9 6-9 6z" fill="currentColor"/></svg>',
   dup: '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5" y="5" width="8" height="9" rx="1"/><path d="M11 5V3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h1"/></svg>',
@@ -37,6 +56,7 @@ const icons = {
   add: '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>',
   del: '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.7 9h4.6l.7-9M6.8 7v4.5M9.2 7v4.5"/></svg>',
   img: '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="5.5" cy="6.5" r="1.2"/><path d="M2.5 12l3.5-3.5 2.5 2.5 3-3 2.5 2.5"/></svg>',
+  chrono: '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="3" rx="0.5"/><path d="M2.5 8h5M9.5 8h4M2.5 8v2.5M7.5 8v2.5M13.5 8v2.5M4 10.5v1M11 10.5v1"/><path d="M2 13.5h12" stroke-dasharray="2 1.5"/></svg>',
 }
 </script>
 
@@ -45,6 +65,7 @@ const icons = {
     <button class="type-badge" :title="'格类型：' + cell.type + '（点击切换 laup→code→var）'"
             @click="store.cycleType(cell.id)">{{ badge }}</button>
     <button title="重新渲染本格（Shift+Enter）" @click="store.runCell(cell.id, true)" v-html="icons.run" />
+    <button v-if="isLifetree" title="全局预览（新窗口：时序图 + 地质年代轴）" @click="openGlobalPreview" v-html="icons.chrono" />
     <button title="上传图片（存为本格附件，也可直接拖拽/粘贴进输入区）" @click="fileInput.click()" v-html="icons.img" />
     <button title="复制本格" @click="store.dupCell(cell.id)" v-html="icons.dup" />
     <button title="上移" @click="store.moveCell(cell.id, -1)" v-html="icons.up" />

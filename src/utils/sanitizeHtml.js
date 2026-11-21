@@ -137,6 +137,11 @@ export function sanitizeHtml(rawHtml) {
       }
     }
     if (element.tagName === "DIV") {
+      if (Object.prototype.hasOwnProperty.call(original, "data-life-stay")) {
+        // `\begin{stay}` 原样块：换行靠 CSS 的 white-space: pre-wrap
+        element.setAttribute("data-life-stay", "");
+        continue;
+      }
       if (original["data-w-e-type"] === "todo") {
         element.setAttribute("data-w-e-type", "todo");
       } else {

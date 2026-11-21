@@ -3,8 +3,11 @@ import {
   buildRefPool, collectCitedNums, collectRefBlocks, exportLaupDoc, migrateCodeCells,
   parseLaupDoc, planCodePanes, runCellSource,
 } from './renderer.js'
+import { runCellSourceV2, exportNotebookV2, collectV2References, v2ReferenceDisplayIndex } from './kernelV2.js'
 
-const LS_KEY = 'laup-notebook-v2'
+// 两套内核各存各的：v2 公测页不读也不写 v1 的稿子。
+// v1 的键沿用历史名字（laup-notebook-v2），改名会让存量草稿凭空消失。
+const LS_KEYS = { v1: 'laup-notebook-v2', v2: 'laup2-beta-notebook' }
 
 /** 渲染位置的合法取值（默认 below）。 */
 export const RENDER_MODES = ['below', 'inplace', 'folded']
@@ -20,6 +23,9 @@ function emptyCell(type = 'laup') {
 export const useNotebook = defineStore('notebook', {
   state: () => ({
     cells: [],
+    // 渲染内核：'v1'（旧版，/notebook）| 'v2'（公测，/laup-v2）。
+    // 只影响预览；变量芯片与 [lifetree] 树仍走 v1（见 kernelV2.js）。
+    kernel: 'v1',
     selectedId: null,
     mode: 'command', // command | edit，对齐 Jupyter 双模式
     // 渲染结果的显示位置（工具条上的开关，用户自选；默认保留下方）：
@@ -57,10 +63,27 @@ export const useNotebook = defineStore('notebook', {
   },
 
   actions: {
+    // 切换内核：先把当前稿子同步落盘（用旧内核的键），再换键加载。
+    // 两套内核的数据互不可见，避免 v2 公测页把 v1 的稿子渲染成"坏掉的样子"。
+    setKernel(kernel) {
+      const next = kernel === 'v2' ? 'v2' : 'v1'
+      if (this.kernel === next) return
+      this.persist(true)
+      this.kernel = next
+      this.cells = []
+      this.selectedId = null
+      this.mode = 'command'
+      this.scope = {}
+      this.execCounter = 0
+      this.editPost = null
+      this.savedAt = null
+      this.draftStatus = ''
+    },
+
     // ---------- 初始化：localStorage 优先，否则空白启动（一个空 laup 格） ----------
     ensureLoaded() {
       let data = null
-      try { data = JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch { data = null }
+      try { data = JSON.parse(localStorage.getItem(LS_KEYS[this.kernel]) || 'null') } catch { data = null }
       if (data?.cells?.length) {
         // 旧版代码格（源码是一整块 `输入---输出`）在这一步拆成 [input] / [output] 两格
         this.cells = migrateCodeCells(data.cells, () => emptyCell('code'))
@@ -121,9 +144,10 @@ export const useNotebook = defineStore('notebook', {
     _t: null,
     persist(immediate = false) {
       clearTimeout(this._t)
+      const key = LS_KEYS[this.kernel]
       const write = () => {
         try {
-          localStorage.setItem(LS_KEY, JSON.stringify({
+          localStorage.setItem(key, JSON.stringify({
             cells: this.cells, execCounter: this.execCounter, renderMode: this.renderMode,
           }))
           this.savedAt = new Date().toLocaleTimeString()
@@ -136,7 +160,7 @@ export const useNotebook = defineStore('notebook', {
               execCounter: this.execCounter,
               renderMode: this.renderMode,
             }
-            localStorage.setItem(LS_KEY, JSON.stringify(slim))
+            localStorage.setItem(key, JSON.stringify(slim))
             this.savedAt = new Date().toLocaleTimeString()
             this.toast = '图片附件超出本机存储，草稿只保存了文字（提交不受影响）'
           } catch {
@@ -156,6 +180,15 @@ export const useNotebook = defineStore('notebook', {
       this.persist()
     },
 
+    // 按当前内核渲染一格。v1 / v2 共用同一套运行流程与作用域；
+    // v2 交回 kernelV2 的适配层（变量芯片、lifetree 等仍由 v1 承担）。
+    renderCell(c, pool, cited, isDisp, pane) {
+      if (this.kernel === 'v2') {
+        return runCellSourceV2(c, { scope: this.scope, refPool: pool, isRefDisplay: isDisp, pane })
+      }
+      return runCellSource(c, this.scope, pool, cited, isDisp, pane)
+    },
+
     // 渲染位置开关：只改「结果画在哪」，一格数据都不动，所以不触发重渲。
     // 非法值退回默认档，免得本地存了个旧值时整页没有输出区。
     setRenderMode(mode) {
@@ -171,7 +204,7 @@ export const useNotebook = defineStore('notebook', {
       const panes = planCodePanes(this.cells)
       this.cells.forEach((c, i) => {
         if (c.type !== 'code') return
-        c.outputHtml = runCellSource(c, this.scope, [], null, false, panes.get(i) || null).outputHtml
+        c.outputHtml = this.renderCell(c, [], null, false, panes.get(i) || null).outputHtml
       })
     },
 
@@ -231,9 +264,9 @@ export const useNotebook = defineStore('notebook', {
       })
     },
 
-    // 全局文献池：所有 laup 格的 \references 块按格顺序汇总（\cite 跨格解析用）
+    // 全局文献池：v2 只认 [references] 代码格；v1 走原有的数据块汇总
     refPool() {
-      return buildRefPool(this.cells)
+      return this.kernel === 'v2' ? collectV2References(this.cells) : buildRefPool(this.cells)
     },
 
     citedNums() {
@@ -248,6 +281,7 @@ export const useNotebook = defineStore('notebook', {
     // 全局文献列表的展示格：优先第一个自带 \references 块的 laup 格；
     // 声明只出现在 var 格时，var 格本身不渲染文献列表，退化为第一个 \cite 的 laup 格
     refDisplayIdx() {
+      if (this.kernel === 'v2') return v2ReferenceDisplayIndex(this.cells)
       const cells = this.cells
       const i = cells.findIndex((c) => c.type === 'laup' && collectRefBlocks(c.source).length > 0)
       if (i >= 0) return i
@@ -263,7 +297,7 @@ export const useNotebook = defineStore('notebook', {
         this.renderCodeCells()
       } else {
         c.execCount = ++this.execCounter
-        const { outputHtml } = runCellSource(c, this.scope, this.refPool(), this.citedNums(),
+        const { outputHtml } = this.renderCell(c, this.refPool(), this.citedNums(),
           this.cells.findIndex((x) => x.id === id) === this.refDisplayIdx(), null)
         c.outputHtml = outputHtml
       }
@@ -289,7 +323,7 @@ export const useNotebook = defineStore('notebook', {
       this.cells.forEach((c, i) => {
         if (c.type !== 'code') c.execCount = ++this.execCounter
         try {
-          const { outputHtml } = runCellSource(c, this.scope, pool, cited, i === disp, panes.get(i) || null)
+          const { outputHtml } = this.renderCell(c, pool, cited, i === disp, panes.get(i) || null)
           c.outputHtml = outputHtml
         } catch (e) {
           // 单格异常不许中断「运行全部」——把错误画进这一格的输出区
@@ -368,6 +402,8 @@ export const useNotebook = defineStore('notebook', {
     exportLanb() {
       const blob = new Blob([JSON.stringify({
         cells: this.cells, execCounter: this.execCounter, renderMode: this.renderMode,
+        // 内核标记：.lanb 是"编辑器快照"，带上它才能把文件还原到对的内核
+        kernel: this.kernel,
       }, null, 2)], { type: 'application/json' })
       download(blob, 'notebook.lanb')
     },
@@ -382,11 +418,24 @@ export const useNotebook = defineStore('notebook', {
       this.scope = {}
       this.runAll(false)
       this.persist(true)
+      // 内核只是提示，不强行切换：导入后立即换成另一套渲染会让人以为文件被改了
+      if (data.kernel === 'v2' && this.kernel !== 'v2') {
+        this.toast = '这份 .lanb 由 v2 内核导出，建议到「Laup v2」页打开以获得同样的预览'
+      }
     },
 
     exportLaup() {
-      const blob = new Blob([exportLaupDoc(this.cells, this.scope)], { type: 'text/plain' })
-      download(blob, 'notebook.laup')
+      try {
+        // 两套内核各导各的：v2 文档不再包含 v1 宿主层的 \varcell / ```code / ```sample
+        const text = this.kernel === 'v2'
+          ? exportNotebookV2(this.cells)
+          : exportLaupDoc(this.cells, this.scope)
+        const blob = new Blob([text], { type: 'text/plain' })
+        download(blob, 'notebook.laup')
+      } catch (error) {
+        // 导出同时做 v2 语法校验：v1 写法混进来时给出明确提示，而不是导出坏文档
+        this.toast = `导出失败：${error?.message || error}`
+      }
     },
   },
 })

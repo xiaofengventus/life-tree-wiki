@@ -12,6 +12,7 @@
 import { snippetCompletion } from '@codemirror/autocomplete'
 import { globalCompletion, localCompletionSource } from '@codemirror/lang-python'
 import { languageOptions, PANE_INPUT, PANE_OUTPUT } from '@/utils/codeLang.js'
+import { PARAM_KEYS } from '@/laup/extensions/lifetree.js'
 
 // from 必须包含反斜杠本身（cmdM[0] 而非 cmdM[1]）：否则只输入 \ 就确认时，
 // 原反斜杠不被替换，snippet 又以 \ 开头 → 出现 \\textcolor 重复。
@@ -103,6 +104,12 @@ export const laupCommandOptions = [
   snippetCompletion('\\begin{center}\n${内容}\n\\end{center}', {
     label: 'begin center', detail: '居中环境', type: 'function',
   }),
+  snippetCompletion('\\begin{stay}\n${原样内容}\n\\end{stay}', {
+    label: 'begin stay', detail: '原样块：不解析、保留换行与缩进', type: 'function',
+  }),
+  snippetCompletion('\\begin{stay-line}\n${第一句}\n${第二句}\n\\end{stay-line}', {
+    label: 'begin stay-line', detail: '每行换行，行内语法与公式照常解析', type: 'function',
+  }),
   snippetCompletion('\\begin{equation}{eq:${id}}\n${公式}\n\\end{equation}\n\n见式 \\eqref{eq:${id}}。', {
     label: 'begin equation', detail: '带编号公式 + \\eqref 引用', type: 'function',
     info: '编号按出现顺序自动生成 (1)(2)…；{eq:id} 可省略',
@@ -131,6 +138,26 @@ export const pythonSnippetOptions = [
   snippetCompletion('if ${cond}:\n    ${pass}', { label: 'if', detail: '条件模板', type: 'keyword' }),
   snippetCompletion('def ${name}(${args}):\n    ${pass}', { label: 'def', detail: '函数模板', type: 'keyword' }),
 ]
+
+// ---------- \begin{ 环境名 ----------
+// 单独一条：`\begin{` 之后不再匹配 `\\(\w*)$`，没有这段就只能在 `\` 后面看到
+// 「\begin stay」整条片段，打了一半的环境名没有任何提示。
+const ENV_OPTIONS = [
+  ['quote', '引用环境（内可写 md/laup）'],
+  ['center', '居中环境'],
+  ['itemize', '多段列表（\\item 起项）'],
+  ['enumerate', '有序多段列表'],
+  ['equation', '带编号公式（可写 {eq:id}）'],
+  ['stay', '原样块：不解析、保留换行与缩进'],
+  ['stay-line', '每行换行，行内语法与公式照常解析'],
+].map(([name, detail]) =>
+  // from 已经吃掉了 `\begin{`，所以模板从名字开始，并顺手补上结束标记
+  snippetCompletion(`${name}}\n\${内容}\n\\end{${name}}`, {
+    label: name,
+    detail,
+    type: 'keyword',
+  }),
+)
 
 // ---------- laup 格补全源 ----------
 // store / cell 是响应式引用，每次补全时实时读取
@@ -192,6 +219,12 @@ export function laupCompletionSource(store, cell) {
         }),
       ]
       return { from: context.pos - fenceM[0].length, options, validFor: /^`{2,3}\w*$/ }
+    }
+
+    // \begin{ —— 环境名（含 stay / stay-line）
+    const envM = /\\begin\{([\w-]*)$/.exec(before)
+    if (envM) {
+      return { from: context.pos - envM[1].length, options: ENV_OPTIONS, validFor: /^[\w-]*$/ }
     }
 
     // \ —— 扩展命令
@@ -275,4 +308,31 @@ export function codeDeclCompletionSource(context) {
   // from 要含掉那个 `[`（标签本身也带 `[`）：CM 用 from→光标之间的文字做前缀过滤，
   // 两边都带括号才过滤得动 —— 只带一边的话一敲字就一条选项都不剩。
   return { from: context.pos - m[0].length, options, validFor: /^\[[A-Za-z0-9_+#-]*$/ }
+}
+
+// ---------- lifetree 格补全源：行尾 [ 参数字段 ----------
+// [lifetree] 格里打出 `[` 就列出参数字段（拉丁名/阶元/作者/年份/时间/文献/备注/图片），
+// 选中插入 `键=`，值自己填 —— 与解析器的行尾参数段同一份键清单。
+const LIFETREE_PARAM_HINTS = {
+  拉丁名: '学名（覆盖正文解析出的拉丁名）',
+  阶元: '分类阶元：界/门/纲/目/科/属/种…',
+  作者: '命名人（正文里写了可省）',
+  年份: '命名年代（正文里写了可省）',
+  时间: '旧写法，等价于 生存（时序图画标记）',
+  生存: '生存时间：区间「老端-新端」画色带，单值画圆点（如 68-66 / 68）',
+  分化: '内节点分化时间（百万年前，一般不填，缺省自动估计）',
+  文献: '依据文献',
+  备注: '备注',
+  图片: '图片',
+}
+export function lifetreeCompletionSource(context) {
+  const line = context.state.doc.lineAt(context.pos)
+  if (line.number === 1) return null // 第一行是 [lifetree] 声明，不掺和
+  const before = line.text.slice(0, context.pos - line.from)
+  const m = /\[([A-Za-z_\u4e00-\u9fa5=,\s]*)$/.exec(before)
+  if (!m) return null
+  const options = PARAM_KEYS.map((key) => ({
+    label: `${key}=`, type: 'property', detail: LIFETREE_PARAM_HINTS[key] || '参数字段', apply: `${key}=`,
+  }))
+  return { from: context.pos - m[1].length, options, validFor: /^[A-Za-z_\u4e00-\u9fa5=,\s]*$/ }
 }

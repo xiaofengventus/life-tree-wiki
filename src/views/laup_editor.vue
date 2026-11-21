@@ -202,6 +202,8 @@ async function submit() {
       creatorUid: userStore.user?.uid || null,
       content: source.value,
       contentFormat: "laup",
+      // 旧版 Laup 编辑器产出的永远是 v1 文档
+      contentKernel: "v1",
       tags: [...tags.value],
       type: postType.value,
       license: license.value,

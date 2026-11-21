@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lifetree-render"
+version = "0.1.0"
+description = "把生命树（cladogram）文档渲染成 PNG / SVG 的 Python 库"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = ["lifetree", "cladogram", "phylogeny", "tree", "visualization", "svg"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = []
+
+[project.optional-dependencies]
+png = ["pillow>=9.0.0"]
+yaml = ["pyyaml>=6.0"]
+
+[project.scripts]
+lifetree = "lifetree.cli:main"
+
+[tool.setuptools]
+packages = ["lifetree"]

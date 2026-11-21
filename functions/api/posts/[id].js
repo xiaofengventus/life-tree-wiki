@@ -8,6 +8,7 @@ import {
   ensurePublicPostTitleAvailable,
   loadPost,
   normalizeContentFormat,
+  normalizeContentKernel,
   normalizePostType,
 } from "../../../server/posts.js";
 import { formatPublicId, parsePublicId } from "../../../server/publicIds.js";
@@ -51,7 +52,7 @@ export const onRequestGet = withApi(async ({ request, params, env }) => {
       throw new ApiError(400, "版本号无效", "INVALID_REVISION");
     }
     const revision = await env.DB.prepare(
-      `SELECT r.revision_number, r.title, r.content_html, r.content_laup,
+      `SELECT r.revision_number, r.title, r.content_html, r.content_laup, r.content_kernel,
               r.change_note, r.created_at,
               u.display_name AS editor_name, u.public_id AS editor_public_id
          FROM post_revisions r LEFT JOIN users u ON u.id = r.created_by
@@ -71,6 +72,8 @@ export const onRequestGet = withApi(async ({ request, params, env }) => {
             ? formatPublicId("user", revision.editor_public_id)
             : "",
           contentType: revision.content_laup ? "laup" : "html",
+          // 该历史版本的内核（存量为空 → 回滚时由服务端按内容判定）
+          contentKernel: revision.content_kernel || "",
           // laup 文章给源码（diff/回滚的真相）；html 文章给清洗后的 HTML
           contentSource: revision.content_laup || "",
           content: revision.content_html,
@@ -141,11 +144,16 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
   let contentHtml;
   let contentText;
   let contentSource = null;
+  let contentKernel = null;
   if (contentFormat === "laup") {
-    const rendered = renderLaupPost(body.content);
+    // 显式内核版本优先；未带时按内容判定，判定结果一并落库（存量文章借此补齐）
+    const requestedKernel = normalizeContentKernel(body.contentKernel)
+      || normalizeContentKernel(existing.content_kernel);
+    const rendered = renderLaupPost(body.content, { kernel: requestedKernel || undefined });
     contentHtml = rendered.html;
     contentText = rendered.text;
     contentSource = String(body.content ?? "");
+    contentKernel = requestedKernel || rendered.kernel;
   } else {
     contentHtml = await sanitizePostHtml(body.content);
     contentText = htmlToPlainText(contentHtml);
@@ -220,13 +228,13 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
   const statements = [
     env.DB.prepare(
       `UPDATE posts SET title = ?, author = ?, cover_media_hash = ?, content_html = ?, content_text = ?,
-        content_laup = ?,
+        content_laup = ?, content_kernel = ?,
         tags_json = ?, type = ?, classification_card_json = ?, citations_json = ?,
         license = ?, revision_count = ?,
         change_note = ?, visibility = ?, version = ?, updated_at = ?
        WHERE id = ? AND version = ? AND deleted_at IS NULL`,
     ).bind(
-      title, author, coverHash, contentHtml, contentText, contentSource, tagsJson, postType,
+      title, author, coverHash, contentHtml, contentText, contentSource, contentKernel, tagsJson, postType,
       classificationCardJson, citationsJson,
       license, nextRevision, changeNote, visibility, nextVersion,
       now, id, expectedVersion,
@@ -236,13 +244,13 @@ export const onRequestPut = withApi(async ({ request, params, env }) => {
     statements.push(
       env.DB.prepare(
         `INSERT INTO post_revisions
-          (post_id, revision_number, title, content_html, content_laup,
+          (post_id, revision_number, title, content_html, content_laup, content_kernel,
            classification_card_json,
            citations_json, change_note, created_at, created_by)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE EXISTS (SELECT 1 FROM posts WHERE id = ? AND version = ?)`,
       ).bind(
-        id, nextRevision, title, contentHtml, contentSource, classificationCardJson,
+        id, nextRevision, title, contentHtml, contentSource, contentKernel, classificationCardJson,
         citationsJson, changeNote, now, user.id, id, nextVersion,
       ),
     );

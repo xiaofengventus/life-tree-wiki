@@ -49,18 +49,25 @@ const LANG_LABELS = [
   ['json', 'JSON'], ['bash', 'Shell'], ['html', 'HTML'], ['css', 'CSS'], ['text', '纯文本'],
 ]
 
+// 非 Prism 语法、但有专门渲染路线的声明名（不上色，走自己的预览）
+const SPECIAL_DECLS = [
+  ['lifetree', '生命树'],
+]
+
 /** 补全 / 提示用的语言清单。`name` 是写进 `[…]` 的字面量，`label` 是给人看的名字。 */
 export function languageOptions() {
-  return LANG_LABELS
+  const code = LANG_LABELS
     .filter(([name]) => name === 'text' || Boolean(Prism.languages[normalizeLang(name)]))
     .map(([name, label]) => ({ name, label }))
+  return [...code, ...SPECIAL_DECLS.map(([name, label]) => ({ name, label }))]
 }
 
-// 认得出是「声明」的名字集：清单里的语言 + 别名表里的键。
+// 认得出是「声明」的名字集：清单里的语言 + 别名表里的键 + 专门渲染路线的名字。
 // 不在这张表里的 `[…]` 一律当正文 —— 否则代码里以 `[x]` 开头的一行会被误吃。
 const DECLARABLE = new Set([
   ...LANG_LABELS.map(([name]) => name),
   ...Object.keys(ALIASES),
+  ...SPECIAL_DECLS.map(([name]) => name),
 ])
 
 // 声明行的词法：`[名字]` 或 `[名字:参数]`，必须独占第一行（行尾可有可无换行）

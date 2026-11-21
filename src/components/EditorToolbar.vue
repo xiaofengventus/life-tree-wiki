@@ -45,7 +45,6 @@ import { CITATION_MENU_KEY } from "@/utils/wangEditorCitation";
 import { FORMULA_MENU_KEY } from "@/utils/wangEditorFormula";
 import { INSERT_MENU_KEY } from "@/utils/wangEditorInsertMenu";
 import { formatToolbarShortcut } from "@/utils/toolbarTooltips";
-
 const props = defineProps({
   editor: { type: Object, default: null },
   citationPanelOpen: { type: Boolean, default: false },
@@ -79,10 +78,9 @@ const toolbarConfig = {
     CODE_SAMPLE_MENU_KEY,
     MD_CELL_MENU_KEY,
     "insertLink",
-    "uploadImage",
-    INSERT_CARD_MENU_KEY,
-    INSERT_TREE_MENU_KEY,
-    IMPORT_MARKDOWN_MENU_KEY,
+    // 图片 / 卡片 / 进化树 / Markdown 统一收进「插入内容」面板：
+    // 之前工具栏、插入面板、浮动工具栏各有一套入口，同一个内容要记三个地方。
+    INSERT_MENU_KEY,
     CITATION_MENU_KEY,
     FORMULA_MENU_KEY,
     "|",
@@ -123,7 +121,7 @@ const toolbarTooltipDefinitions = {
   [FLOATING_TOOLS_MENU_KEY]: { label: "浮动工具栏开关" },
   [IMPORT_DOC_MENU_KEY]: { label: "导入文档（Word / Markdown / HTML）" },
   [EXPORT_DOC_MENU_KEY]: { label: "导出文档（Word / Markdown / HTML）" },
-  [INSERT_MENU_KEY]: { label: "插入内容", shortcut: "mod+Shift+I" },
+  [INSERT_MENU_KEY]: { label: "插入内容（图片 / 卡片 / 进化树 / Markdown）", shortcut: "mod+Shift+I" },
   [CITATION_MENU_KEY]: { label: "插入正文引用", shortcut: "mod+Alt+K" },
   [FORMULA_MENU_KEY]: { label: "插入数学公式", shortcut: "mod+Alt+M" },
   undo: { label: "撤销", shortcut: "mod+Z" },

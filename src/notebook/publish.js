@@ -46,9 +46,10 @@ function collectAttachmentUrls(cells) {
  * @param onStep   (done, total, stage) 进度回调；stage: 'upload' | 'submit'
  * @param edit     编辑已发布文章时传 { id, version }（乐观锁版本号，PUT /api/posts/:id）；
  *                 null = 新建文章
+ * @param kernel   'v1' | 'v2'：用哪套内核导出 .laup（v2 文档不含 v1 宿主层写法）
  * @returns 保存后的文章对象（含 uid/title/visibility）
  */
-export async function publishNotebook(cells, scope, meta, user, onStep = () => {}, edit = null) {
+export async function publishNotebook(cells, scope, meta, user, onStep = () => {}, edit = null, kernel = 'v1') {
   // ① 附件上传（唯一化：同一张图只传一次）
   const urls = collectAttachmentUrls(cells)
   const urlMap = new Map()
@@ -62,8 +63,10 @@ export async function publishNotebook(cells, scope, meta, user, onStep = () => {
 
   // ② 导出 Laup 源码（附件 data URL → /media/<hash>）
   onStep(0, 1, 'submit')
-  const { exportLaupDoc } = await import('./renderer.js')
-  const content = exportLaupDoc(cells, scope, urlMap)
+  // 两套内核各导各的：v2 页发布的文档只含 v2 语法，服务端据此选内核
+  const content = kernel === 'v2'
+    ? (await import('./kernelV2.js')).exportNotebookV2(cells, urlMap)
+    : (await import('./renderer.js')).exportLaupDoc(cells, scope, urlMap)
   if (!content.replace(/import\s+"laup"|\s/g, '')) {
     const err = new Error('正文为空：至少写一个 laup 格再提交')
     err.code = 'EMPTY_CONTENT'
@@ -80,6 +83,8 @@ export async function publishNotebook(cells, scope, meta, user, onStep = () => {
     creatorUid: user?.uid || null,
     content,
     contentFormat: 'laup',
+    // 内核版本显式落库：阅读端/服务端不必再猜是 v1 还是 v2
+    contentKernel: kernel,
     tags: meta.tags,
     type: meta.type,
     license: meta.license,

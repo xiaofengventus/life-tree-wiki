@@ -35,7 +35,9 @@ const visibleDrafts = computed(() => {
 });
 
 function typeLabel(draft) {
-  return { TREE: "进化树", LAUP: "Laup 文章" }[draft.contentType] || "文章";
+  const base = { TREE: "进化树", LAUP: "Laup 文章", NOTEBOOK: "Notebook" }[draft.contentType] || "文章";
+  // 内核标记随 payload 一起存：同一份 Notebook 稿能看出是 v1 还是 v2 公测页写的
+  return draft.payload?.kernel === "v2" ? `${base} · v2 公测` : base;
 }
 
 function modeLabel(mode) {

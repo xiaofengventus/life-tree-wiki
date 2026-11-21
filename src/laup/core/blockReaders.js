@@ -9,13 +9,14 @@
 import { N } from './ast.js';
 import { LaupError } from './diag.js';
 import { matchList, splitRow, parseAlignRow } from './mdBlock.js';
+import { parseInline } from './inline.js';
 
 export const CONTENT_ENVS = new Set(['quote', 'center', 'itemize', 'enumerate']);
 
 // ── \begin{环境} … \end{环境}
 export function readEnv(lines, i, base, ctx, out, scan) {
   const no = base + i + 1;
-  const m = /^\s*\\begin\{([A-Za-z][A-Za-z0-9]*)\}\s*(.*)$/.exec(lines[i]);
+  const m = /^\s*\\begin\{([A-Za-z][A-Za-z0-9-]*)\}\s*(.*)$/.exec(lines[i]);
   const name = m[1];
   let id = null;
 
@@ -44,6 +45,25 @@ export function readEnv(lines, i, base, ctx, out, scan) {
 
   if (name === 'equation') {
     out.push(N.equation(id, body.join('\n').trim()));
+    return next;
+  }
+
+  // 原样块：一个字都不解析，换行 / 缩进 / 空格全保留（渲染成 white-space: pre-wrap）
+  if (name === 'stay') {
+    out.push(N.stay(body.join('\n')));
+    return next;
+  }
+
+  // 只保留换行：每行的行内语法（粗体、公式、\textcolor…）照常解析
+  if (name === 'stay-line') {
+    let start = 0;
+    let end = body.length;
+    while (start < end && !body[start].trim()) start += 1;
+    while (end > start && !body[end - 1].trim()) end -= 1;
+    const lines = body
+      .slice(start, end)
+      .map((line, k) => parseInline(line, innerBase + start + k));
+    out.push(N.stayLine(lines));
     return next;
   }
 

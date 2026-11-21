@@ -25,7 +25,7 @@ export const LATEX_MAX_LENGTH = 4_000;
  * 代码块 / 行内代码里出现 `\frac` 是在讲 LaTeX 本身，不是公式；
  * 链接文字不动是为了避免把 URL 片段误伤。
  */
-const SKIP_SELECTOR = "code,pre,a,script,style,textarea,kbd,samp,svg,[data-life-math]";
+const SKIP_SELECTOR = "code,pre,a,script,style,textarea,kbd,samp,svg,[data-life-math],[data-life-stay]";
 
 /**
  * 裸 LaTeX 的命令白名单。
@@ -40,6 +40,8 @@ const MATH_COMMANDS = new Set([
   "vec", "hat", "bar", "tilde", "dot", "ddot", "acute", "grave", "check", "breve", "mathring",
   "mathrm", "mathbf", "mathit", "mathsf", "mathtt", "mathcal", "mathbb", "mathfrak",
   "boldsymbol", "text", "textrm", "textit", "textbf", "texttt", "operatorname", "mbox",
+  // 颜色 / 字体（KaTeX 原生支持，常用于正文里给关键词上色）
+  "textcolor", "color", "colorbox", "fcolorbox", "textnormal", "textsf", "textup",
   "left", "right", "big", "Big", "bigg", "Bigg", "bigl", "bigr", "Bigl", "Bigr",
   "lvert", "rvert", "lVert", "rVert", "vert", "Vert", "langle", "rangle",
   "lceil", "rceil", "lfloor", "rfloor", "llbracket", "rrbracket",

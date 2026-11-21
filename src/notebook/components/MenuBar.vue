@@ -27,6 +27,7 @@ function onImportFile(ev) {
 <template>
   <div id="menubar">
     <span class="brand">laup</span><span class="brand-sub">Notebook</span>
+    <span v-if="store.kernel === 'v2'" class="kernel-tag" title="预览由 laup v2 内核渲染；变量芯片与 lifetree 仍走 v1">v2 公测</span>
     <button title="作用域重置并自上而下运行全部单元格" @click="store.runAll()">▶ 运行全部</button>
     <label class="render-mode" title="渲染结果画在哪里 —— 下方（Jupyter 的样子）／原地（结果盖住源码，双击回到源码）／折叠源码（源码收成一行摘要条，点它展开）">
       结果
@@ -50,6 +51,11 @@ function onImportFile(ev) {
 
 <style scoped>
 #menubar .submit-btn { border-color: #e25303; color: #e25303; font-weight: bold; }
+#menubar .kernel-tag {
+  margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  background: #e8f3ff; border: 1px solid #b6dbff; color: #1a6fc4;
+  font-size: 11.5px; line-height: 1.6; white-space: nowrap;
+}
 #menubar .submit-btn:hover { background: #fdf1e8; }
 #menubar .render-mode {
   display: inline-flex; align-items: center; gap: 4px;

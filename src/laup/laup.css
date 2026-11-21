@@ -534,3 +534,15 @@
   font: 15px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* \begin{stay}：原样块，换行 / 缩进 / 空格都由 CSS 保留 */
+.laup-stay {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+
+/* \begin{stay-line}：只保留换行，行内语法照常渲染 */
+.laup-stay-line {
+  line-height: 1.85;
+}

@@ -20,8 +20,13 @@ import {
 } from "../src/laup/core/index.js";
 import { safeUrl } from "../src/laup/core/safeUrl.js";
 import { PACK_NAME, lifeElements } from "../src/laup/extensions/life.js";
+import { lifesequence, PACK_NAME as LIFETREE_PACK } from "../src/laup/extensions/lifetree.js";
 // 变量（\varcell 块 + 正文里的 {{name}}）是宿主层的东西，客户端与服务端共用这一份口径
 import { extractVarScope, interpolateVars } from "../shared/notebookVars.js";
+// v1 / v2 两套内核独立：先判断文档是哪一套写的，再交给对应的解释器。
+// v1 的编辑器与解释器原样保留（存量文章继续按 v1 渲染）；v2 文档直接走 v2，不做翻译。
+import { detectLaupKernel } from "../shared/laupKernel.js";
+import { typesetCells } from "../src/laup2/index.js";
 
 const MAX_SOURCE_BYTES = 256 * 1024;
 const MAX_OUTPUT_BYTES = 512 * 1024;
@@ -34,6 +39,10 @@ const MAX_OUTPUT_BYTES = 512 * 1024;
 //   那又变成"Laup 迁就站点"了。
 if (!listExtensions().includes(PACK_NAME)) {
   defineExtension(lifeElements({ treeRoute: (id) => `/life-tree/${id}` }));
+}
+// Lifeseqence：```lifetree 围栏（Notebook 的 [lifetree] 格落库形态）服务端渲染
+if (!listExtensions().includes(LIFETREE_PACK)) {
+  defineExtension(lifesequence());
 }
 
 const encoder = new TextEncoder();
@@ -69,19 +78,84 @@ function assertSafeUrls(html) {
 
 /**
  * 把 Laup 源码渲染成可入库的正文。
- * 写错语法 → 400（带行号）；出现 `\raw` → 400；产物过大 → 413。
+ *
+ * v1 / v2 独立：优先用请求里显式带的内核版本（落库字段），没有再按文档写法判定。
+ * v2 文档里出现 v1 语法（[input:cpp] 等）会按 v2 的口径报 400，由作者改写。
+ * 写错语法 → 400；出现 `\raw` → 400；产物过大 → 413。
+ *
+ * @param {string} source
+ * @param {{ kernel?: 'v1'|'v2' }} [options]
  */
-export function renderLaupPost(source) {
+export function renderLaupPost(source, options = {}) {
   // `import "laup"` 等行是 Notebook 宿主层的特性开关（见 src/notebook/renderer.js 的
   // preprocess），Laup 核心不认识这个语法，不剥掉会被当成正文渲染成第一段文字。
   const raw = String(source ?? "").replace(
-    /^[ \t]*import\s+["'][^"']+["'][ \t]*$/gm,
+    /^[ \t]*import(?:\s+["'][^"']+["']|\s+[A-Za-z][\w-]*)[ \t]*$/gm,
     "",
   );
   if (byteLength(raw) > MAX_SOURCE_BYTES) {
     throw new ApiError(413, "Laup 源码过大", "CONTENT_TOO_LARGE");
   }
 
+  const requested = options.kernel === "v1" || options.kernel === "v2" ? options.kernel : "";
+  // 显式版本优先；存量文章（未落库）按内容判定
+  const kernel = requested || detectLaupKernel(raw);
+  const rendered = kernel === "v1" ? renderWithV1(raw) : renderWithV2(raw);
+
+  const html = rendered.html;
+  if (byteLength(html) > MAX_OUTPUT_BYTES) {
+    throw new ApiError(413, "正文渲染结果过大", "CONTENT_TOO_LARGE");
+  }
+  assertSafeUrls(html);
+
+  return {
+    html,
+    text: htmlToPlainText(html),
+    warnings: rendered.warnings,
+    // 便于日志/排查：这一篇最终由哪个内核产出
+    kernel,
+  };
+}
+
+/** v2 路径：原文直接交给 v2 的格层（变量格、[references] 都由 v2 自己解析）。 */
+function renderWithV2(raw) {
+  if (!raw.trim()) {
+    throw new ApiError(400, "文章正文不能为空", "EMPTY_CONTENT");
+  }
+  // `\raw` 在 v2 里只是一个 Broken 节点，不会抛错 —— 发布路径必须在这里硬拒
+  if (/\\raw[ \t]*\{/.test(raw)) {
+    throw new ApiError(
+      400,
+      "\\raw 是直通 HTML 的通道，发布时不允许（v2 已默认禁用）",
+      "LAUP_RAW_NOT_ALLOWED",
+    );
+  }
+  const result = typesetCells(raw);
+  // 格层本身对未知的 `[input:cpp]` 会当正文（不报错），发布路径必须点名拒绝
+  if (/^\[(?:input|output):[A-Za-z0-9+#-]+\][ \t]*$/m.test(raw)) {
+    throw new ApiError(
+      400,
+      "v2 的输入/输出栏不声明语言：请写成 [input] / [output]，语言只写在代码格里",
+      "LAUP_COMPILE_FAILED",
+    );
+  }
+  // 与 v1 的 compile 模式对齐：语法错误必须当场 400，不能把 Broken 块发出去
+  const fatal = (result.diagnostics || []).find((item) => item.level === "error");
+  if (fatal) {
+    throw new ApiError(400, `Laup 源码有错 —— ${fatal.message}`, "LAUP_COMPILE_FAILED");
+  }
+  // 空文档（只有变量格 / 注释）同样拒收
+  if (!result.html.replace(/^<article class="laup2">\s*|<\/article>\s*$/g, "").trim()) {
+    throw new ApiError(400, "文章正文不能为空", "EMPTY_CONTENT");
+  }
+  return {
+    html: result.html,
+    warnings: (result.diagnostics || []).map((item) => ({ line: null, message: item.message })),
+  };
+}
+
+/** v1 路径：v2 还不支持的写法（lifetree / \tree / \image / \raw）继续用旧内核。 */
+function renderWithV1(raw) {
   // ── 变量解析（宿主层）
   //   Notebook 导出的 .laup 里，变量定义住在零输出的 \varcell 块里，正文写 {{name}}。
   //   这里先扫出定义（扫描的是原文，块的位置被替换成等量空行 → 报错行号仍然指得准），
@@ -117,15 +191,8 @@ export function renderLaupPost(source) {
     );
   }
 
-  const html = result.output;
-  if (byteLength(html) > MAX_OUTPUT_BYTES) {
-    throw new ApiError(413, "正文渲染结果过大", "CONTENT_TOO_LARGE");
-  }
-  assertSafeUrls(html);
-
   return {
-    html,
-    text: htmlToPlainText(html),
+    html: result.output,
     warnings: result.warnings.map((warning) => ({
       line: warning.line,
       message: warning.message,

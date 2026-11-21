@@ -13,6 +13,9 @@ import { formatDateTime } from "@/utils/date";
 import { useUserStore } from "@/stores/user";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+// laup v2 产物的结构样式（对照卡 / 提示块 / 目录 / 文献…）；
+// 通用标签样式仍由 .article-content 那套 Wiki 排版负责。
+import "@/laup2/laup2.css";
 // laup-math 手机友好语法 → LaTeX（失败回退原文，纯 LaTeX 文章零损耗）
 import { translate } from "@/utils/mathKit";
 import { highlightLaupCode } from "@/utils/codeLang";
@@ -45,9 +48,11 @@ const canDelete = computed(() => isCreator.value || userStore.isSiteOwner);
 
 function updatePost() {
   if (!isCreator.value || !post.value) return;
-  // Laup 正文回 Notebook 编辑（源码在 post.contentSource）；富文本正文才走 create-post
+  // Laup 正文回对应内核对编辑（源码在 post.contentSource）；富文本正文才走 create-post
   if (post.value.contentType === "laup") {
-    router.push(`/notebook?edit=${encodeURIComponent(post.value.id)}`);
+    // 内核版本已显式落库：v2 文章直接回 /laup-v2，避免在 v1 页里看到满屏错误
+    const editorPath = post.value.contentKernel === "v2" ? "/laup-v2" : "/notebook";
+    router.push(`${editorPath}?edit=${encodeURIComponent(post.value.id)}`);
     return;
   }
   router.push(`/create-post?edit=${encodeURIComponent(post.value.id)}`);
@@ -110,7 +115,10 @@ const isLaupPost = computed(() =>
 );
 const notebookHtml = computed(() => {
   if (!isLaupPost.value || readView.value !== "notebook") return "";
-  return renderNotebookDoc(post.value.contentSource);
+  return renderNotebookDoc(post.value.contentSource, {
+    // 落库的内核版本优先；存量文章为空时 renderer 自己按内容判定
+    kernel: post.value.contentKernel || undefined,
+  });
 });
 
 // html 块 → 目录（h1~h3 编号锚点）+ 代码上色。Notebook 视图与服务端视图共用同一份。
@@ -244,6 +252,8 @@ async function rollbackTo(revision) {
       author: post.value.author || undefined,
       content: snapshot.contentType === "laup" ? snapshot.contentSource : snapshot.content,
       contentFormat: snapshot.contentType === "laup" ? "laup" : "html",
+      // 回滚也要带上该版本的内核，避免服务端重新判定成另一套
+      contentKernel: snapshot.contentType === "laup" ? (snapshot.contentKernel || undefined) : undefined,
       tags: post.value.tags || [],
       type: post.value.type || "",
       license: post.value.license || "支持闭源",
@@ -309,7 +319,8 @@ function renderMath() {
     try {
       katex.render(translate(el.dataset.tex) ?? el.dataset.tex, el, {
         throwOnError: false,
-        displayMode: el.classList.contains("laup-math-display"),
+        displayMode: el.classList.contains("laup-math-display")
+          || el.classList.contains("laup2-math-display"),
       });
       el.dataset.texDone = "1";
     } catch { /* 非法公式保留原文 */ }

@@ -29,6 +29,14 @@ export function normalizeContentFormat(value, fallback = "html") {
   return CONTENT_FORMATS.has(candidate) ? candidate : fallback;
 }
 
+// Laup 内核版本：v1（旧版，存量文章）/ v2（长期支持）。空 = 未标记，按内容判定。
+export const CONTENT_KERNELS = new Set(["v1", "v2"]);
+
+export function normalizeContentKernel(value) {
+  const candidate = String(value || "").trim().toLowerCase();
+  return CONTENT_KERNELS.has(candidate) ? candidate : "";
+}
+
 export async function ensurePublicPostTitleAvailable(DB, title, excludeId = "") {
   const existing = await DB.prepare(
     `SELECT 1 FROM posts
@@ -77,6 +85,8 @@ export function postDetail(row, revisionRows = []) {
     contentType,
     // 只有 Laup 正文才带源码：编辑器靠它回填（Html→Laup 没有反解，不存源码就再也编不回来）。
     contentSource: contentType === "laup" ? row.content_laup : "",
+    // 内核版本：显式落库优先；NULL 的存量文章由调用方按内容判定
+    contentKernel: contentType === "laup" ? (row.content_kernel || "") : "",
     citations: parseCitations(row.citations_json),
     history: revisionRows.map((revision) => ({
       revisionCount: revision.revision_number,

@@ -192,6 +192,24 @@
 }
 #notebook-page .output pre code { background: none; padding: 0; font-size: 100%; }
 
+/* `\begin{stay}` 原样块：逐行换行 */
+#notebook-page .output [data-life-stay] {
+  margin: 6px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+/* Laup 里的 stay / stay-line（Notebook 单元格走 Laup 渲染） */
+#notebook-page .output .laup-stay {
+  margin: 6px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+
+#notebook-page .output .laup-stay-line { line-height: 1.8; }
+
 #notebook-page .output table { border-collapse: collapse; margin: 8px 0; }
 #notebook-page .output th, #notebook-page .output td { border: 1px solid #d5d5d5; padding: 4px 12px; font-size: 13px; }
 #notebook-page .output th { background: #f2f2f2; }
@@ -353,3 +371,89 @@
 #notebook-page .token.regex,
 #notebook-page .token.important,
 #notebook-page .token.variable { color: #116329; }
+
+/* ---------- [lifetree] 分类树格：/life-tree 同款矩形分支 DOM ---------- */
+/* 与 LifeTreeDom.vue 同一套 class 与视觉（那边是 scoped，这里作用域限定在 notebook）。 */
+#notebook-page .life-tree-dom { overflow-x: auto; padding: 6px 2px; }
+#notebook-page .life-tree-canvas { position: relative; flex: none; }
+#notebook-page .tree-branch { position: absolute; background: #555; }
+#notebook-page .tree-branch.is-horizontal { height: 1.5px; }
+#notebook-page .tree-branch.is-vertical { width: 1.5px; }
+#notebook-page .tree-label { position: absolute; font-size: 14px; line-height: 22px; white-space: nowrap; color: #1f2328; }
+#notebook-page .tree-label.is-root { font-size: 16px; font-weight: 700; }
+#notebook-page .label-plain { color: inherit; text-decoration: none; }
+#notebook-page .label-plain .chinese { font-style: normal; }
+#notebook-page .latin { font-family: Georgia, "Times New Roman", serif; font-style: italic; }
+#notebook-page .age { margin-left: 7px; color: #8a919c; font-size: 11px; }
+#notebook-page .tree-label .extinct-mark { color: #176a8b; font-weight: 700; }
+
+/* ---------- [lifetree] 格编辑器：VSCode 风格缩进参考线 ---------- */
+/* 每一级缩进列一条竖直虚线，由 lifetreeDecor.js 以内联 background 注入（按实测字符宽
+   算像素，不用 ch，避免字体回退/缩放错位）。这里只需给行建立定位上下文：
+   .cm-line padding 为 0，故 background-position: 0 = 文本起点。 */
+#notebook-page .cm-editor .cm-line.lt-guide { position: relative; }
+
+/* ---------- laup v2 内核产物（/laup-v2 公测页 + v2 预览） ----------
+   v1 的产物走上面那套 .laup-* / .life-code-sample-*；v2 用的是 .laup2-*：
+   语义标记不同，视觉口径与 notebook 保持一致（同一个灰底代码块、同一张对照卡）。 */
+#notebook-page .output .laup2 { color: #1f2328; line-height: 1.75; }
+#notebook-page .output .laup2-sample {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; margin: 8px 0;
+}
+#notebook-page .output .laup2-sample-pane {
+  overflow: hidden; border: 1px solid #d8dee4; border-radius: 6px; background: #fff;
+}
+#notebook-page .output .laup2-sample-pane > header {
+  padding: 5px 10px; border-bottom: 1px solid #e5e9ef;
+  background: #f6f8fa; color: #33475b; font-size: 12px; font-weight: 600;
+}
+#notebook-page .output .laup2-sample-pane > pre {
+  margin: 0; padding: 9px 11px; border: 0; border-radius: 0;
+  background: #fbfcfd; font-size: 12.8px;
+}
+@media (max-width: 720px) {
+  #notebook-page .output .laup2-sample { grid-auto-flow: row; }
+}
+#notebook-page .output .laup2-callout {
+  margin: 8px 0; padding: 8px 12px;
+  border-left: 4px solid #9aa4ad; background: #f7f9fb;
+}
+#notebook-page .output .laup2-callout-warning { border-left-color: #d98c00; background: #fff8e6; }
+#notebook-page .output .laup2-toc {
+  margin: 8px 0; padding: 10px 14px;
+  border: 1px solid #e6e8eb; border-radius: 6px; background: #fafbfc;
+}
+#notebook-page .output .laup2-toc ul { list-style: none; padding-left: 0; margin: 0; }
+#notebook-page .output .laup2-toc-l3 { padding-left: 1.2em; }
+#notebook-page .output .laup2-toc-l4,
+#notebook-page .output .laup2-toc-l5,
+#notebook-page .output .laup2-toc-l6 { padding-left: 2.4em; }
+#notebook-page .output .laup2-equation { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+#notebook-page .output .laup2-eqno { color: #8a919c; font-size: 13px; }
+#notebook-page .output .laup2-references { margin: 14px 0 4px; font-size: 13.5px; color: #444d56; }
+#notebook-page .output .laup2-references h2 { font-size: 15px; margin: 0 0 6px; }
+#notebook-page .output .laup2-footnotes { margin-top: 18px; font-size: 13px; color: #444d56; }
+#notebook-page .output .laup2-raw { white-space: pre-wrap; overflow-wrap: anywhere; }
+#notebook-page .output .laup2-broken {
+  padding: 8px 12px; border: 1px dashed #e0a0a0; background: #fff5f5;
+  color: #a33; white-space: pre-wrap;
+}
+
+/* todo / card / tree（v2 新增的复合块） */
+#notebook-page .output .laup2-todo { list-style: none; margin: 8px 0; padding-left: 0; }
+#notebook-page .output .laup2-todo li { display: flex; align-items: flex-start; gap: 7px; margin: 4px 0; }
+#notebook-page .output .laup2-todo li input { margin-top: 5px; flex: none; }
+#notebook-page .output .laup2-todo li.is-done > span { color: #8a919c; text-decoration: line-through; }
+
+#notebook-page .output .laup2-card { margin: 10px 0; border: 1px solid #a2a9b1; background: #f8f9fa; border-radius: 4px; overflow: hidden; }
+#notebook-page .output .laup2-card > header { padding: 7px 11px; background: #eaecf0; font-weight: 700; font-size: 13px; }
+#notebook-page .output .laup2-card table { width: 100%; border-collapse: collapse; margin: 0; }
+#notebook-page .output .laup2-card th,
+#notebook-page .output .laup2-card td { padding: 5px 11px; border: 0; border-top: 1px solid #e4e7eb; font-size: 12.8px; text-align: left; }
+#notebook-page .output .laup2-card th { width: 32%; background: #f2f4f7; font-weight: 600; }
+#notebook-page .output .laup2-card-note { margin-left: 6px; color: #8a919c; font-size: 12px; }
+
+#notebook-page .output .laup2-tree { margin: 8px 0; border: 1px solid #cfe0d5; border-radius: 8px; background: #f7fbf8; }
+#notebook-page .output .laup2-tree a { display: flex; align-items: center; gap: 8px; padding: 10px 12px; color: #27503a; text-decoration: none; }
+#notebook-page .output .laup2-tree-label { padding: 1px 7px; border: 1px solid #cfe0d5; border-radius: 999px; color: #6b8577; font-size: 11px; }
+#notebook-page .output .laup2-tree-id { margin-left: auto; color: #8a919c; font-size: 11.5px; }

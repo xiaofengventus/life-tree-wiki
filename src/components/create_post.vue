@@ -1,16 +1,30 @@
 <template>
   <section class="create-post-page">
     <div class="create-post-container">
-      <div>
-        <h1>{{ isEditing ? "编辑帖子" : "创建新帖子" }}</h1>
-        <p
-          class="draft-save-state"
-          :class="{ error: draftAutosave.errorMessage.value }"
-        >
-          {{ draftStatusText }}
-        </p>
-      </div>
+      <p
+        class="draft-save-state"
+        :class="{ error: draftAutosave.errorMessage.value }"
+      >
+        {{ draftStatusText }}
+      </p>
       <div class="draft-actions">
+        <button
+          type="button"
+          class="cp-submit"
+          :disabled="submitting"
+          title="打开提交文章对话框"
+          @click="submitDialogOpen = true"
+        >
+          提交文章
+        </button>
+        <button
+          type="button"
+          :disabled="!draftAutosave.canSave.value"
+          title="保存草稿（Ctrl/⌘ + S）"
+          @click="draftAutosave.saveNow()"
+        >
+          保存草稿
+        </button>
         <label class="draft-mode-select">
           <span>草稿</span>
           <select
@@ -22,15 +36,7 @@
             <option value="manual">手动保存</option>
           </select>
         </label>
-        <button
-          type="button"
-          :disabled="!draftAutosave.canSave.value"
-          title="保存草稿（Ctrl/⌘ + S）"
-          @click="draftAutosave.saveNow()"
-        >
-          保存草稿
-        </button>
-        <RouterLink to="/drafts">打开草稿箱</RouterLink>
+        <RouterLink to="/drafts">打开草稿</RouterLink>
       </div>
     </div>
     <p v-if="isEditing" class="editing-hint">
@@ -42,21 +48,6 @@
     </p>
 
     <form class="create-post-form" @submit.prevent="submitPost('PUBLIC')">
-      <!-- 内容区 -->
-      <div class="content-area">
-        <label for="post-title" class="content-title-label">标题</label>
-        <input
-          id="post-title"
-          v-model="title"
-          type="text"
-          name="title"
-          placeholder="请输入帖子标题"
-          required
-          class="content-title-input"
-        />
-      </div>
-
-      <label>内容</label>
       <Teleport to="body">
         <div
           v-if="insertPanelOpen"
@@ -108,6 +99,11 @@
                 <span class="insert-tool-icon">M↓</span>
                 <strong>Markdown 导入</strong>
                 <small>预览后插入到当前光标处</small>
+              </button>
+              <button type="button" @click="chooseImageFromPanel">
+                <span class="insert-tool-icon">＋</span>
+                <strong>上传图片</strong>
+                <small>从本机选择图片，插入图片块并填写注释</small>
               </button>
               <button type="button" @click="openContentMediaLibrary">
                 <span class="insert-tool-icon">▧</span>
@@ -453,26 +449,18 @@
           aria-label="插入格式栏"
           @mousedown.prevent
         >
-          <!-- 分组一：图片 -->
+          <!-- 入口收敛：图片 / 卡片 / 进化树 / Markdown 全部走同一个插入面板 -->
           <span class="caret-insert-toolbar-label">插入</span>
           <button
             type="button"
-            title="上传本地图片"
-            aria-label="上传本地图片"
-            @click="chooseInlineImage"
+            title="插入内容（图片 / 卡片 / 进化树 / Markdown）"
+            aria-label="插入内容"
+            @click="openInsertToolSection('menu')"
           >
-            <span aria-hidden="true">▧↑</span>
-          </button>
-          <button
-            type="button"
-            title="从图片库选择"
-            aria-label="从图片库选择"
-            @click="openInlineMediaLibrary"
-          >
-            <span aria-hidden="true">▧</span>
+            <span aria-hidden="true">＋</span>
           </button>
           <span class="caret-insert-divider" aria-hidden="true"></span>
-          <!-- 分组二：学术元素（引用 / 公式） -->
+          <!-- 学术元素（引用 / 公式）：与正文选区强相关，保留快捷入口 -->
           <button
             type="button"
             :title="`插入正文引用\n${formatToolbarShortcut('mod+Alt+K')}`"
@@ -489,32 +477,6 @@
           >
             <span aria-hidden="true">Σ</span>
           </button>
-          <span class="caret-insert-divider" aria-hidden="true"></span>
-          <!-- 分组三：结构化内容（卡片 / 进化树 / Markdown） -->
-          <button
-            type="button"
-            title="配置文章卡片（生物卡片 / 自定义卡片）"
-            aria-label="配置文章卡片"
-            @click="openInsertToolSection('sidebar')"
-          >
-            <span aria-hidden="true">▦</span>
-          </button>
-          <button
-            type="button"
-            title="插入 Research 进化树块"
-            aria-label="插入 Research 进化树块"
-            @click="openInsertToolSection('tree')"
-          >
-            <span aria-hidden="true">🌳</span>
-          </button>
-          <button
-            type="button"
-            title="从 Markdown 导入正文"
-            aria-label="从 Markdown 导入正文"
-            @click="openInsertToolSection('markdown')"
-          >
-            <span aria-hidden="true">M↓</span>
-          </button>
         </div>
       </Teleport>
       <input
@@ -524,7 +486,22 @@
         hidden
         @change="handleInlineImageChange"
       />
-      <div class="editor-layout">
+      <div class="studio-layout">
+        <aside class="studio-outline" aria-label="文章目录">
+          <header><strong>目录</strong></header>
+          <ul>
+            <li
+              v-for="item in outlineItems"
+              :key="item.key"
+              :class="`lv-${item.level}`"
+            >
+              {{ item.text }}
+            </li>
+            <li v-if="!outlineItems.length" class="empty">还没有标题</li>
+          </ul>
+        </aside>
+
+        <div class="editor-layout">
         <!-- 左侧参考文献管理面板 -->
         <aside v-show="!citationPanelCollapsed" class="citation-panel">
           <div class="citation-panel-body">
@@ -628,7 +605,7 @@
           </div>
         </aside>
 
-        <!-- 右侧编辑器 -->
+        <!-- 右侧编辑器：整页一个大输入框（不拆格、不显示源码） -->
         <div
           ref="editorWrapperRef"
           class="editor-wrapper"
@@ -648,6 +625,16 @@
             @customPaste="handleCustomPaste"
           />
         </div>
+        </div>
+
+        <aside class="studio-preview" aria-label="手机预览">
+          <div class="phone-shell">
+            <div class="phone-screen">
+              <div class="phone-body article-content" v-html="content"></div>
+            </div>
+          </div>
+          <p class="studio-count">{{ plainContent.length }}/100000</p>
+        </aside>
       </div>
       <p v-if="imageMessage" class="image-message" aria-live="polite">
         {{ imageMessage }}
@@ -655,6 +642,41 @@
       <p v-if="importExportMessage" class="image-message" aria-live="polite">
         {{ importExportMessage }}
       </p>
+    </form>
+
+    <!-- 提交文章：标题、封面与全部元数据都收进这个对话框 -->
+    <Teleport to="body">
+      <div
+        v-if="submitDialogOpen"
+        class="submit-dialog-backdrop"
+        role="presentation"
+        @click.self="submitDialogOpen = false"
+      >
+        <form class="submit-dialog" @submit.prevent="submitPost('PUBLIC')">
+          <header class="submit-dialog-head">
+            <strong>{{ isEditing ? "更新文章" : "提交文章" }}</strong>
+            <button
+              type="button"
+              class="submit-dialog-close"
+              aria-label="关闭"
+              @click="submitDialogOpen = false"
+            >
+              ×
+            </button>
+          </header>
+
+          <div class="content-area">
+            <label for="post-title" class="content-title-label">标题</label>
+            <input
+              id="post-title"
+              v-model="title"
+              type="text"
+              name="title"
+              placeholder="请输入帖子标题"
+              required
+              class="content-title-input"
+            />
+          </div>
 
       <!-- 内容区下方：封面和元数据 -->
       <div class="post-metadata-section">
@@ -844,7 +866,9 @@
       <small v-if="!isEditing || isPrivateWork" class="private-save-hint">
         私密文章保存在服务器，可跨设备继续编辑；数量不限。
       </small>
-    </form>
+        </form>
+      </div>
+    </Teleport>
 
     <ImageCropperDialog
       ref="coverCropper"
@@ -1393,6 +1417,8 @@ const pendingContentImage = shallowRef(null);
 const editingImageNode = shallowRef(null);
 const insertPanelOpen = ref(false);
 const insertPanelSection = ref("menu");
+// 提交文章对话框：标题、封面与全部元数据都在里面，正文页只留编辑区
+const submitDialogOpen = ref(false);
 const floatingToolbarsEnabled = ref(true);
 const insertToolbarVisible = ref(false);
 const insertToolbarRef = ref(null);
@@ -1690,6 +1716,20 @@ const plainContent = computed(() =>
     .trim(),
 );
 
+// 左栏目录：只读标题（h1–h3），和 B 站编辑器的「目录」一致
+const outlineItems = computed(() => {
+  const items = [];
+  const re = /<h([1-3])[^>]*>([\s\S]*?)<\/h\1>/gi;
+  let match;
+  let index = 0;
+  while ((match = re.exec(content.value || ""))) {
+    const text = match[2].replace(/<[^>]+>/g, "").trim();
+    if (!text) continue;
+    items.push({ key: `${match[1]}-${index++}`, level: Number(match[1]), text });
+  }
+  return items;
+});
+
 const canSubmit = computed(
   () =>
     !props.submitting &&
@@ -1809,9 +1849,10 @@ function hideInsertToolbar() {
   insertToolbarVisible.value = false;
 }
 
-function chooseInlineImage() {
-  hideInsertToolbar();
-  inlineImageInput.value?.click();
+/** 插入面板里的「上传图片」：关掉面板后走隐藏 input（全页唯一的本地图片入口） */
+function chooseImageFromPanel() {
+  closeInsertPanel();
+  nextTick(() => inlineImageInput.value?.click());
 }
 
 async function handleInlineImageChange(event) {
@@ -1823,11 +1864,6 @@ async function handleInlineImageChange(event) {
   } catch {
     // handleLocalImage 已经把可读错误写入 imageMessage。
   }
-}
-
-async function openInlineMediaLibrary() {
-  hideInsertToolbar();
-  await openMediaPicker("content");
 }
 
 function openInlineCitation() {
@@ -3043,10 +3079,11 @@ async function submitPost(targetVisibility = "PUBLIC") {
       ? changeNote.value.trim()
       : changeNote.value.trim() || generatedNote;
 
+  // 提交成功后关闭对话框；父组件负责跳转/刷新
+  submitDialogOpen.value = false;
   emit(
     "submit",
-    {
-      id: editId.value || null,
+    {      id: editId.value || null,
       version: editingPost.value?.version || 1,
       title: title.value.trim(),
       creator: creator.value,
@@ -5476,6 +5513,230 @@ onBeforeUnmount(() => {
   margin: 0;
   color: #b42318;
   font-size: 14px;
+}
+
+/* ── Notebook 风格外壳 ──────────────────────────────────────────
+   与 /notebook 的 #menubar 对齐：白底、细下边线、3px 小圆角按钮、
+   内容列 1000px 居中。只覆盖外壳，不动编辑器内部的排版规则。
+   顶部仍留出固定工具栏的高度（.editor-toolbar-fixed 固定在 64px）。 */
+.create-post-page {
+  padding: 120px 0 0;
+  background: #f3f7fd;
+}
+.create-post-page .create-post-container {
+  width: min(100%, 1000px);
+  margin: 0 auto 14px;
+  padding: 0 16px 8px;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
+  border-bottom: 1px solid #e3e3e3;
+}
+.create-post-page .draft-save-state {
+  margin: 0;
+  color: #999;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.create-post-page .draft-actions { margin-left: auto; align-items: center; gap: 6px; }
+.create-post-page .draft-actions .cp-submit {
+  border-color: #2f6b4f;
+  background: #2f6b4f;
+  color: #fff;
+}
+.create-post-page .draft-actions .cp-submit:hover {
+  border-color: #255840;
+  background: #255840;
+}
+.create-post-page .draft-mode-select {
+  border-color: #ccc;
+  border-radius: 3px;
+  background: #fff;
+  color: #555;
+  font-size: 12px;
+  font-weight: 400;
+}
+.create-post-page .draft-actions button,
+.create-post-page .draft-actions a {
+  padding: 3px 10px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #f7f7f7;
+  color: #333;
+  font-size: 12.5px;
+  font-weight: 400;
+}
+.create-post-page .draft-actions button:hover,
+.create-post-page .draft-actions a:hover { background: #ececec; }
+.create-post-page .create-post-form {
+  width: 100%;
+  padding: 0;
+}
+
+/* ── B 站编辑器式三栏：目录 / 正文 / 手机预览 ─────────────────── */
+.create-post-page .studio-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 300px;
+  gap: 0;
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  margin: 0;
+  padding: 0;
+  align-items: stretch;
+}
+.create-post-page .studio-outline,
+.create-post-page .studio-preview {
+  position: sticky;
+  top: 120px;
+  height: calc(100vh - 120px);
+  padding: 18px 16px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  overflow: auto;
+}
+.create-post-page .studio-outline { border-right: 1px solid #eceff3; }
+.create-post-page .studio-preview { border-left: 1px solid #eceff3; }
+.studio-outline header {
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 13px;
+}
+.studio-outline ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.studio-outline li {
+  color: #4b5563;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-outline li.lv-2 { padding-left: 10px; }
+.studio-outline li.lv-3 { padding-left: 20px; color: #6b7280; }
+.studio-outline li.empty { color: #9aa1ab; }
+
+/* 中间：一张白色书写页（B 站版心），不再铺满浅蓝底 */
+.create-post-page .editor-layout {
+  justify-content: center;
+  padding: 28px 32px 80px;
+}
+.create-post-page .editor-wrapper {
+  width: min(100%, 760px);
+  min-height: 72vh;
+  margin: 0 auto;
+  padding: 40px 48px 56px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.create-post-page .editor-wrapper :deep(.w-e-text-container) {
+  min-height: 60vh;
+}
+
+.studio-preview .phone-shell {
+  width: 240px;
+  margin: 0 auto;
+  padding: 8px;
+  border: 1px solid #d7dde5;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+.studio-preview .phone-screen {
+  height: 68vh;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 18px;
+  background: #fff;
+}
+.studio-preview .phone-body { font-size: 12px; line-height: 1.7; }
+.studio-preview .studio-count {
+  margin: 10px 0 0;
+  color: #9aa1ab;
+  font-size: 12px;
+  text-align: center;
+}
+@media (max-width: 1180px) {
+  .create-post-page .studio-layout { grid-template-columns: 200px minmax(0, 1fr); }
+  .create-post-page .studio-preview { display: none; }
+  .create-post-page .editor-layout { padding: 24px 20px 60px; }
+}
+@media (max-width: 900px) {
+  .create-post-page .studio-layout { display: block; }
+  .create-post-page .studio-outline { display: none; }
+  .create-post-page .editor-wrapper { padding: 28px 20px 40px; }
+}
+.create-post-page .editing-hint {
+  width: min(100%, 1000px);
+  margin: 8px auto 10px;
+  font-size: 12.5px;
+}
+
+/* ── 提交文章对话框：标题 / 封面 / 元数据都在这里 ─────────────── */
+.submit-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px 32px;
+  background: rgba(15, 23, 42, 0.42);
+  overflow: auto;
+}
+.submit-dialog {
+  width: min(100%, 760px);
+  padding: 18px 20px 22px;
+  border: 1px solid #d7dde5;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+}
+.submit-dialog-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.submit-dialog-head strong { color: #1f2328; font-size: 16px; }
+.submit-dialog-close {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.submit-dialog-close:hover { background: #f1f5f9; color: #1f2328; }
+.submit-dialog .post-metadata-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* ── 正文不再套壳：去掉边框与圆角，直接作为页面正文 ──────────── */
+.create-post-page .editor-wrapper {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+.create-post-page .editor-wrapper :deep(.w-e-text-container) {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
 }
 
 </style>
