@@ -148,9 +148,10 @@ export function exportBlock(node) {
     case "Todo":
       return [
         "\\begin{todo}",
-        ...(node.attrs.items || []).map(
-          (item) => `- [${item.done ? "x" : " "}] ${String(item.text).split("\n").join("\n  ")}`,
-        ),
+        ...(node.attrs.items || []).map((item) => {
+          const text = Array.isArray(item.text) ? exportInline(item.text) : String(item.text ?? "");
+          return `- [${item.done ? "x" : " "}] ${text.split("\n").join("\n  ")}`;
+        }),
         "\\end{todo}",
       ].join("\n");
     case "Sample": {

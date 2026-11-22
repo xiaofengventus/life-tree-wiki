@@ -108,12 +108,6 @@ defineCommand({
   args: [],
   build: () => N.toc(),
 });
-defineCommand({
-  name: "raw",
-  scope: "block",
-  args: [{ name: "html", type: "text" }],
-  build: (args) => N.broken("\\raw 在 v2 中默认禁用（安全策略）", args.html || ""),
-});
 
 defineCommand({
   name: "cover",
@@ -266,7 +260,9 @@ defineEnvironment({ name: "sample", content: "raw", build: buildSample });
 const TODO_LINE_RE = /^[ \t]*(?:[-*+][ \t]*)?\[([ xX])\][ \t]*(.*)$/;
 const TREE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-function buildTodo(body) {
+function buildTodo(body, ctx) {
+  const parse = (text) =>
+    (ctx && typeof ctx.parseInline === "function" ? ctx.parseInline(String(text ?? "")) : [N.text(String(text ?? ""))]);
   const items = [];
   for (const line of String(body ?? "").split("\n")) {
     const match = TODO_LINE_RE.exec(line);
@@ -277,7 +273,7 @@ function buildTodo(body) {
     const text = line.trim();
     if (text && items.length) items[items.length - 1].text += `\n${text}`;
   }
-  return N.todo(items);
+  return N.todo(items.map((item) => ({ done: item.done, text: parse(item.text) })));
 }
 
 function buildTree(body) {

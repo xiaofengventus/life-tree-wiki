@@ -24,6 +24,56 @@ const TABLE_SEP_RE = /^[ \t]*\|?[ \t]*:?-{1,}:?[ \t]*(\|[ \t]*:?-{1,}:?[ \t]*)*\
 
 const isBlank = (line) => !String(line).trim();
 
+/** 某个字符前面是否有奇数个反斜杠（= 被转义） */
+function isEscaped(text, index) {
+  let count = 0;
+  for (let i = index - 1; i >= 0 && text[i] === "\\"; i -= 1) count += 1;
+  return count % 2 === 1;
+}
+
+/**
+ * 表格行按 `|` 切格 —— 逐字符扫描，而不是 `split('|')`：
+ *   · `\|` 是转义，拼成字面 `|`，不切格
+ *   · 行内代码（`…` / ``…``）里的 `|` 不切格
+ *   · 其它转义原样保留，交给行内解析器
+ */
+export function splitTableRow(line) {
+  const text = String(line ?? "");
+  const cells = [];
+  let cell = "";
+  let codeTicks = 0;
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === "\\" && i + 1 < text.length) {
+      const next = text[i + 1];
+      cell += next === "|" ? "|" : ch + next;
+      i += 2;
+      continue;
+    }
+    if (ch === "`") {
+      let run = 1;
+      while (text[i + run] === "`") run += 1;
+      if (codeTicks === 0) codeTicks = run;
+      else if (codeTicks === run) codeTicks = 0;
+      cell += "`".repeat(run);
+      i += run;
+      continue;
+    }
+    if (ch === "|" && codeTicks === 0) {
+      cells.push(cell.trim());
+      cell = "";
+      i += 1;
+      continue;
+    }
+    cell += ch;
+    i += 1;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+
 function lineStart(source, index) {
   return source.slice(0, index).split("\n").length;
 }
@@ -181,13 +231,12 @@ export function lexBlocks(source) {
 
     // 表格：本行含 |，且下一行是分隔行
     if (raw.includes("|") && i + 1 < lines.length && TABLE_SEP_RE.test(lines[i + 1]) && lines[i + 1].includes("-")) {
-      const parseRow = (line) =>
-        line
-          .trim()
-          .replace(/^\|/, "")
-          .replace(/\|$/, "")
-          .split("|")
-          .map((cell) => cell.trim());
+      const parseRow = (line) => {
+        let text = String(line ?? "").trim();
+        if (text.startsWith("|")) text = text.slice(1);
+        if (text.endsWith("|") && !isEscaped(text, text.length - 1)) text = text.slice(0, -1);
+        return splitTableRow(text);
+      };
       const head = parseRow(raw);
       const aligns = parseRow(lines[i + 1]).map((cell) => {
         const left = cell.startsWith(":");

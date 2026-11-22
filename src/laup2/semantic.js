@@ -22,6 +22,34 @@ export function createSemanticState() {
   };
 }
 
+/** 复合块的行内节点挂在 attrs 上（不是 children），语义 pass 也要走进去 */
+function mapAttrInlines(node, fn) {
+  if (node.type === "Card") {
+    if (Array.isArray(node.attrs.name)) node.attrs.name = node.attrs.name.map(fn).filter(Boolean);
+    if (Array.isArray(node.attrs.rows)) {
+      node.attrs.rows = node.attrs.rows.map((row) => ({
+        ...row,
+        value: Array.isArray(row.value) ? row.value.map(fn).filter(Boolean) : row.value,
+      }));
+    }
+  }
+  if (node.type === "Todo" && Array.isArray(node.attrs.items)) {
+    node.attrs.items = node.attrs.items.map((item) => ({
+      ...item,
+      text: Array.isArray(item.text) ? item.text.map(fn).filter(Boolean) : item.text,
+    }));
+  }
+  if (node.type === "Table") {
+    if (Array.isArray(node.attrs.head)) {
+      node.attrs.head = node.attrs.head.map((cell) => cell.map(fn).filter(Boolean));
+    }
+    if (Array.isArray(node.attrs.rows)) {
+      node.attrs.rows = node.attrs.rows.map((row) => row.map((cell) => cell.map(fn).filter(Boolean)));
+    }
+  }
+  return node;
+}
+
 /** 第一阶段：分配编号、收集目录 / 脚注 / 文献 */
 export function collectSemantics(doc, state = createSemanticState(), options = {}) {
   const collectReferences = options.collectReferences === true;
@@ -61,6 +89,7 @@ export function collectSemantics(doc, state = createSemanticState(), options = {
     if (node.type === "Env" && Array.isArray(node.attrs.value)) {
       node.attrs.value = node.attrs.value.map(assign).filter(Boolean);
     }
+    mapAttrInlines(node, assign);
     return node;
   };
 
@@ -113,6 +142,7 @@ export function resolveSemantics(doc, options = {}) {
     if (node.type === "Env" && Array.isArray(node.attrs.value)) {
       node.attrs.value = node.attrs.value.map(resolve).filter(Boolean);
     }
+    mapAttrInlines(node, resolve);
     return node;
   };
 

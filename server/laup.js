@@ -25,7 +25,7 @@ import { lifesequence, PACK_NAME as LIFETREE_PACK } from "../src/laup/extensions
 import { extractVarScope, interpolateVars } from "../shared/notebookVars.js";
 // v1 / v2 两套内核独立：先判断文档是哪一套写的，再交给对应的解释器。
 // v1 的编辑器与解释器原样保留（存量文章继续按 v1 渲染）；v2 文档直接走 v2，不做翻译。
-import { detectLaupKernel } from "../shared/laupKernel.js";
+import { detectLaupKernel, scanLaupSource } from "../shared/laupKernel.js";
 import { typesetCells } from "../src/laup2/index.js";
 
 const MAX_SOURCE_BYTES = 256 * 1024;
@@ -122,17 +122,10 @@ function renderWithV2(raw) {
   if (!raw.trim()) {
     throw new ApiError(400, "文章正文不能为空", "EMPTY_CONTENT");
   }
-  // `\raw` 在 v2 里只是一个 Broken 节点，不会抛错 —— 发布路径必须在这里硬拒
-  if (/\\raw[ \t]*\{/.test(raw)) {
-    throw new ApiError(
-      400,
-      "\\raw 是直通 HTML 的通道，发布时不允许（v2 已默认禁用）",
-      "LAUP_RAW_NOT_ALLOWED",
-    );
-  }
   const result = typesetCells(raw);
   // 格层本身对未知的 `[input:cpp]` 会当正文（不报错），发布路径必须点名拒绝
-  if (/^\[(?:input|output):[A-Za-z0-9+#-]+\][ \t]*$/m.test(raw)) {
+  const visible = scanLaupSource(raw).visible;
+  if (/^\[(?:input|output):[A-Za-z0-9+#-]+\][ \t]*$/m.test(visible)) {
     throw new ApiError(
       400,
       "v2 的输入/输出栏不声明语言：请写成 [input] / [output]，语言只写在代码格里",

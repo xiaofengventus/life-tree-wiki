@@ -96,7 +96,7 @@ function renderBlock(node, meta) {
     case "Table":
       return renderTable(node, meta);
     case "Todo":
-      return renderTodo(node);
+      return renderTodo(node, meta);
     case "Card":
       return renderCard(node, meta);
     case "TreeEmbed":
@@ -117,14 +117,18 @@ function renderBlock(node, meta) {
 }
 
 /** 待办清单：只读复选框（可勾选状态一目了然） */
-function renderTodo(node) {
+function renderTodo(node, meta) {
   const items = node.attrs.items || [];
   if (!items.length) return `<ul class="laup2-todo"></ul>`;
+  const inline = (value) =>
+    Array.isArray(value)
+      ? value.map((child) => renderInline(child, meta)).join("")
+      : esc(value).replace(/\n/g, "<br>");
   const rows = items
     .map((item) => [
       `<li${item.done ? ' class="is-done"' : ""}>`,
       `<input type="checkbox" disabled${item.done ? " checked" : ""}>`,
-      `<span>${esc(item.text).replace(/\n/g, "<br>")}</span>`,
+      `<span>${inline(item.text)}</span>`,
       `</li>`,
     ].join(""))
     .join("");

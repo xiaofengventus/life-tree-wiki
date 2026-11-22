@@ -104,7 +104,11 @@ const V1_IN_LAUP = [
   [/^[ \t]*\\tree[ \t]*=/m, 'v2 还没有 \\tree 研究树嵌入'],
 ];
 
-/** 去掉围栏代码块与行内代码，避免「示例代码」被误判成真的 v1 写法。 */
+/** 去掉围栏代码块、行内代码与 raw 环境（stay / equation），避免示例文字被误判。 */
+function stripRawRegions(source) {
+  const visible = stripCodeForCheck(source);
+  return visible.replace(/\\begin\{(?:stay|equation)\}[\s\S]*?\\end\{(?:stay|equation)\}/g, "");
+}
 function stripCodeForCheck(source) {
   const out = [];
   let fence = null;
@@ -131,7 +135,7 @@ export function v1LeftoverInLaup(source) {
   if (/^[ \t]{0,3}`{3,}[ \t]*sample\b/m.test(text)) {
     return "输入/输出案例请拆成 [input] / [output] 两个代码格";
   }
-  const visible = stripCodeForCheck(text);
+  const visible = stripRawRegions(text);
   for (const [pattern, message] of V1_IN_LAUP) {
     if (pattern.test(visible)) return message;
   }
@@ -147,7 +151,7 @@ function renderLaupCell(cell, scope, refPool, isRefDisplay) {
   // 跨格的文献池：v2 的 \cite 只认同一次渲染里的 [references] 格，
   // 编辑器是一格一格渲染的，所以在这里补一个合成文献格（只有引用/展示格需要）。
   const refs = (Array.isArray(refPool) ? refPool : []).filter(Boolean)
-  const hasCite = /\\cite\s*\{/.test(source)
+  const hasCite = /\\cite\s*\{/.test(stripRawRegions(source))
   const declaresRefs = /^[ \t]*\[references\][ \t]*(?:\n|$)/i.test(source)
   const injectRefs = refs.length > 0 && !declaresRefs && (hasCite || isRefDisplay)
   if (injectRefs) source += `\n\n\\cellbreak\n[references]\n${refs.join('\n')}`
