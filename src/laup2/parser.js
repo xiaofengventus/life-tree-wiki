@@ -6,7 +6,7 @@
  */
 
 import { N } from "./ast.js";
-import { lexBlocks, lexInline } from "./lexer.js";
+import { lexBlocks, lexInline, decodeEntities, normalizeLabel } from "./lexer.js";
 import { getCommand, getEnvironment, safeColor, safeSize } from "./registry.js";
 import { createDiagnostics } from "./diagnostics.js";
 
@@ -23,16 +23,28 @@ function joinLines(lines, firstLine) {
   const kept = trimBlank(lines);
   const starts = [];
   let text = "";
+  let hard = false;
   kept.forEach((line, index) => {
-    const clean = line.replace(/\s+$/, "");
+    const last = index === kept.length - 1;
+    // CommonMark 硬换行：行尾两个以上空格，或一个反斜杠
+    const bySpaces = !last && /\s{2,}$/.test(line);
+    const byBackslash = !last && /(^|[^\\])\\$/.test(line.replace(/\s+$/, ""));
+    let clean = line.replace(/\s+$/, "");
+    if (byBackslash) clean = clean.slice(0, -1);
+
     if (index > 0) {
-      const prev = text[text.length - 1] || "";
-      const next = clean[0] || "";
-      const cjk = /[\u3000-\u9fff\uff00-\uffef]/;
-      if (!(cjk.test(prev) && cjk.test(next))) text += " ";
+      if (hard) {
+        text += "\\\\";
+      } else {
+        const prev = text[text.length - 1] || "";
+        const next = clean[0] || "";
+        const cjk = /[\u3000-\u9fff\uff00-\uffef]/;
+        if (!(cjk.test(prev) && cjk.test(next))) text += " ";
+      }
     }
     starts.push({ offset: text.length, line: firstLine + index });
     text += clean;
+    hard = bySpaces || byBackslash;
   });
   return { text, starts };
 }
@@ -56,6 +68,61 @@ const withSpan = (node, span) => {
   return node;
 };
 
+// 这些环境的正文不解析命令，里面的 `[x]: url` 只是示例
+const RAW_ENV_NAMES = new Set(["stay", "equation", "todo", "card", "tree", "sample"]);
+
+/** HTML 注释在 CommonMark 里不产出内容；替换成等量空白，保持行号不变 */
+function stripHtmlComments(source) {
+  return String(source ?? "").replace(/<!--[\s\S]*?-->/g, (match) => match.replace(/[^\n]/g, ""));
+}
+
+/** 收集引用式链接定义（`[label]: url "title"`）并从正文移除 */
+function extractLinkDefs(source) {
+  const lines = String(source ?? "").split("\n");
+  const defs = new Map();
+  let fence = null;
+  const rawStack = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const open = /^[ \t]{0,3}(`{3,}|~{3,})/.exec(line);
+    const close = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+    if (fence) {
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (open) {
+      fence = open[1];
+      continue;
+    }
+    const envOpen = /^[ \t]*\\begin\{([A-Za-z][A-Za-z0-9-]*)\}/.exec(line);
+    if (envOpen && RAW_ENV_NAMES.has(envOpen[1])) {
+      rawStack.push(envOpen[1]);
+      continue;
+    }
+    const envEnd = /^[ \t]*\\end\{([A-Za-z][A-Za-z0-9-]*)\}/.exec(line);
+    if (envEnd && rawStack.length && rawStack[rawStack.length - 1] === envEnd[1]) {
+      rawStack.pop();
+      continue;
+    }
+    if (rawStack.length) continue;
+
+    const match = /^[ \t]{0,3}\[([^\]]+)\]:[ \t]*(<[^>]*>|\S+)(?:[ \t]+(?:"([^"]*)"|'([^']*)'|\(([^)]*)\)))?[ \t]*$/.exec(line);
+    if (!match) continue;
+    const label = normalizeLabel(match[1]);
+    if (!label || label.startsWith("^")) continue; // GFM 脚注定义不按链接处理
+    if (!defs.has(label)) {
+      defs.set(label, {
+        href: decodeEntities(match[2].replace(/^<|>$/g, "")),
+        title: decodeEntities(match[3] || match[4] || match[5] || ""),
+      });
+    }
+    lines[i] = "";
+  }
+
+  return { defs, source: lines.join("\n") };
+}
+
 /**
  * 解析源码。
  * @param {string} source
@@ -63,17 +130,24 @@ const withSpan = (node, span) => {
  * @returns {{ doc: object, diagnostics: import('./diagnostics.js').Diagnostic[] }}
  */
 export function parse(source, options = {}) {
-  const ctx = { mode: options.mode || "edit", diagnostics: [] };
+  const { defs, source: text } = extractLinkDefs(stripHtmlComments(source));
+  const ctx = {
+    mode: options.mode || "edit",
+    diagnostics: [],
+    linkDefs: defs,
+    // 'jupyter'：额外接受 \(…\) / \[…\]（Jupyter 的数学定界符）
+    mathDelimiters: options.mathDelimiters === "jupyter" ? "jupyter" : "dollar",
+  };
   ctx.report = createDiagnostics(ctx.diagnostics);
   // 复合环境的字段也要能写行内语法（卡片的标题 / 项目内容）
-  ctx.parseInline = (text) => parseInline(String(text ?? ""), ctx);
-  const doc = N.doc(parseBlocks(String(source ?? ""), ctx));
+  ctx.parseInline = (value) => parseInline(String(value ?? ""), ctx);
+  const doc = N.doc(parseBlocks(text, ctx));
   return { doc, diagnostics: ctx.diagnostics };
 }
 
 // ── 块级 ────────────────────────────────────────────────────────
 export function parseBlocks(source, ctx) {
-  const tokens = lexBlocks(source);
+  const tokens = lexBlocks(source, ctx);
   const nodes = [];
   let i = 0;
 
@@ -81,12 +155,16 @@ export function parseBlocks(source, ctx) {
     const token = tokens[i];
 
     switch (token.type) {
-      case "heading":
+      case "heading": {
+        // ATX 标题带 text；Setext 标题带多行 lines（`标题\n====`）
+        const joined = token.lines
+          ? joinLines(token.lines, token.span[0])
+          : { text: String(token.text ?? ""), starts: null };
         nodes.push(
           withSpan(
             N.heading(
               token.level,
-              parseInline(token.text, ctx, (offset) => ({
+              parseInline(joined.text, ctx, joined.starts ? makeLocator(joined.starts) : (offset) => ({
                 line: token.span[0],
                 column: token.level + 2 + offset,
               })),
@@ -96,6 +174,7 @@ export function parseBlocks(source, ctx) {
         );
         i += 1;
         break;
+      }
       case "hr":
         nodes.push(withSpan(N.hr(), token.span));
         i += 1;
@@ -314,6 +393,9 @@ export function parseInline(src, ctx, locator = null) {
   return parseInlineTokens(
     lexInline(src, {
       warn: (code, message) => ctx.report.warn(code, message),
+      // 引用式链接要靠文档级定义表解析
+      linkDefs: ctx.linkDefs,
+      mathDelimiters: ctx.mathDelimiters,
     }),
     ctx,
     locator,
@@ -372,14 +454,14 @@ function parseInlineTokens(tokens, ctx, locator) {
       case "link":
         out.push(
           withInlineSpan(
-            N.link(token.href, parseInlineTokens(token.tokens, ctx, locator)),
+            N.link(token.href, parseInlineTokens(token.tokens, ctx, locator), token.title || ""),
             token,
             locator,
           ),
         );
         break;
       case "image":
-        out.push(N.image(token.src, { alt: token.alt }));
+        out.push(N.image(token.src, { alt: token.alt, title: token.title || "" }));
         break;
       case "command":
         out.push(...buildInlineCommand(token, ctx, locator));

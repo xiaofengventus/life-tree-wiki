@@ -24,8 +24,9 @@ const userStore = useUserStore()
 
 // 渲染内核由路由决定：/notebook = v1（旧版），/laup-v2 = v2（公测）。
 // 编辑器、快捷键、草稿、提交链路完全共用，只有预览走不同的内核。
-const props = defineProps({ kernel: { type: String, default: 'v1' } })
+const props = defineProps({ kernel: { type: String, default: 'v1' }, embedded: Boolean })
 
+const page = ref(null)
 const showHelp = ref(false)
 const showSubmit = ref(false)
 
@@ -74,6 +75,7 @@ watch([draftAutosave.draftId, draftAutosave.status, draftAutosave.lastSavedAt, d
 onMounted(async () => {
   store.setKernel(props.kernel)
   store.ensureLoaded()
+  if (props.embedded) return
   // ?draft=<id>：从草稿箱「继续编辑」跳回来
   const draftId = String(route.query.draft || '')
   if (draftId) {
@@ -161,6 +163,7 @@ function onKeydown(e) {
   if (showHelp.value || showSubmit.value) return
   if (store.mode === 'edit') return
   const t = e.target
+  if (props.embedded && !page.value?.contains(t)) return
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || t.tagName === 'SELECT' || t.closest?.('.cm-editor'))) return
 
   if (e.shiftKey && e.key === 'Enter') {
@@ -185,7 +188,7 @@ function onKeydown(e) {
       if (lastKey === 'd') store.delCell()
       break
     case 'm': if (store.selectedId) store.setType(store.selectedId, 'laup'); break
-    case 'v': if (store.selectedId) store.setType(store.selectedId, 'var'); break
+    case 'v': if (store.kernel === 'v1' && store.selectedId) store.setType(store.selectedId, 'var'); break
     case 'y': if (store.selectedId) store.setType(store.selectedId, 'code'); break
   }
   lastKey = e.key
@@ -198,10 +201,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div id="notebook-page">
+  <div id="notebook-page" ref="page" :class="{ 'notebook-embedded': embedded }">
     <template v-if="!showHelp">
-      <NavBar />
-      <MenuBar @toggle-help="showHelp = true" @submit="showSubmit = true" />
+      <NavBar v-if="!embedded" />
+      <MenuBar :embedded="embedded" @toggle-help="showHelp = true" @submit="showSubmit = true" />
       <div id="notebook">
         <CellCard v-for="c in store.cells" :key="c.id" :cell="c" />
         <div class="ghost-add" title="在末尾新建 laup 格（快捷键 B）" @click="store.insertCell(store.cells.length - 1)">

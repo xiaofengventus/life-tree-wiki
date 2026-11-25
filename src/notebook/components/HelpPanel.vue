@@ -4,6 +4,8 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { useNotebook } from '../store.js'
 import { codePreviewHtml, renderLaupHtml } from '../renderer.js'
+import { importNotebookV2 } from '../kernelV2.js'
+import { typesetCells } from '../../laup2/index.js'
 import { parseCodeDecl } from '@/utils/codeLang.js'
 
 const store = useNotebook()
@@ -257,19 +259,38 @@ const sections = [
   },
 ]
 
+const v2Sections = [
+  {
+    title: '1. Laup 格：写作与引用',
+    desc: '用 Laup 格写正文、Markdown 与公式。用 \\cite{1} 按 1 起始的编号引用文献；引用号显示为下标。旧 var 格原文保留为 Laup 格，不再执行变量定义。',
+    code: ['# Laup v2 示例', '', '这是 **正文**，也可以写公式 $E=mc^2$，或引用文献 \\cite{1}。', '\\cellbreak', '[references]', '第 1 条参考文献'].join('\n'),
+  },
+  {
+    title: '2. Code 格：展示代码与输入输出',
+    desc: '首行用 [cpp]、[python] 等声明展示语言，不执行代码。相邻的 [input] 和 [output] 会合并成一张对照卡，且不声明语言。[references] 是文献声明，一行一条，不是第三种编辑格。',
+    code: ['[cpp]', 'int main() { return 0; }', '\\cellbreak', '[input]', '2 3', '\\cellbreak', '[output]', '5'].join('\n'),
+  },
+]
+
 // asCell: true 的段落按「代码格源码」渲染（走代码格那条预览路线），
 // 这样手册里看到的就是代码格真实的产物；其余段落按 laup 源码渲染。
 const rendered = computed(() =>
-  sections.map((s) => ({
-    ...s,
-    html: s.asCell ? codePreviewHtml(parseCodeDecl(s.code)) : renderLaupHtml(s.code, s.scope || {}),
-  }))
+  store.kernel === 'v2'
+    ? v2Sections.map((s) => ({ ...s, html: typesetCells(s.code).html }))
+    : sections.map((s) => ({
+      ...s,
+      html: s.asCell ? codePreviewHtml(parseCodeDecl(s.code)) : renderLaupHtml(s.code, s.scope || {}),
+    }))
 )
 
 const emit = defineEmits(['close'])
 
 async function openInNotebook() {
-  await store.loadExample()
+  if (store.kernel === 'v2') {
+    store.applyDraft({ cells: importNotebookV2(v2Sections.map((s) => s.code).join('\n\\cellbreak\n')) })
+  } else {
+    await store.loadExample()
+  }
   emit('close')
 }
 
@@ -301,7 +322,8 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       <div class="output doc-out" v-html="s.plain ? s.plain : s.html"></div>
     </section>
 
-    <footer id="help-foot">
+    <footer v-if="store.kernel === 'v2'" id="help-foot">Laup v2 · Laup / Code</footer>
+    <footer v-else id="help-foot">
       laup 核心规范 v0.5 ·
       完整示例文档 <code>public/notebook-example.laup</code>
     </footer>

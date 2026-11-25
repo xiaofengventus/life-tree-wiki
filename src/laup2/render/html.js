@@ -18,12 +18,14 @@ export function safeHref(raw) {
   return "";
 }
 
-export function safeSrc(raw) {
+export function safeSrc(raw, allowAttachment = false) {
   const src = String(raw ?? "").trim();
   if (!src) return "";
   if (src.startsWith("/") && !src.startsWith("//")) return src;
   if (/^https?:\/\//i.test(src)) return src;
   if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,/i.test(src)) return src;
+  // 宿主（如 JupyterLab 的 AttachmentsResolver）负责把 attachment: 换成 dataURL
+  if (allowAttachment && /^attachment:[\w.\-\u4e00-\u9fa5]+$/i.test(src)) return src;
   return "";
 }
 
@@ -61,11 +63,17 @@ function renderBlock(node, meta) {
       return `<pre class="laup2-code"${node.attrs.lang ? ` data-lang="${esc(node.attrs.lang)}"` : ""}><code${node.attrs.lang ? ` class="language-${esc(node.attrs.lang)}"` : ""}>${esc(node.attrs.value)}</code></pre>`;
     case "Sample":
       return renderSample(node);
-    case "Math":
+    case "Math": {
+      // 宿主自己排版数学（如 JupyterLab 的 KaTeX typesetter）：输出 $…$ 文本
+      if (meta?.mathSource) {
+        return `<p>${esc(node.attrs.display ? `$$${node.attrs.tex}$$` : `$${node.attrs.tex}$`)}</p>`;
+      }
       return node.attrs.display
         ? `<div class="laup2-math-display" data-tex="${esc(node.attrs.tex)}">${esc(node.attrs.tex)}</div>`
         : `<p><span class="laup2-math" data-tex="${esc(node.attrs.tex)}">${esc(node.attrs.tex)}</span></p>`;
+    }
     case "Equation":
+      if (meta?.mathSource) return `<p>$$${esc(node.attrs.tex)}$$</p>`;
       return [
         `<div class="laup2-equation"${node.attrs.id ? ` id="eq-${esc(node.attrs.id)}"` : ""}>`,
         `<div class="laup2-math-display" data-tex="${esc(node.attrs.tex)}">${esc(node.attrs.tex)}</div>`,
@@ -73,18 +81,19 @@ function renderBlock(node, meta) {
         `</div>`,
       ].join("");
     case "Image": {
-      const src = safeSrc(node.attrs.src);
+      const src = safeSrc(node.attrs.src, meta?.allowAttachment);
       if (!src) return `<p>${esc(node.attrs.alt || node.attrs.src)}</p>`;
       const caption = node.attrs.caption || node.attrs.alt || "";
+      const title = node.attrs.title ? ` title="${esc(node.attrs.title)}"` : "";
       return [
         `<figure class="laup2-figure">`,
-        `<img src="${esc(src)}" alt="${esc(node.attrs.alt || "")}" loading="lazy">`,
+        `<img src="${esc(src)}" alt="${esc(node.attrs.alt || "")}"${title} loading="lazy">`,
         caption ? `<figcaption>${esc(caption)}</figcaption>` : "",
         `</figure>`,
       ].join("");
     }
     case "Cover": {
-      const src = safeSrc(node.attrs.src);
+      const src = safeSrc(node.attrs.src, meta?.allowAttachment);
       if (!src) return `<p>${esc(node.attrs.caption || node.attrs.src)}</p>`;
       return [
         `<figure class="laup2-cover">`,
@@ -276,11 +285,15 @@ function renderInline(node, meta) {
     case "Link": {
       const href = safeHref(node.attrs.href);
       const text = inline(node.children, meta);
-      return href ? `<a href="${esc(href)}">${text}</a>` : text;
+      const title = node.attrs.title ? ` title="${esc(node.attrs.title)}"` : "";
+      return href ? `<a href="${esc(href)}"${title}>${text}</a>` : text;
     }
     case "Image": {
-      const src = safeSrc(node.attrs.src);
-      return src ? `<img class="laup2-inline-img" src="${esc(src)}" alt="${esc(node.attrs.alt || "")}">` : esc(node.attrs.alt || "");
+      const src = safeSrc(node.attrs.src, meta?.allowAttachment);
+      const title = node.attrs.title ? ` title="${esc(node.attrs.title)}"` : "";
+      return src
+        ? `<img class="laup2-inline-img" src="${esc(src)}" alt="${esc(node.attrs.alt || "")}"${title}>`
+        : esc(node.attrs.alt || "");
     }
     case "Color": {
       const styles = [];
@@ -291,8 +304,12 @@ function renderInline(node, meta) {
     }
     case "Size":
       return `<span style="font-size:${Number(node.attrs.size) || 16}px">${inline(node.children, meta)}</span>`;
-    case "Math":
+    case "Math": {
+      if (meta?.mathSource) {
+        return esc(node.attrs.display ? `$$${node.attrs.tex}$$` : `$${node.attrs.tex}$`);
+      }
       return `<span class="laup2-math" data-tex="${esc(node.attrs.tex)}">${esc(node.attrs.tex)}</span>`;
+    }
     case "FootnoteRef": {
       const n = node.attrs.number || "?";
       return `<sup class="laup2-fn-ref" id="fnref-${n}"><a href="#fn-${n}">${n}</a></sup>`;
@@ -309,7 +326,7 @@ function renderInline(node, meta) {
       const links = numbers
         .map((n) => `<a href="#ref-${n}">[${n}]</a>`)
         .join("");
-      return `<sup class="laup2-cite">${links}</sup>`;
+      return `<sub class="laup2-cite">${links}</sub>`;
     }
     case "Break":
       return "<br>";
@@ -348,6 +365,7 @@ export const defaultCss = `
 .laup2 h2 { padding-bottom: .3em; border-bottom: 1px solid #e6e8eb; }
 .laup2 p { margin: .9em 0; }
 .laup2 blockquote { margin: 1.2em 0; padding: .2em 1.1em; border-left: 3px solid #cfd6dd; background: #fafbfc; }
+.laup2-center { text-align: center; }
 .laup2 pre.laup2-code { background: #f6f8fa; border: 1px solid #e6e8eb; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
 .laup2 table { border-collapse: collapse; width: 100%; margin: 1.2em 0; }
 .laup2 th, .laup2 td { border: 1px solid #d8dee4; padding: 8px 12px; vertical-align: top; }

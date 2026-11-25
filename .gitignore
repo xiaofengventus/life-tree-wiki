@@ -75,3 +75,11 @@ __pycache__/
 # Non-website content kept outside the repo (moved to E:/vue项目/)
 /xmind特色版/
 /xmind*/
+
+# Laup core 发布壳：源码只有 src/laup2 一份，prepack 时才复制到这里
+/packages/laup2/src/
+/packages/jupyterlab/lib/
+/packages/jupyterlab/node_modules/
+/packages/jupyterlab/.yarn/
+/packages/jupyterlab/tsconfig.tsbuildinfo
+/packages/jupyterlab/jupyterlab_laup/labextension/

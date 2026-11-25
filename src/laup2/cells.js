@@ -1,17 +1,15 @@
 /**
  * Laup v2 —— 单元格层。
  *
- * 内核只处理「一份文档」；这一层把整篇 Notebook 拆成格、识别格类型、
- * 合并输入/输出案例卡，并让脚注 / 公式 / 文献编号**跨格连续**。
+ * 内核只处理传入的一份源码；这一层把源码拆成格、识别格类型、
+ * 合并输入/输出案例卡，并让语义在这份源码的格之间连续。
+ * 宿主若逐个传入 Jupyter cell，则每个 cell 都是独立作用域，不会跨宿主 cell 共享状态。
  *
- * 格类型（只看首行）：
+ * 以下是文档内的首行声明，不是宿主的编辑格类型：
  *   [input]            输入栏（纯文本，不声明语言）
  *   [output]           输出栏（纯文本，不声明语言）
- *   [cpp] 等            代码格，语言就是方括号里的名字
- *   [var]              变量格（格内写 `name = value`，可多条）
- *   var x = 1          变量格（单行简写）
- *   [reference]       参考文献格（一行一条）
- *   [references]      同上
+ *   [cpp] 等            展示型代码，语言就是方括号里的名字
+ *   [references]      参考文献格（一行一条）
  *   其他                Laup 文档格
  *
  * 格与格之间用独占一行的 `\cellbreak` 分隔（兼容 v1 的 `\cellbreak=[` 块写法）。
@@ -25,33 +23,31 @@ import { createDiagnostics } from "./diagnostics.js";
 
 const CELLBREAK_START = /^[ \t]*\\cellbreak[ \t]*(?:=[ \t]*\[[ \t]*)?$/;
 const LANG_DECL = /^\[([A-Za-z0-9+#-]{1,16})\]$/;
-const INLINE_VAR = /^var[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*=[ \t]*(.*)$/;
-const VAR_LINE = /^(?:var[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)[ \t]*=[ \t]*([\s\S]*)$/;
+const CODE_MAGIC = /^%%(cpp|cxx)(?=[ \t]|$)/i;
+
+/** @typedef {{ type: 'laup'|'code', source: string, lang?: string }} CellInput */
 
 /**
- * 变量求值。支持：
- *   字符串（单/双引号）、数字、true/false/null、JSON 对象/数组，其余按原样字符串。
- */
-export function evaluate(raw) {
-  const text = String(raw ?? "").trim().replace(/;$/, "");
-  if (/^"""[\s\S]*"""$/.test(text)) return text.slice(3, -3);
-  if (text.length >= 2 && /^(["'])[\s\S]*\1$/.test(text)) return text.slice(1, -1);
-  if (/^-?\d+(?:\.\d+)?$/.test(text)) return Number(text);
-  if (text === "true") return true;
-  if (text === "false") return false;
-  if (text === "null") return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-/**
- * 把整篇源码拆成格。
+ * 字符串按 Laup 分隔符拆格；数组由宿主提供格边界与类型。
+ * @param {string|CellInput[]} source
  * @returns {Array<object>}
  */
 export function parseCells(source) {
+  if (Array.isArray(source)) {
+    return source.map((cell) => {
+      const text = String(cell.source ?? "");
+      if (cell.type === "laup") {
+        return { ...classifyCell(text.replace(/\r\n?/g, "\n")), sourceType: "laup" };
+      }
+      if (cell.type !== "code") throw new TypeError(`未知的格类型：${cell.type}`);
+
+      // 保留魔法命令以及完整代码文本，只标记展示语言，不执行。
+      const firstLine = text.split(/\r\n?|\n/, 1)[0];
+      const lang = CODE_MAGIC.test(firstLine) ? "cpp" : (cell.lang || "python");
+      return { type: "code", sourceType: "code", pane: null, lang, source: text, body: text };
+    });
+  }
+
   const lines = String(source ?? "").replace(/\r\n?/g, "\n").split("\n");
   const groups = [[]];
   let skippingBreak = false;
@@ -100,25 +96,12 @@ function classifyCell(source) {
     const name = declared[1].toLowerCase();
     const body = source.slice(firstLine.length).replace(/^\n/, "");
     if (name === "input" || name === "output") return { type: "code", pane: name, source, body };
-    if (name === "var") return { type: "var", source, body };
+    if (name === "var") return { type: "laup", source };
     if (name === "references") return { type: "reference", source, body };
     return { type: "code", pane: null, lang: name, source, body };
   }
 
-  if (INLINE_VAR.test(head)) return { type: "var", source };
   return { type: "laup", source };
-}
-
-/** 变量格 → [[名字, 值], …]；`[var]` 格里允许裸赋值 */
-export function readVarCell(cell) {
-  const source = cell.body !== undefined ? cell.body : cell.source;
-  const out = [];
-  for (const line of String(source ?? "").split("\n")) {
-    const match = VAR_LINE.exec(line.trim());
-    if (!match || !match[2].trim()) continue;
-    out.push([match[1], evaluate(match[2])]);
-  }
-  return out;
 }
 
 /** 参考文献格 → 条目数组（一行一条，空行忽略） */
@@ -138,30 +121,27 @@ const renderNodes = (nodes, meta) =>
   renderHtml({ type: "Doc", attrs: {}, children: nodes, span: null }, { meta, fragment: true });
 
 /**
- * 渲染整篇 Notebook。
+ * 渲染传入的一份 Laup 源码。
  *
- * @param {string} source
- * @param {{ variables?: Record<string, unknown> }} options
+ * 传入源码内部可用 `\cellbreak` 分格并共享本次调用的语义状态；
+ * 不同调用之间不会共享变量、文献、脚注或公式编号。
+ *
+ * @param {string|CellInput[]} source
+ * @param {{ variables?: Record<string, unknown>, mathDelimiters?: 'dollar'|'jupyter', mathOutput?: 'source', allowAttachment?: boolean, referencePool?: string[], showReferences?: boolean }} options
  */
 export function typesetCells(source, options = {}) {
   const cells = parseCells(source);
   const diagnostics = [];
   const report = createDiagnostics(diagnostics);
 
-  // ① 变量快照：按出现顺序求值，后面的格能用到前面的定义
-  const snapshots = [];
-  let variables = { ...options.variables };
-  for (const cell of cells) {
-    if (cell.type === "var") {
-      for (const [name, value] of readVarCell(cell)) variables[name] = value;
-    }
-    snapshots.push({ ...variables });
-  }
+  const variables = { ...options.variables };
 
   // ② 解析所有 Laup 格
   const docs = cells.map((cell) => {
     if (cell.type !== "laup") return null;
-    const { doc, diagnostics: parseDiagnostics } = parse(cell.source);
+    const { doc, diagnostics: parseDiagnostics } = parse(cell.source, {
+      mathDelimiters: options.mathDelimiters,
+    });
     diagnostics.push(...parseDiagnostics);
     return doc;
   });
@@ -175,22 +155,30 @@ export function typesetCells(source, options = {}) {
     }
   });
 
-  // ④ 回填阶段：变量用各自快照，公式/文献引用用全局编号
+  // 宿主逐格预览时，使用整篇 Notebook 的文献编号，而非当前格的局部编号。
+  if (options.referencePool) state.references = [...options.referencePool];
+
+  // ④ 回填阶段：使用宿主传入的变量和整篇文档的引用编号
   cells.forEach((cell, index) => {
     if (docs[index]) {
-      resolveSemantics(docs[index], { state, variables: snapshots[index], report });
+      resolveSemantics(docs[index], { state, variables, report });
     }
   });
 
   // ⑤ 渲染：格内容按顺序，脚注与文献各输出一次（文末）
-  const meta = { toc: state.toc, footnotes: state.footnotes };
+  const meta = {
+    toc: state.toc,
+    footnotes: state.footnotes,
+    allowAttachment: options.allowAttachment === true,
+    mathSource: options.mathOutput === "source",
+  };
   const results = [];
   let index = 0;
 
   while (index < cells.length) {
     const cell = cells[index];
 
-    if (cell.type === "var" || cell.type === "reference") {
+    if (cell.type === "reference") {
       results.push({ cell, html: "" });
       index += 1;
       continue;
@@ -224,7 +212,7 @@ export function typesetCells(source, options = {}) {
     index += 1;
   }
 
-  if (state.references.length) {
+  if (state.references.length && options.showReferences !== false) {
     results.push({ cell: null, html: renderNodes([N.references(state.references)], meta) });
   }
   if (state.footnotes.length) {

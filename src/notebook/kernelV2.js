@@ -6,9 +6,8 @@
 //   · v1 独有的写法（[input:cpp]、\references=[…]、\varcell、```code/.sample、[lifetree]）
 //     在 v2 页面直接报错，由作者改写 —— 不做静默兜底。
 
-import { typesetCells } from '@/laup2/index.js'
-import { parseCells, readVarCell } from '@/laup2/cells.js'
-import { highlightLaupCode, parseCodeDecl } from '@/utils/codeLang.js'
+import { parseCells, readReferenceCell, typesetCells } from '../laup2/index.js'
+import { highlightLaupCode, parseCodeDecl } from '../utils/codeLang.js'
 import { sanitizeHtml } from './renderer.js'
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -43,24 +42,23 @@ function withAttachments(source, cell) {
   return { src, restore }
 }
 
-// ── 变量格：原生芯片（v2 的变量格本身零输出，芯片是编辑器的反馈） ──────
-function renderVarCell(cell, scope) {
-  const pairs = readVarCell({ source: cell.source })
-  for (const [name, value] of pairs) scope[name] = value
-  if (!pairs.length) return ''
-  return pairs.map(([name, value]) => {
-    const text = String(typeof value === 'string' ? value : JSON.stringify(value))
-    const flat = esc(text).replace(/\n/g, '⏎')
-    return `<span class="var-chip" title="${esc(text)}">${esc(name)} = ${flat.length > 48 ? `${flat.slice(0, 48)}…` : flat}</span>`
-  }).join('')
+/** 旧快照的 var 只改编辑格类型，源码和附件原样保留。 */
+export function normalizeV2CellType(type) {
+  return type === 'code' ? 'code' : 'laup'
+}
+
+export function normalizeV2Cell(cell) {
+  const legacyVarDecl = cell.type === 'code' && /^[ \t]*\[var\][ \t]*(?:\r\n?|\n|$)/i.test(cell.source)
+  const type = legacyVarDecl ? 'laup' : normalizeV2CellType(cell.type)
+  return type === cell.type ? cell : { ...cell, type }
 }
 
 // ── 代码格：只认 v2 的声明；v1 写法直接报错 ──────────────────────────
-function renderCodeCell(cell, scope, pane) {
+function renderCodeCell(cell, refOptions, pane) {
   const decl = parseCodeDecl(cell.source)
 
   if (decl.kind === 'none') {
-    return errorBlock('代码格首行必须写类型声明：[cpp] / [input] / [output] / [var] / [references]')
+    return errorBlock('代码格首行必须写类型声明：[cpp] / [input] / [output] / [references]')
   }
   if ((decl.kind === 'input' || decl.kind === 'output') && decl.raw) {
     return errorBlock(
@@ -83,14 +81,15 @@ function renderCodeCell(cell, scope, pane) {
       }
       parts.push(`[${item.kind}]\n${String(item.body ?? '').replace(/\s+$/, '')}`)
     }
-    const result = typesetCells(parts.join('\n\\cellbreak\n'), { variables: scope })
+    const result = typesetCells(parts.map((source) => ({ type: 'laup', source })))
     return sanitizeHtml(articleBody(result.html)) + warningBlock(result.diagnostics)
   }
 
-  const name = decl.raw
-  const result = typesetCells(`[${name}]\n${String(decl.body ?? '').replace(/\s+$/, '')}`, {
-    variables: scope,
-  })
+  const result = decl.raw === 'references'
+    ? typesetCells([{ type: 'laup', source: cell.source }], refOptions)
+    : decl.kind === 'input' || decl.kind === 'output'
+      ? typesetCells([{ type: 'laup', source: cell.source }])
+      : typesetCells([{ type: 'code', lang: decl.raw, source: decl.body }])
   return highlightLaupCode(sanitizeHtml(articleBody(result.html))) + warningBlock(result.diagnostics)
 }
 
@@ -99,7 +98,7 @@ function renderCodeCell(cell, scope, pane) {
 // 所以在这里点名，作为"手动迁移清单"的即时提示。
 const V1_IN_LAUP = [
   [/^[ \t]*\\references[ \t]*=/m, 'v1 的 \\references=[…] 数据块在 v2 里要改成单独的 [references] 代码格（一条一行）'],
-  [/^[ \t]*\\varcell[ \t]*=/m, 'v1 的 \\varcell=[…] 数据块在 v2 里要改成单独的 [var] 代码格'],
+  [/^[ \t]*\\varcell[ \t]*=/m, 'v1 的 \\varcell=[…] 数据块在 v2 里已停用，请保留原文备查并把需要展示的内容写入 Laup 正文'],
   [/^[ \t]*\\image[ \t]*[=!]/m, 'v2 用 ![说明](地址) 插图，不再用 \\image 数据块'],
   [/^[ \t]*\\tree[ \t]*=/m, 'v2 还没有 \\tree 研究树嵌入'],
 ];
@@ -142,40 +141,29 @@ export function v1LeftoverInLaup(source) {
   return "";
 }
 
-function renderLaupCell(cell, scope, refPool, isRefDisplay) {
-  let source = String(cell.source ?? '')
+function renderLaupCell(cell, scope, refOptions) {
+  const source = String(cell.source ?? '')
   // 迁移期：命中 v1 写法就只显示提示，避免"看起来渲染出来了"的错觉
   const leftover = v1LeftoverInLaup(source)
   if (leftover) return errorBlock(`这一格还是 v1 写法：${leftover}`)
 
-  // 跨格的文献池：v2 的 \cite 只认同一次渲染里的 [references] 格，
-  // 编辑器是一格一格渲染的，所以在这里补一个合成文献格（只有引用/展示格需要）。
-  const refs = (Array.isArray(refPool) ? refPool : []).filter(Boolean)
-  const hasCite = /\\cite\s*\{/.test(stripRawRegions(source))
-  const declaresRefs = /^[ \t]*\[references\][ \t]*(?:\n|$)/i.test(source)
-  const injectRefs = refs.length > 0 && !declaresRefs && (hasCite || isRefDisplay)
-  if (injectRefs) source += `\n\n\\cellbreak\n[references]\n${refs.join('\n')}`
-
   const { src, restore } = withAttachments(source, cell)
-  const result = typesetCells(src, { variables: scope })
-  let html = restore(articleBody(result.html))
-  if (injectRefs && !isRefDisplay) {
-    html = html.replace(/<section class="laup2-references">[\s\S]*?<\/section>/g, '')
-  }
-  return sanitizeHtml(highlightLaupCode(html)) + warningBlock(result.diagnostics)
+  const result = typesetCells(src, { variables: scope, ...refOptions })
+  return sanitizeHtml(highlightLaupCode(restore(articleBody(result.html)))) + warningBlock(result.diagnostics)
 }
 
 /**
- * 渲染一格（v2）。变量作用域由调用方持有（store.scope），var 格会写回。
+ * 渲染一格（v2）。可读取宿主变量，不从格源码写入变量。
  * @param {object} cell
  * @param {{ scope?: object, refPool?: string[], isRefDisplay?: boolean, pane?: object|null }} ctx
  */
 export function runCellSourceV2(cell, ctx = {}) {
-  const { scope = {}, refPool = [], isRefDisplay = false, pane = null } = ctx
+  const { scope = {}, refPool, isRefDisplay, pane = null } = ctx
+  const refOptions = { referencePool: refPool, showReferences: isRefDisplay }
   try {
-    if (cell.type === 'var') return { outputHtml: renderVarCell(cell, scope) }
-    if (cell.type === 'code') return { outputHtml: renderCodeCell(cell, scope, pane) }
-    return { outputHtml: renderLaupCell(cell, scope, refPool, isRefDisplay) }
+    const normalized = normalizeV2Cell(cell)
+    if (normalized.type === 'code') return { outputHtml: renderCodeCell(normalized, refOptions, pane) }
+    return { outputHtml: renderLaupCell(normalized, scope, refOptions) }
   } catch (error) {
     return { outputHtml: errorBlock(`渲染失败：${error?.message || error}`) }
   }
@@ -194,14 +182,16 @@ export function exportNotebookV2(cells, urlMap = null) {
   })
 
   const parts = []
-  for (const cell of Array.isArray(cells) ? cells : []) {
-    const source = String(cell?.source ?? '').trim()
-    if (!source) continue
+  for (const rawCell of Array.isArray(cells) ? cells : []) {
+    if (!rawCell) continue
+    const cell = normalizeV2Cell(rawCell)
+    const source = String(cell.source ?? '')
+    if (!source.trim()) continue
     // 导出即校验：v1 写法混进 v2 文档时，发布前就报错，不把错误语法写进库
     if (cell.type === 'code') {
       const decl = parseCodeDecl(source)
       if (decl.kind === 'none') {
-        throw new Error('代码格首行必须写类型声明：[cpp] / [input] / [output] / [var] / [references]')
+        throw new Error('代码格首行必须写类型声明：[cpp] / [input] / [output] / [references]')
       }
       if ((decl.kind === 'input' || decl.kind === 'output') && decl.raw) {
         throw new Error(`v2 的输入/输出栏不声明语言：${decl.declText} 请改成 [${decl.kind}]`)
@@ -215,56 +205,38 @@ export function exportNotebookV2(cells, urlMap = null) {
       if (leftover) throw new Error(leftover)
     }
     const body = swapMedia(restoreAttachments(source, cell))
-    parts.push(cell.type === 'var' ? `[var]\n${body}` : body)
+    parts.push(body)
   }
   return parts.join('\n\n\\cellbreak\n\n') + '\n'
 }
 
 /** v2 `.laup` 源码 → store 的格数组（打开已发布文章 / 导入时用）。 */
 export function importNotebookV2(source) {
-  return parseCells(source).map((cell) => {
-    if (cell.type === 'laup') return { type: 'laup', source: cell.source }
-    if (cell.type === 'var') return { type: 'var', source: String(cell.body ?? '').trim() }
-    if (cell.type === 'reference') return { type: 'code', source: `[references]\n${cell.body}` }
-    return { type: 'code', source: `[${cell.pane || cell.lang || 'text'}]\n${cell.body}` }
-  })
+  return parseCells(source).map((cell) => ({
+    type: cell.type === 'laup' ? 'laup' : 'code',
+    source: cell.source,
+  }))
 }
 
 /** 所有 [references] 代码格的条目，按格顺序汇总（= 全局编号）。 */
 export function collectV2References(cells) {
   const out = []
   for (const cell of Array.isArray(cells) ? cells : []) {
-    if (cell?.type === 'code') {
-      const decl = parseCodeDecl(cell.source)
-      if (decl.kind !== 'lang' || decl.raw !== 'references') continue
-      for (const line of String(decl.body ?? '').split('\n')) {
-        const text = line.trim()
-        if (text) out.push(text)
-      }
-      continue
-    }
-    // 直接写在 laup 格里的 [references] 段也认（格类型没切到 code 时）
-    if (cell?.type === 'laup') {
-      const match = /^[ \t]*\[references\][ \t]*\n?([\s\S]*)$/i.exec(String(cell.source ?? ''))
-      if (!match) continue
-      for (const line of match[1].split('\n')) {
-        const text = line.trim()
-        if (text) out.push(text)
-      }
-    }
+    for (const section of referenceSections(cell)) out.push(...readReferenceCell(section))
   }
   return out
 }
 
-/** 文献列表的展示格：第一个 [references] 代码格；没有则第一个带 \cite 的 laup 格。 */
+function referenceSections(cell) {
+  if (cell?.type === 'laup') return parseCells(cell.source).filter((part) => part.type === 'reference')
+  if (cell?.type !== 'code') return []
+  const decl = parseCodeDecl(cell.source)
+  return decl.declText === '[references]'
+    ? parseCells([{ type: 'laup', source: cell.source }]).filter((part) => part.type === 'reference')
+    : []
+}
+
+/** 文献列表显示在首个 [references] 声明所在的编辑格中。 */
 export function v2ReferenceDisplayIndex(cells) {
-  const list = Array.isArray(cells) ? cells : []
-  const declared = list.findIndex((cell) => {
-    if (cell?.type === 'laup') return /^[ \t]*\[references\][ \t]*(?:\n|$)/i.test(String(cell.source ?? ''))
-    if (cell?.type !== 'code') return false
-    const decl = parseCodeDecl(cell.source)
-    return decl.kind === 'lang' && decl.raw === 'references'
-  })
-  if (declared >= 0) return declared
-  return list.findIndex((cell) => cell?.type === 'laup' && /\\cite\s*\{/.test(cell.source))
+  return (Array.isArray(cells) ? cells : []).findIndex((cell) => referenceSections(cell).length > 0)
 }

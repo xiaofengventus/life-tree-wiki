@@ -27,6 +27,13 @@ const tools = [
     icon: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   },
   {
+    to: "/papilot",
+    name: "Papilot Laup 工作台",
+    en: "Papilot · Laup v2",
+    desc: "新建或导入 Laup 文档，使用站内 Notebook 单元格与整篇排版预览。",
+    icon: "M4 5h16v14H4zM8 9h8M8 13h5",
+  },
+  {
     to: "/laup-v2",
     name: "Laup v2",
     en: "Laup v2",

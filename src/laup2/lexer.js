@@ -21,8 +21,125 @@ const ENV_RE = /^[ \t]*\\begin\{([A-Za-z][A-Za-z0-9-]*)\}[ \t]*(.*)$/;
 const ENV_END_RE = /^[ \t]*\\end\{([A-Za-z][A-Za-z0-9-]*)\}[ \t]*$/;
 const COMMAND_RE = /^[ \t]*\\([A-Za-z][A-Za-z0-9-]*)(.*)$/;
 const TABLE_SEP_RE = /^[ \t]*\|?[ \t]*:?-{1,}:?[ \t]*(\|[ \t]*:?-{1,}:?[ \t]*)*\|?[ \t]*$/;
+// Setext 标题下划线：`====` / `----`（至少两个 `-`，避免和空列表项混淆）
+const SETEXT_RE = /^[ \t]{0,3}(?:=+|-{2,})[ \t]*$/;
 
 const isBlank = (line) => !String(line).trim();
+
+// ── HTML 实体（CommonMark：文本里的实体先解码，渲染时再统一转义） ──
+// 覆盖数字实体 + 常用命名实体；未收录的名字按原文保留。
+const NAMED_ENTITIES = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\u00a0",
+  copy: "©", reg: "®", trade: "™", hellip: "…", mdash: "—", ndash: "–",
+  lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»",
+  times: "×", divide: "÷", deg: "°", plusmn: "±", middot: "·", bull: "•",
+  dagger: "†", Dagger: "‡", sect: "§", para: "¶", euro: "€", pound: "£", yen: "¥", cent: "¢",
+  alpha: "α", beta: "β", gamma: "γ", delta: "δ", epsilon: "ε", theta: "θ",
+  lambda: "λ", mu: "μ", pi: "π", sigma: "σ", omega: "ω",
+  Delta: "Δ", Sigma: "Σ", Omega: "Ω",
+  rarr: "→", larr: "←", uarr: "↑", darr: "↓", harr: "↔",
+  le: "≤", ge: "≥", ne: "≠", asymp: "≈", infin: "∞",
+  sum: "∑", prod: "∏", radic: "√", part: "∂", int: "∫", there4: "∴",
+};
+
+const ENTITY_RE = /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z][A-Za-z0-9]{1,31}));/g;
+
+export function decodeEntities(text) {
+  return String(text ?? "").replace(ENTITY_RE, (match, dec, hex, name) => {
+    if (dec || hex) {
+      const code = dec ? Number(dec) : parseInt(hex, 16);
+      if (code === 0) return "\uFFFD";
+      if (code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return "\uFFFD";
+      return String.fromCodePoint(code);
+    }
+    const value = NAMED_ENTITIES[name];
+    return value === undefined ? match : value;
+  });
+}
+
+/** 引用式链接的标签归一化（CommonMark：折叠空白、大小写不敏感） */
+export function normalizeLabel(label) {
+  return String(label ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/** 从 `[` 开始找配对的 `]`（跳过转义与行内代码） */
+function findClosingBracket(text, start) {
+  let depth = 0;
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "\\") {
+      i += 1;
+      continue;
+    }
+    if (ch === "`") {
+      const run = /^`+/.exec(text.slice(i))[0];
+      const end = text.indexOf(run, i + run.length);
+      if (end > i) {
+        i = end + run.length - 1;
+        continue;
+      }
+    }
+    if (ch === "[") depth += 1;
+    else if (ch === "]") {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** `(dest "title")`：支持尖括号地址、括号地址与三种标题引号 */
+function readInlineDestination(text, start) {
+  let i = start + 1;
+  while (text[i] === " " || text[i] === "\t") i += 1;
+
+  let href = "";
+  if (text[i] === "<") {
+    const end = text.indexOf(">", i + 1);
+    if (end < 0) return null;
+    href = text.slice(i + 1, end);
+    i = end + 1;
+  } else {
+    const from = i;
+    let depth = 0;
+    while (i < text.length) {
+      const ch = text[i];
+      if (ch === "\\" && i + 1 < text.length) {
+        i += 2;
+        continue;
+      }
+      if (ch === "(") depth += 1;
+      else if (ch === ")") {
+        if (depth === 0) break;
+        depth -= 1;
+      } else if (/\s/.test(ch)) break;
+      i += 1;
+    }
+    href = text.slice(from, i);
+  }
+
+  while (text[i] === " " || text[i] === "\t" || text[i] === "\n") i += 1;
+
+  let title = "";
+  const quote = text[i];
+  if (quote === '"' || quote === "'" || quote === "(") {
+    const closer = quote === "(" ? ")" : quote;
+    const end = text.indexOf(closer, i + 1);
+    if (end < 0) return null;
+    title = text.slice(i + 1, end);
+    i = end + 1;
+    while (text[i] === " " || text[i] === "\t") i += 1;
+  }
+
+  if (text[i] !== ")") return null;
+  return { href: decodeEntities(href), title: decodeEntities(title), next: i + 1 };
+}
+
+function lookupRef(ctx, label) {
+  const key = normalizeLabel(label);
+  if (!key || !ctx.linkDefs || !ctx.linkDefs.size) return null;
+  return ctx.linkDefs.get(key) || null;
+}
 
 /** 某个字符前面是否有奇数个反斜杠（= 被转义） */
 function isEscaped(text, index) {
@@ -47,9 +164,19 @@ export function splitTableRow(line) {
     const ch = text[i];
     if (ch === "\\" && i + 1 < text.length) {
       const next = text[i + 1];
-      cell += next === "|" ? "|" : ch + next;
-      i += 2;
-      continue;
+      // 只有 `\|` / `\\` 需要成对消费：前者还原成字面管道，后者留给行内解析器。
+      // 其它 `\x` 只吃掉反斜杠本身 —— 例如 `` `\` `` 里的反斜杠后面紧跟的是
+      // 收尾反引号，必须留给行内代码配对，否则代码段永远不闭合。
+      if (next === "|") {
+        cell += "|";
+        i += 2;
+        continue;
+      }
+      if (next === "\\") {
+        cell += "\\\\";
+        i += 2;
+        continue;
+      }
     }
     if (ch === "`") {
       let run = 1;
@@ -82,7 +209,7 @@ function lineStart(source, index) {
  * 块级词法。
  * @returns {Array<object>} tokens
  */
-export function lexBlocks(source) {
+export function lexBlocks(source, ctx = {}) {
   const text = String(source ?? "").replace(/\r\n?/g, "\n");
   const lines = text.split("\n");
   const tokens = [];
@@ -128,6 +255,34 @@ export function lexBlocks(source) {
       for (; j < lines.length; j += 1) {
         const line = lines[j].trim();
         if (line === "$$") {
+          closed = true;
+          break;
+        }
+        body.push(lines[j]);
+      }
+      tokens.push({
+        type: "mathblock",
+        tex: body.join("\n").trim(),
+        span: [i + 1, Math.min(j + 1, lines.length)],
+        closed,
+      });
+      i = j + 1;
+      continue;
+    }
+
+    // 公式块 \[ … \]（Jupyter 定界符，需显式开启）
+    if (ctx.mathDelimiters === "jupyter" && trimmed.startsWith("\\[")) {
+      const rest = trimmed.slice(2);
+      if (rest.endsWith("\\]") && rest.length >= 2) {
+        tokens.push({ type: "mathblock", tex: rest.slice(0, -2).trim(), span: [i + 1, i + 1] });
+        i += 1;
+        continue;
+      }
+      const body = rest ? [rest] : [];
+      let j = i + 1;
+      let closed = false;
+      for (; j < lines.length; j += 1) {
+        if (lines[j].trim() === "\\]") {
           closed = true;
           break;
         }
@@ -229,7 +384,7 @@ export function lexBlocks(source) {
       continue;
     }
 
-    // 表格：本行含 |，且下一行是分隔行
+    // 表格：本行含 |，且下一行是分隔行（列数必须与表头一致，否则退回段落/Setext）
     if (raw.includes("|") && i + 1 < lines.length && TABLE_SEP_RE.test(lines[i + 1]) && lines[i + 1].includes("-")) {
       const parseRow = (line) => {
         let text = String(line ?? "").trim();
@@ -243,15 +398,17 @@ export function lexBlocks(source) {
         const right = cell.endsWith(":");
         return left && right ? "center" : right ? "right" : "left";
       });
-      const rows = [];
-      let j = i + 2;
-      while (j < lines.length && lines[j].includes("|") && !isBlank(lines[j])) {
-        rows.push(parseRow(lines[j]));
-        j += 1;
+      if (head.length === aligns.length && head.length > 0) {
+        const rows = [];
+        let j = i + 2;
+        while (j < lines.length && lines[j].includes("|") && !isBlank(lines[j])) {
+          rows.push(parseRow(lines[j]));
+          j += 1;
+        }
+        tokens.push({ type: "table", head, align: aligns, rows, span: [i + 1, j] });
+        i = j;
+        continue;
       }
-      tokens.push({ type: "table", head, align: aligns, rows, span: [i + 1, j] });
-      i = j;
-      continue;
     }
 
     // 块级命令
@@ -270,12 +427,18 @@ export function lexBlocks(source) {
       }
     }
 
-    // 普通段落行（连续行合并）
+    // 普通段落行（连续行合并）；下一行是 Setext 下划线时升级成标题
     const para = [raw];
     let j = i + 1;
+    let setext = 0;
     while (j < lines.length) {
       const next = lines[j];
       if (isBlank(next)) break;
+      if (SETEXT_RE.test(next)) {
+        setext = next.trim()[0] === "=" ? 1 : 2;
+        j += 1;
+        break;
+      }
       if (
         FENCE_RE.test(next) ||
         HEADING_RE.test(next) ||
@@ -283,7 +446,8 @@ export function lexBlocks(source) {
         QUOTE_RE.test(next) ||
         LIST_RE.test(next) ||
         ENV_RE.test(next) ||
-        next.trim().startsWith("$$")
+        next.trim().startsWith("$$") ||
+        (ctx.mathDelimiters === "jupyter" && next.trim().startsWith("\\["))
       ) {
         break;
       }
@@ -292,7 +456,11 @@ export function lexBlocks(source) {
       para.push(next);
       j += 1;
     }
-    tokens.push({ type: "para", lines: para, span: [i + 1, j] });
+    if (setext) {
+      tokens.push({ type: "heading", level: setext, lines: para, span: [i + 1, j] });
+    } else {
+      tokens.push({ type: "para", lines: para, span: [i + 1, j] });
+    }
     i = j;
   }
 
@@ -371,7 +539,7 @@ export function lexInline(src, ctx = {}) {
   let buffer = "";
   const flush = () => {
     if (buffer) {
-      tokens.push({ type: "text", value: buffer });
+      tokens.push({ type: "text", value: decodeEntities(buffer) });
       buffer = "";
     }
   };
@@ -383,6 +551,25 @@ export function lexInline(src, ctx = {}) {
     // 转义 / 换行
     if (ch === "\\") {
       const next = text[i + 1];
+      // Jupyter 的 \(…\) / \[…\]：开启 mathDelimiters:'jupyter' 时按数学处理
+      if (ctx.mathDelimiters === "jupyter" && next === "(") {
+        const end = text.indexOf("\\)", i + 2);
+        if (end > i) {
+          flush();
+          tokens.push({ type: "math", tex: text.slice(i + 2, end), display: false });
+          i = end + 2;
+          continue;
+        }
+      }
+      if (ctx.mathDelimiters === "jupyter" && next === "[") {
+        const end = text.indexOf("\\]", i + 2);
+        if (end > i) {
+          flush();
+          tokens.push({ type: "math", tex: text.slice(i + 2, end), display: true });
+          i = end + 2;
+          continue;
+        }
+      }
       if (next === "\\") {
         flush();
         tokens.push({ type: "break" });
@@ -516,35 +703,112 @@ export function lexInline(src, ctx = {}) {
     }
     if (emphasized) continue;
 
-    // 图片 ![alt](src)
-    if (ch === "!" && text[i + 1] === "[") {
-      const close = text.indexOf("]", i + 2);
-      const hrefEnd = text.indexOf(")", close + 1);
-      if (close > i && hrefEnd > close && text[close + 1] === "(") {
+    // 自动链接 <https://…> / <mail@example.com>
+    if (ch === "<") {
+      const rest = text.slice(i);
+      const uri = /^<([A-Za-z][A-Za-z0-9+.-]{1,31}:[^<>\s]*)>/.exec(rest);
+      if (uri) {
         flush();
         tokens.push({
-          type: "image",
-          alt: text.slice(i + 2, close),
-          src: text.slice(close + 2, hrefEnd).trim(),
+          type: "link",
+          href: uri[1],
+          title: "",
+          tokens: [{ type: "text", value: uri[1] }],
         });
-        i = hrefEnd + 1;
+        i += uri[0].length;
+        continue;
+      }
+      const mail = /^<([^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)>/.exec(rest);
+      if (mail) {
+        flush();
+        tokens.push({
+          type: "link",
+          href: `mailto:${mail[1]}`,
+          title: "",
+          tokens: [{ type: "text", value: mail[1] }],
+        });
+        i += mail[0].length;
         continue;
       }
     }
 
-    // 链接 [text](href)
+    // 图片 ![alt](src "title") / ![alt][label] / ![alt]
+    if (ch === "!" && text[i + 1] === "[") {
+      const close = findClosingBracket(text, i + 1);
+      if (close > i) {
+        const alt = text.slice(i + 2, close);
+        const after = text[close + 1];
+        if (after === "(") {
+          const dest = readInlineDestination(text, close + 1);
+          if (dest) {
+            flush();
+            tokens.push({ type: "image", alt, src: dest.href, title: dest.title });
+            i = dest.next;
+            continue;
+          }
+        } else {
+          let label = alt;
+          let next = close + 1;
+          if (after === "[") {
+            const end = text.indexOf("]", close + 2);
+            if (end > close + 1) {
+              label = text.slice(close + 2, end) || alt;
+              next = end + 1;
+            }
+          }
+          const ref = lookupRef(ctx, label);
+          if (ref) {
+            flush();
+            tokens.push({ type: "image", alt, src: ref.href, title: ref.title });
+            i = next;
+            continue;
+          }
+        }
+      }
+    }
+
+    // 链接 [text](href "title") / [text][label] / [label]
     if (ch === "[") {
-      const close = text.indexOf("]", i + 1);
-      const hrefEnd = close > i ? text.indexOf(")", close + 1) : -1;
-      if (close > i && hrefEnd > close && text[close + 1] === "(") {
-        flush();
-        tokens.push({
-          type: "link",
-          href: text.slice(close + 2, hrefEnd).trim(),
-          tokens: lexInline(text.slice(i + 1, close), ctx),
-        });
-        i = hrefEnd + 1;
-        continue;
+      const close = findClosingBracket(text, i);
+      if (close > i) {
+        const labelText = text.slice(i + 1, close);
+        const after = text[close + 1];
+        if (after === "(") {
+          const dest = readInlineDestination(text, close + 1);
+          if (dest) {
+            flush();
+            tokens.push({
+              type: "link",
+              href: dest.href,
+              title: dest.title,
+              tokens: lexInline(labelText, ctx),
+            });
+            i = dest.next;
+            continue;
+          }
+        } else {
+          let label = labelText;
+          let next = close + 1;
+          if (after === "[") {
+            const end = text.indexOf("]", close + 2);
+            if (end > close + 1) {
+              label = text.slice(close + 2, end) || labelText;
+              next = end + 1;
+            }
+          }
+          const ref = lookupRef(ctx, label);
+          if (ref) {
+            flush();
+            tokens.push({
+              type: "link",
+              href: ref.href,
+              title: ref.title,
+              tokens: lexInline(labelText, ctx),
+            });
+            i = next;
+            continue;
+          }
+        }
       }
     }
 

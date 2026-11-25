@@ -6,9 +6,10 @@
  * 产物是一份静态 HTML：内核默认样式（defaultCss）+ 站内阅读页的 Wiki 排版，
  * 与 WikiPostDetail 的 .article-content 同一套口径，不再套用额外的主题包。
  */
+import assert from "node:assert/strict";
 import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { typeset, typesetCells, defaultCss } from "../src/laup2/index.js";
+import { typeset, typesetCells, parseCells, exportCells, cellCompletions, defaultCss } from "../src/laup2/index.js";
 
 const ARTICLE = [
   "# 生命时序的排版实验",
@@ -59,9 +60,7 @@ const ARTICLE = [
 ].join("\n");
 
 const NOTEBOOK = [
-  'var title = "输入输出案例"',
-  "\\cellbreak",
-  "# {{title}}",
+  "# 输入输出案例",
   "\\cellbreak",
   "相邻的输入/输出格会合并成一张卡，栏内不声明语言。",
   "\\cellbreak",
@@ -155,6 +154,22 @@ ${body}
 
 const article = typeset(ARTICLE);
 const notebook = typesetCells(NOTEBOOK);
+
+// 格类型与引用回归检查：展示声明不是新的编辑格，旧 var 不再执行。
+const legacy = '[var]\n  var title = "旧标题"';
+assert.deepEqual(parseCells(legacy), [{ type: "laup", source: legacy }]);
+assert.equal(exportCells(legacy), `${legacy}\n`);
+assert.throws(() => parseCells([{ type: "var", source: legacy }]), TypeError);
+assert.ok(!cellCompletions().some(({ label }) => label === "[var]"));
+assert.deepEqual(typesetCells(legacy).variables, {});
+assert.match(notebook.html, /<sub class="laup2-cite"><a href="#ref-1">\[1\]<\/a><a href="#ref-2">\[2\]<\/a><\/sub>/);
+assert.match(notebook.html, /<li id="ref-2">/);
+assert.match(notebook.html, /class="language-cpp"/);
+assert.equal(notebook.html.split('class="laup2-sample"').length - 1, 1);
+
+const preview = typesetCells('正文 \\cite{2}', { referencePool: ["第一条", "第二条"], showReferences: false });
+assert.match(preview.html, /<sub class="laup2-cite"><a href="#ref-2">\[2\]<\/a><\/sub>/);
+assert.doesNotMatch(preview.html, /class="laup2-references"/);
 
 const body = [
   '<div class="demo-split"><h2>文章（typeset）</h2></div>',

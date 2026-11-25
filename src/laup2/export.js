@@ -32,10 +32,18 @@ export function exportInline(nodes) {
           return `~~${exportInline(node.children)}~~`;
         case "Underline":
           return `\\underline{${exportInline(node.children)}}`;
-        case "Link":
-          return `[${exportInline(node.children)}](${node.attrs.href})`;
-        case "Image":
-          return `![${node.attrs.alt || ""}](${node.attrs.src})`;
+        case "Link": {
+          const title = node.attrs.title
+            ? ` "${String(node.attrs.title).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+            : "";
+          return `[${exportInline(node.children)}](${node.attrs.href}${title})`;
+        }
+        case "Image": {
+          const title = node.attrs.title
+            ? ` "${String(node.attrs.title).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+            : "";
+          return `![${node.attrs.alt || ""}](${node.attrs.src}${title})`;
+        }
         case "Color":
           return node.attrs.color
             ? `\\textcolor{${node.attrs.color}}{${exportInline(node.children)}}`
@@ -206,6 +214,7 @@ export { exportCells };
 function exportCells(source) {
   const cells = parseCells(source);
   const parts = cells.map((cell) => {
+    if (/^[ \t]*\[var\][ \t]*(?:\n|$)/i.test(cell.source)) return cell.source;
     if (cell.type !== "laup") return cell.source.trim();
     return exportSource(parse(cell.source).doc).trim();
   });

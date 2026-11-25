@@ -15,6 +15,8 @@
 #notebook-page *, #notebook-page *::before, #notebook-page *::after { box-sizing: border-box; }
 
 /* ---------- 菜单栏 ---------- */
+/* 站内导航条是 sticky top:0 / z-index:50（高 64px + 1px 边框），
+   工具栏必须让开这段高度并待在它下面，否则会被导航条盖住、看起来随页面滚走。 */
 #notebook-page #menubar {
   display: flex;
   align-items: center;
@@ -22,9 +24,9 @@
   padding: 6px 14px;
   border-bottom: 1px solid var(--border);
   position: sticky;
-  top: 0;
+  top: 65px;
   background: #fff;
-  z-index: 20;
+  z-index: 19;
 }
 #notebook-page #menubar .brand { font-weight: bold; color: #e25303; font-size: 15px; }
 #notebook-page #menubar .brand-sub { color: #888; margin-right: 14px; font-size: 14px; }
@@ -419,6 +421,7 @@
   border-left: 4px solid #9aa4ad; background: #f7f9fb;
 }
 #notebook-page .output .laup2-callout-warning { border-left-color: #d98c00; background: #fff8e6; }
+#notebook-page .output .laup2-center { text-align: center; }
 #notebook-page .output .laup2-toc {
   margin: 8px 0; padding: 10px 14px;
   border: 1px solid #e6e8eb; border-radius: 6px; background: #fafbfc;

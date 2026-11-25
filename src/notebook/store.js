@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
+import { hasInjectionContext, inject } from 'vue'
 import {
   buildRefPool, collectCitedNums, collectRefBlocks, exportLaupDoc, migrateCodeCells,
   parseLaupDoc, planCodePanes, runCellSource,
 } from './renderer.js'
-import { runCellSourceV2, exportNotebookV2, collectV2References, v2ReferenceDisplayIndex } from './kernelV2.js'
+import { runCellSourceV2, exportNotebookV2, collectV2References, v2ReferenceDisplayIndex, normalizeV2Cell, normalizeV2CellType } from './kernelV2.js'
+import { ipynbToCells } from './ipynb.js'
 
 // 两套内核各存各的：v2 公测页不读也不写 v1 的稿子。
 // v1 的键沿用历史名字（laup-notebook-v2），改名会让存量草稿凭空消失。
@@ -20,11 +22,17 @@ function emptyCell(type = 'laup') {
   return { id: makeId(), type, source: '', attachments: {}, execCount: null, outputHtml: '' }
 }
 
-export const useNotebook = defineStore('notebook', {
+export const notebookContext = Symbol('notebook')
+
+export function useNotebook(pinia) {
+  return (!pinia && hasInjectionContext() && inject(notebookContext, null)) || useNotebookStore(pinia)
+}
+
+const useNotebookStore = defineStore('notebook', {
   state: () => ({
     cells: [],
+    storageEnabled: true,
     // 渲染内核：'v1'（旧版，/notebook）| 'v2'（公测，/laup-v2）。
-    // 只影响预览；变量芯片与 [lifetree] 树仍走 v1（见 kernelV2.js）。
     kernel: 'v1',
     selectedId: null,
     mode: 'command', // command | edit，对齐 Jupyter 双模式
@@ -83,10 +91,14 @@ export const useNotebook = defineStore('notebook', {
     // ---------- 初始化：localStorage 优先，否则空白启动（一个空 laup 格） ----------
     ensureLoaded() {
       let data = null
-      try { data = JSON.parse(localStorage.getItem(LS_KEYS[this.kernel]) || 'null') } catch { data = null }
-      if (data?.cells?.length) {
-        // 旧版代码格（源码是一整块 `输入---输出`）在这一步拆成 [input] / [output] 两格
-        this.cells = migrateCodeCells(data.cells, () => emptyCell('code'))
+      if (this.storageEnabled) {
+        try { data = JSON.parse(localStorage.getItem(LS_KEYS[this.kernel]) || 'null') } catch { data = null }
+      } else if (this.cells.length) {
+        return
+      }
+      if (Array.isArray(data?.cells) && data.cells.length) {
+        // v1 迁移旧输入输出格；v2 只收口编辑格类型，不改旧 var 原文。
+        this.cells = this.prepareCells(data.cells)
         this.execCounter = data.execCounter || 0
         // 渲染位置是**用户偏好**，跟着本机存，不跟着文档走（换文章也还是他自己选的那档）
         if (RENDER_MODES.includes(data.renderMode)) this.renderMode = data.renderMode
@@ -108,12 +120,18 @@ export const useNotebook = defineStore('notebook', {
       if (run) { this.runAll(false); this.persist(true) }
     },
 
+    prepareCells(cells) {
+      return this.kernel === 'v2'
+        ? cells.map(normalizeV2Cell)
+        : migrateCodeCells(cells, () => emptyCell('code'))
+    },
+
     // 从草稿箱恢复（payload 由 buildDraft 写入，见 NotebookView 的 useDraftAutosave）
     applyDraft(payload = {}) {
       const raw = Array.isArray(payload.cells) && payload.cells.length
         ? payload.cells.map((c) => ({ ...emptyCell(c.type), type: c.type, source: c.source || '', attachments: c.attachments || {} }))
         : [emptyCell('laup')]
-      const cells = migrateCodeCells(raw, () => emptyCell('code'))
+      const cells = this.prepareCells(raw)
       this.cells = cells
       this.execCounter = Number(payload.execCounter) || 0
       // 草稿带了就跟着走；没带（如 ?edit= 载入已发布文章）就沿用本机偏好，不重置
@@ -132,7 +150,7 @@ export const useNotebook = defineStore('notebook', {
       const text = await res.text()
       const parsed = parseLaupDoc(text)
       if (!parsed.length) throw new Error('example.laup 里没有内容')
-      this.cells = migrateCodeCells(parsed.map((c) => ({ ...emptyCell(c.type), source: c.source })), () => emptyCell('code'))
+      this.cells = this.prepareCells(parsed.map((c) => ({ ...emptyCell(c.type), source: c.source })))
       this.execCounter = 0
       this.selectedId = this.cells[0].id
       this.mode = 'command'
@@ -144,8 +162,10 @@ export const useNotebook = defineStore('notebook', {
     _t: null,
     persist(immediate = false) {
       clearTimeout(this._t)
+      if (!this.storageEnabled) return
       const key = LS_KEYS[this.kernel]
       const write = () => {
+        if (!this.storageEnabled) return
         try {
           localStorage.setItem(key, JSON.stringify({
             cells: this.cells, execCounter: this.execCounter, renderMode: this.renderMode,
@@ -174,14 +194,15 @@ export const useNotebook = defineStore('notebook', {
     setSource(id, source) {
       const c = this.cells.find((x) => x.id === id)
       if (!c || c.source === source) return
+      const refreshReferences = this.kernel === 'v2' && c.type === 'code'
+        && /^\[references\][ \t]*(?:\r?\n|$)/im.test(`${c.source}\n${source}`)
       c.source = source
-      // 代码格的预览很便宜（不编译 Laup），边打边更新；laup 格仍等 Shift+Enter
-      if (c.type === 'code') this.renderCodeCells()
+      // 代码格边打边预览；文献声明变化时同步更新编号和列表。
+      if (c.type === 'code') this.renderCodeCells(refreshReferences)
       this.persist()
     },
 
-    // 按当前内核渲染一格。v1 / v2 共用同一套运行流程与作用域；
-    // v2 交回 kernelV2 的适配层（变量芯片、lifetree 等仍由 v1 承担）。
+    // 按当前内核渲染一格。v2 交给独立适配层，不写入变量作用域。
     renderCell(c, pool, cited, isDisp, pane) {
       if (this.kernel === 'v2') {
         return runCellSourceV2(c, { scope: this.scope, refPool: pool, isRefDisplay: isDisp, pane })
@@ -199,12 +220,13 @@ export const useNotebook = defineStore('notebook', {
     // 代码格没有「运行」这回事：预览随时可以重画（不编译 Laup，成本可忽略）。
     // 配对关系（[input] + [output] 并成一张对照卡）会因邻格改动而变，
     // 所以整批重画，免得配对的另一半留着旧产物。
-    // 代码格的分支不碰全局文献池 —— 传空数组，省掉每次按键的整篇正则扫描。
-    renderCodeCells() {
+    renderCodeCells(refreshReferences = false) {
       const panes = planCodePanes(this.cells)
+      const pool = this.kernel === 'v2' ? this.refPool() : []
+      const display = this.kernel === 'v2' ? this.refDisplayIdx() : -1
       this.cells.forEach((c, i) => {
-        if (c.type !== 'code') return
-        c.outputHtml = this.renderCell(c, [], null, false, panes.get(i) || null).outputHtml
+        if (c.type !== 'code' && !refreshReferences) return
+        c.outputHtml = this.renderCell(c, pool, null, i === display, panes.get(i) || null).outputHtml
       })
     },
 
@@ -264,7 +286,7 @@ export const useNotebook = defineStore('notebook', {
       })
     },
 
-    // 全局文献池：v2 只认 [references] 代码格；v1 走原有的数据块汇总
+    // 全局文献池：v2 认 [references] 首行声明；v1 走原有的数据块汇总
     refPool() {
       return this.kernel === 'v2' ? collectV2References(this.cells) : buildRefPool(this.cells)
     },
@@ -350,7 +372,7 @@ export const useNotebook = defineStore('notebook', {
     },
 
     insertCell(afterIndex, type = 'laup') {
-      const cell = { id: makeId(), type, source: '', attachments: {}, execCount: null, outputHtml: '' }
+      const cell = emptyCell(this.kernel === 'v2' ? normalizeV2CellType(type) : type)
       this.cells.splice(afterIndex + 1, 0, cell)
       this.selectedId = cell.id
       this.mode = 'command'
@@ -388,30 +410,30 @@ export const useNotebook = defineStore('notebook', {
     setType(id, type) {
       const c = this.cells.find((x) => x.id === id)
       if (!c) return
-      c.type = type
+      c.type = this.kernel === 'v2' ? normalizeV2CellType(type) : type
       this.persist()
     },
 
     cycleType(id) {
       const c = this.cells.find((x) => x.id === id)
       if (!c) return
-      this.setType(id, c.type === 'laup' ? 'code' : c.type === 'code' ? 'var' : 'laup')
+      this.setType(id, c.type === 'laup' ? 'code' : c.type === 'code' && this.kernel === 'v1' ? 'var' : 'laup')
     },
 
     // ---------- 导入导出 ----------
-    exportLanb() {
+    exportLanb(filename = 'notebook.lanb') {
       const blob = new Blob([JSON.stringify({
         cells: this.cells, execCounter: this.execCounter, renderMode: this.renderMode,
         // 内核标记：.lanb 是"编辑器快照"，带上它才能把文件还原到对的内核
         kernel: this.kernel,
       }, null, 2)], { type: 'application/json' })
-      download(blob, 'notebook.lanb')
+      download(blob, filename)
     },
 
     importLanb(text) {
       const data = JSON.parse(text)
       if (!Array.isArray(data.cells) || !data.cells.length) throw new Error('文件里没有单元格')
-      this.cells = migrateCodeCells(data.cells, () => emptyCell('code'))
+      this.cells = this.prepareCells(data.cells)
       this.execCounter = data.execCounter || 0
       if (RENDER_MODES.includes(data.renderMode)) this.renderMode = data.renderMode
       this.selectedId = this.cells[0].id
@@ -424,9 +446,28 @@ export const useNotebook = defineStore('notebook', {
       }
     },
 
+    // ipynb（Jupyter Notebook）导入：转换成标准 Laup 格
+    //   markdown → laup 格；code → [语言] 代码格（+ 可选 [output] 格）；raw → stay
+    importIpynb(text) {
+      const { cells, stats } = ipynbToCells(text)
+      this.cells = cells
+      this.selectedId = this.cells[0].id
+      this.scope = {}
+      this.execCounter = 0
+      this.runAll(false)
+      this.persist(true)
+      const detail = [
+        `${stats.markdown} 个 Markdown`,
+        `${stats.code} 个代码格`,
+        stats.outputs ? `${stats.outputs} 个输出` : '',
+        stats.raw ? `${stats.raw} 个 Raw` : '',
+      ].filter(Boolean).join('、')
+      this.toast = `已导入 ipynb：${detail}`
+    },
+
     exportLaup() {
       try {
-        // 两套内核各导各的：v2 文档不再包含 v1 宿主层的 \varcell / ```code / ```sample
+        // 两套内核各导各的：v2 不生成 v1 的宿主层数据块或代码围栏。
         const text = this.kernel === 'v2'
           ? exportNotebookV2(this.cells)
           : exportLaupDoc(this.cells, this.scope)

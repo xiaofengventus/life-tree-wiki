@@ -56,6 +56,7 @@ const router = createRouter({
     { path: "/laup-v2", name: "laup-v2", component: notebookView, props: { kernel: "v2" } },
     // 创作中心：六项创作入口的汇总页（B 站创作区式的左侧栏布局）
     { path: "/create", name: "create", component: createHub },
+    { path: "/papilot", name: "papilot", component: () => import("@/views/PapilotWorkspace.vue") },
     { path: "/lifetree-preview", name: "lifetree-preview", component: lifetreePreview },
     { path: "/view-post/:id", name: "view-post", component: viewPost },
     { path: "/evolution-tree", name: "create-tree", component: createTree },

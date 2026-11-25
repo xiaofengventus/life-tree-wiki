@@ -4,6 +4,7 @@
 import { ref } from 'vue'
 import { useNotebook } from '../store.js'
 
+defineProps({ embedded: Boolean })
 const emit = defineEmits(['toggle-help', 'submit'])
 const store = useNotebook()
 const fileInput = ref(null)
@@ -11,10 +12,13 @@ const fileInput = ref(null)
 function onImportFile(ev) {
   const f = ev.target.files?.[0]
   if (!f) return
+  const isIpynb = /\.ipynb$/i.test(f.name)
   const rd = new FileReader()
   rd.onload = () => {
     try {
-      store.importLanb(rd.result)
+      // 按扩展名分流：.ipynb 先转成 Laup 格，再走和 .lanb 一样的运行流程
+      if (isIpynb) store.importIpynb(rd.result)
+      else store.importLanb(rd.result)
     } catch (e) {
       alert('导入失败：' + e.message)
     }
@@ -27,7 +31,7 @@ function onImportFile(ev) {
 <template>
   <div id="menubar">
     <span class="brand">laup</span><span class="brand-sub">Notebook</span>
-    <span v-if="store.kernel === 'v2'" class="kernel-tag" title="预览由 laup v2 内核渲染；变量芯片与 lifetree 仍走 v1">v2 公测</span>
+    <span v-if="store.kernel === 'v2'" class="kernel-tag" title="Laup v2 内核：Laup / Code 两种编辑格">v2 公测</span>
     <button title="作用域重置并自上而下运行全部单元格" @click="store.runAll()">▶ 运行全部</button>
     <label class="render-mode" title="渲染结果画在哪里 —— 下方（Jupyter 的样子）／原地（结果盖住源码，双击回到源码）／折叠源码（源码收成一行摘要条，点它展开）">
       结果
@@ -38,14 +42,14 @@ function onImportFile(ev) {
       </select>
     </label>
     <button title="导出 .lanb（JSON，对齐 .ipynb，含附件与渲染位置）" @click="store.exportLanb()">导出 .lanb</button>
-    <button title="导入 .lanb" @click="fileInput.click()">导入</button>
-    <button title="导出标准 .laup 文档（变量内联、附件内联）" @click="store.exportLaup()">导出 .laup</button>
+    <button v-if="!embedded" title="导入 .lanb 快照，或 .ipynb（Jupyter Notebook，自动转成 Laup 格）" @click="fileInput.click()">导入</button>
+    <button :title="store.kernel === 'v2' ? '导出 Laup v2 文档（保留声明，附件内联）' : '导出标准 .laup 文档（变量内联、附件内联）'" @click="store.exportLaup()">导出 .laup</button>
     <button title="功能与语法手册（代码/输出对照）" @click="emit('toggle-help')">📖 使用手册</button>
-    <button class="submit-btn" title="把这篇 Notebook 提交为站内文章（wiki-detail 样式展示）" @click="emit('submit')">⬆ 提交文章</button>
+    <button v-if="!embedded" class="submit-btn" title="把这篇 Notebook 提交为站内文章（wiki-detail 样式展示）" @click="emit('submit')">⬆ 提交文章</button>
     <button title="清空为单个空 laup 格" @click="store.clearAll()">清空</button>
-    <RouterLink class="drafts-link" to="/drafts" title="本机草稿箱（IndexedDB）">📂 草稿箱</RouterLink>
-    <span class="saved" :title="store.draftStatus">{{ store.draftStatus || `已自动保存 ${store.savedAt || '—'}` }}</span>
-    <input ref="fileInput" type="file" accept=".lanb,application/json" style="display:none" @change="onImportFile" />
+    <RouterLink v-if="!embedded" class="drafts-link" to="/drafts" title="本机草稿箱（IndexedDB）">📂 草稿箱</RouterLink>
+    <span v-if="!embedded && store.storageEnabled" class="saved" :title="store.draftStatus">{{ store.draftStatus || `已自动保存 ${store.savedAt || '—'}` }}</span>
+    <input v-if="!embedded" ref="fileInput" type="file" accept=".lanb,.ipynb,application/json,application/x-ipynb+json" style="display:none" @change="onImportFile" />
   </div>
 </template>
 

@@ -1,0 +1,49 @@
+/* Laup 扩展在 JupyterLab 里的样式补充。
+ *
+ * @xiaoxueria/laup2/css 只负责 .laup2-* 语义块（卡片 / 对照卡 / 目录 / 文献…），
+ * 标题、段落、表格这些通用标签由宿主决定 —— JupyterLab 默认没有表格边框，
+ * 这里按 Laup 站点的口径补上。 */
+
+.laup2 table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.2em 0;
+}
+
+.laup2 th,
+.laup2 td {
+  border: 1px solid #d8dee4;
+  padding: 6px 10px;
+  vertical-align: top;
+  text-align: left;
+}
+
+.laup2 th {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+
+/* 代码格（[cpp] / [python] …）：Jupyter 只给了 pre 的基础样式 */
+.laup2 pre.laup2-code {
+  margin: 1.2em 0;
+  padding: 12px 14px;
+  border: 1px solid #e6e8eb;
+  border-radius: 6px;
+  background: #f6f8fa;
+  overflow-x: auto;
+}
+
+.laup2 pre.laup2-code code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 渲染失败时的兜底 */
+.laup-error {
+  padding: 8px 12px;
+  border: 1px dashed #e0a0a0;
+  background: #fff5f5;
+  color: #a33;
+  white-space: pre-wrap;
+}

@@ -19,7 +19,7 @@ import { createDiagnostics, formatDiagnostics } from "./diagnostics.js";
 
 export { N, walk, plainText, slugify } from "./ast.js";
 export { parse, parseInline, parseBlocks } from "./parser.js";
-export { parseCells, typesetCells, readVarCell, readReferenceCell, evaluate } from "./cells.js";
+export { parseCells, typesetCells, readReferenceCell } from "./cells.js";
 export { exportSource, exportBlock, exportInline, exportCells } from "./export.js";
 export {
   commandCompletions,
@@ -58,16 +58,24 @@ export const targets = { html: renderHtml };
  *   target?: 'html',
  *   variables?: Record<string, unknown>,
  *   mode?: 'edit'|'strict',
+ *   mathDelimiters?: 'dollar'|'jupyter',
  * }} options
  */
 export function typeset(source, options = {}) {
-  const { doc, diagnostics } = parse(source, { mode: options.mode });
+  const { doc, diagnostics } = parse(source, {
+    mode: options.mode,
+    mathDelimiters: options.mathDelimiters,
+  });
   const report = createDiagnostics(diagnostics);
   const meta = applySemantics(doc, {
     variables: options.variables || {},
     report,
     diagnostics,
   });
+  // 宿主可能用 attachment: 占位图（由宿主解析成 dataURL），默认仍然拒收
+  if (options.allowAttachment === true) meta.allowAttachment = true;
+  // 宿主自己排版数学：输出 $…$ 文本，交给 KaTeX / MathJax
+  if (options.mathOutput === 'source') meta.mathSource = true;
 
   const target = options.target || "html";
   const renderer = targets[target];

@@ -31,7 +31,12 @@ export const N = {
   math: (tex, display) => node("Math", { tex, display }),
   equation: (id, tex) => node("Equation", { id, tex, number: null }),
   image: (src, opts = {}) =>
-    node("Image", { src, alt: opts.alt || "", caption: opts.caption || "" }),
+    node("Image", {
+      src,
+      alt: opts.alt || "",
+      caption: opts.caption || "",
+      title: opts.title || "",
+    }),
   /** 文档封面：独立于正文图片，渲染成通栏大图 */
   cover: (src, caption = "") => node("Cover", { src, caption }),
   table: (data) =>
@@ -62,7 +67,7 @@ export const N = {
   del: (children) => node("Del", {}, children),
   underline: (children) => node("Underline", {}, children),
   codeInline: (value) => node("CodeInline", { value }),
-  link: (href, children) => node("Link", { href }, children),
+  link: (href, children, title = "") => node("Link", { href, title }, children),
   color: (color, bg, children) => node("Color", { color, bg }, children),
   size: (size, children) => node("Size", { size }, children),
   footnoteRef: (children) => node("FootnoteRef", {}, children),

@@ -36,6 +36,9 @@
 }
 @media (max-width: 640px) { .laup2-sample { grid-auto-flow: row; } }
 
+/* 居中容器 */
+.laup2-center { text-align: center; }
+
 /* 提示块 */
 .laup2-callout {
   margin: 1.3em 0; padding: .65em 1em;
