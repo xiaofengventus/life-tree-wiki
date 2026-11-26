@@ -70,22 +70,12 @@ export function safeSize(raw) {
   return Number.isFinite(n) && n >= 8 && n <= 72 ? n : null;
 }
 
-/** "1,3-5" → [1,3,4,5]；解析失败返回空数组 */
+/** BibTeX 键列表："knuth1984, lamport1994" → ["knuth1984", "lamport1994"]；空段丢弃 */
 export function parseCiteIds(raw) {
-  const ids = [];
-  for (const part of String(raw ?? "").split(/[,，]/)) {
-    const text = part.trim();
-    if (!text) continue;
-    const range = /^(\d{1,3})\s*[-–]\s*(\d{1,3})$/.exec(text);
-    if (range) {
-      const from = Number(range[1]);
-      const to = Number(range[2]);
-      for (let n = from; n <= to && n - from < 100; n += 1) ids.push(n);
-      continue;
-    }
-    if (/^\d{1,3}$/.test(text)) ids.push(Number(text));
-  }
-  return ids;
+  return String(raw ?? "")
+    .split(/[,，]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 /** 装载全部内置命令 / 环境（resetRegistry 会再调一次） */

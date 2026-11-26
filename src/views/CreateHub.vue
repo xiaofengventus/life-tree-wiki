@@ -6,42 +6,6 @@ import NavBar from "@/components/navBar.vue";
 
 const tools = [
   {
-    to: "/ls",
-    name: "LifeSequence",
-    en: "LifeSequence",
-    desc: "上传模型、签出子树、编辑锁与提交合并的网页协作视图。",
-    icon: "M6 3v12a3 3 0 0 0 3 3h9M6 9h9a3 3 0 0 0 3-3V3",
-  },
-  {
-    to: "/laup",
-    name: "Laup 写作",
-    en: "Laup Editor",
-    desc: "整篇文档式的 Laup 编辑器，适合长文与结构化章节。",
-    icon: "M4 20h4l10-10-4-4L4 16v4zM14 6l4 4",
-  },
-  {
-    to: "/notebook",
-    name: "Notebook",
-    en: "Notebook",
-    desc: "Jupyter 式多格编辑器：变量、代码、输入输出对照卡。",
-    icon: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
-  },
-  {
-    to: "/papilot",
-    name: "Papilot Laup 工作台",
-    en: "Papilot · Laup v2",
-    desc: "新建或导入 Laup 文档，使用站内 Notebook 单元格与整篇排版预览。",
-    icon: "M4 5h16v14H4zM8 9h8M8 13h5",
-  },
-  {
-    to: "/laup-v2",
-    name: "Laup v2",
-    en: "Laup v2",
-    desc: "与 Notebook 同一套编辑器，预览改由 v2 内核渲染（Lexer → AST → 语义 → 渲染）。",
-    icon: "M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3",
-    tag: "公测",
-  },
-  {
     to: "/create-post",
     name: "创建专栏",
     en: "Article",

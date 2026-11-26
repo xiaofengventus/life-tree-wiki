@@ -10,7 +10,13 @@
 
 import { N, plainText, slugify } from "./ast.js";
 
-export function createSemanticState() {
+/**
+ * @param {{ bib?: Map<string, object> }} options 项目文献库：键 → 条目
+ */
+export function createSemanticState(options = {}) {
+  const bib = options.bib instanceof Map ? options.bib : new Map();
+  const citeOrder = new Map(); // 键 → 引用序号（首次引用时分配）
+  const cited = [];            // 按编号排列的已引用条目
   return {
     slugSeen: new Map(),
     equationNo: 0,
@@ -18,7 +24,24 @@ export function createSemanticState() {
     equationNumbers: new Map(),
     toc: [],
     footnotes: [],
-    references: [],
+    bib,
+    cited,
+    /** 键数组 → [{ key, number, id, entry }]；库里没有的键不分配编号（由调用方报诊断）。 */
+    resolveCite(keys) {
+      const out = [];
+      for (const key of keys) {
+        const entry = bib.get(key);
+        if (!entry) continue;
+        if (!citeOrder.has(key)) {
+          const number = cited.length + 1;
+          citeOrder.set(key, number);
+          cited.push({ key, number, id: `ref-${slugify(key) || number}`, entry });
+        }
+        const rec = cited[citeOrder.get(key) - 1];
+        if (!out.includes(rec)) out.push(rec);
+      }
+      return out;
+    },
   };
 }
 
@@ -78,11 +101,6 @@ export function collectSemantics(doc, state = createSemanticState(), options = {
       state.footnotes.push({ number: state.footnoteNo, children: node.children || [] });
     }
 
-    if (node.type === "References") {
-      state.references.push(...(node.attrs.entries || []));
-      if (collectReferences) return null; // 跨格模式：文献统一在文末输出
-    }
-
     if (Array.isArray(node.children)) {
       node.children = node.children.map(assign).filter(Boolean);
     }
@@ -125,15 +143,17 @@ export function resolveSemantics(doc, options = {}) {
     }
 
     if (node.type === "Cite") {
-      const ids = node.attrs.ids || [];
-      const valid = ids.filter((n) => n >= 1 && n <= state.references.length);
-      node.attrs.numbers = valid;
-      if (valid.length !== ids.length) {
+      // 键式引用：在项目文献库（references.bib）里按键查；编号按"正文首次引用顺序"分配，
+      // 与 BibTeX 一致 —— 库里有 100 条，也只编被引用的那些。
+      const keys = node.attrs.ids || [];
+      node.attrs.items = state.resolveCite(keys);
+      const missing = keys.filter((key) => !node.attrs.items.some((item) => item.key === key));
+      if (missing.length) {
         report.warn(
-          "E_CITE_RANGE",
-          state.references.length === 0
-            ? "\\cite 还没有对应的 [references] 格（文献列表为空）"
-            : `\\cite 里的序号超出参考文献范围（共 ${state.references.length} 条）`,
+          "E_CITE_KEY",
+          state.bib.size === 0
+            ? `\\cite{${missing.join(",")}} 找不到文献：当前文档还没有 references.bib`
+            : `\\cite 里这些键不在 references.bib：${missing.join(", ")}`,
         );
       }
     }

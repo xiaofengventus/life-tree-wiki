@@ -261,7 +261,6 @@ onBeforeUnmount(() => {
   <main ref="pageRef" class="life-tree-page" aria-label="生命树">
     <!-- 列表状态：识别服务器上的全部树（分页） -->
     <section v-if="!currentTreeId" class="tree-list" aria-label="进化树列表">
-      <RouterLink to="/ls" class="tree-title">LS 工程主树与协作</RouterLink>
       <p v-if="listLoading" class="state">正在加载树列表...</p>
       <p v-else-if="listError" class="state error">{{ listError }}</p>
       <p v-else-if="!treeList.length" class="state">暂无进化树。</p>

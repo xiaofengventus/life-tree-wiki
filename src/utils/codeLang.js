@@ -133,6 +133,36 @@ export function highlightLaupCode(html) {
       const grammar = Prism.languages[lang]
       if (grammar) code.innerHTML = Prism.highlight(text, grammar, lang)
       else code.textContent = text
+      // 逐行包一层：PDF 分页要能按行断页（LaTeX 的 \clearpage 也只会断在行间）
+      wrapCodeLines(code)
+    }
+
+    /** 逐行包一层 <span class="ln">：PDF 分页才能断在行间（LaTeX 也只会在行间断页）。 */
+    const escHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    function wrapCodeLines(code) {
+      const lines = []
+      const pushLine = () => { lines.push([]) }
+      const walk = (node, carryOpen) => {
+        for (const child of Array.from(node.childNodes)) {
+          if (child.nodeType === 3) {
+            const parts = (child.nodeValue || '').split('\n')
+            parts.forEach((part, i) => {
+              if (i) { closeAll(carryOpen); pushLine(); reopen(carryOpen) }
+              if (part) lines[lines.length - 1].push(escHtml(part))
+            })
+          } else if (child.nodeType === 1) {
+            const open = `<span class="${child.className || ''}">`
+            lines[lines.length - 1].push(open)
+            walk(child, [...carryOpen, open])
+            lines[lines.length - 1].push('</span>')
+          }
+        }
+      }
+      const closeAll = (stack) => { for (let i = stack.length - 1; i >= 0; i -= 1) lines[lines.length - 1].push('</span>') }
+      const reopen = (stack) => { for (const open of stack) lines[lines.length - 1].push(open) }
+      pushLine()
+      walk(code, [])
+      code.innerHTML = lines.map((parts) => `<span class="ln">${parts.join('') || ' '}</span>`).join('')
     }
 
     for (const code of doc.body.querySelectorAll('pre > code')) {
@@ -156,7 +186,7 @@ export function highlightLaupCode(html) {
       if (kind !== 'lang' || !isDeclarable(raw)) continue
       // 声明认得但该语言没语法（如 [yml]）→ 只剥掉声明行，不上色
       if (lang) colorize(code, lang, body)
-      else code.textContent = body
+      else { code.textContent = body; wrapCodeLines(code) }
     }
 
     return doc.body.innerHTML

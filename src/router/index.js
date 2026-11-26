@@ -11,7 +11,6 @@ const createTree = () => import("@/views/evolution_user_tree.vue");
 // viewTree（SVG 画布渲染）已停用：树阅读统一由 life-tree 的 DOM 渲染承担
 // const viewTree = () => import("@/views/WikiTreeDetail.vue");
 const searchView = () => import("@/views/WikiSearch.vue");
-const platformTrees = () => import("@/views/PlatformTrees.vue");
 const notifications = () => import("@/views/notifications.vue");
 const mediaLibrary = () => import("@/views/media_library.vue");
 const drafts = () => import("@/views/draft_box.vue");
@@ -22,10 +21,7 @@ const lifeTree = () => import("@/views/LifeTree.vue");
 const treeContributions = () => import("@/views/tree_contributions.vue");
 const columns = () => import("@/views/Columns.vue");
 const collectionDetail = () => import("@/views/collection_detail.vue");
-// Laup 写作（Vue 内置版）：编辑器内核在 src/laup/，页面为 src/views/laup_editor.vue。
-// 发布链路仍旧收 Laup 源码（contentFormat:'laup'），由 server/laup.js 用 Laup 渲染器重渲。
-const laupEditor = () => import("@/views/laup_editor.vue");
-// laup Notebook（Jupyter 式多格编辑器）：模块在 src/notebook/，与旧版 laup 写作互不影响。
+// Laup Notebook（Jupyter 式多格编辑器）：模块在 src/notebook/。
 // 提交文章走同一条发布管道（contentFormat:'laup' → server/laup.js 重渲 → wiki-detail 展示）。
 const notebookView = () => import("@/notebook/NotebookView.vue")
 // Laup v2 公测：编辑器与 Notebook 完全共用（NotebookView），只有预览换 v2 内核。
@@ -39,24 +35,24 @@ const mobileAuthHandoff = () => import("@/views/MobileAuthHandoff.vue");
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: "/ls/:id?", name: "ls-project", component: () => import("@/views/LSWorkspace.vue") },
     { path: "/", name: "home", component: homeView },
     { path: "/login", name: "login", component: loginView },
     { path: "/search", name: "search", component: searchView },
     { path: "/research", redirect: "/search" },
     { path: "/wiki/:title", name: "wiki-post", component: viewPost },
-    { path: "/platform-trees", name: "platform-trees", component: platformTrees },
     { path: "/life-tree/:id?", name: "life-tree", component: lifeTree },
     { path: "/columns", name: "columns", component: columns },
     { path: "/collections/:id", name: "collection-detail", component: collectionDetail },
     { path: "/create-post", name: "create-post", component: createPost },
-    { path: "/laup", name: "laup", component: laupEditor },
     { path: "/notebook", name: "notebook", component: notebookView },
-    // v2 公测入口：同一套编辑器与草稿流程，预览改由 src/laup2 渲染
+    // 唯一写作入口：Laup v2 页面（单元格编辑 + 右侧可折叠的实时渲染 / PDF 预览）。
+    // 旧的分散入口一律重定向过来，不再单独维护多套编辑器页面。
     { path: "/laup-v2", name: "laup-v2", component: notebookView, props: { kernel: "v2" } },
+    { path: "/workbench", redirect: "/laup-v2" },
+    { path: "/papilot", redirect: "/laup-v2" },
     // 创作中心：六项创作入口的汇总页（B 站创作区式的左侧栏布局）
     { path: "/create", name: "create", component: createHub },
-    { path: "/papilot", name: "papilot", component: () => import("@/views/PapilotWorkspace.vue") },
+    // /notebook 是旧版 v1 内核页面，保留但不再从任何入口链接过去
     { path: "/lifetree-preview", name: "lifetree-preview", component: lifetreePreview },
     { path: "/view-post/:id", name: "view-post", component: viewPost },
     { path: "/evolution-tree", name: "create-tree", component: createTree },
@@ -69,7 +65,8 @@ const router = createRouter({
     { path: "/users/:uid", name: "public-user-space", component: userSpace },
     { path: "/notifications", name: "notifications", component: notifications, meta: { requiresAuth: true } },
     { path: "/media-library", name: "media-library", component: mediaLibrary, meta: { requiresAuth: true } },
-    { path: "/drafts", name: "drafts", component: drafts, meta: { requiresAuth: true } },
+    // 草稿箱是本机数据，访客也能进（只有「提交发布」才要登录）
+    { path: "/drafts", name: "drafts", component: drafts },
     { path: "/mobile-auth", name: "mobile-auth", component: mobileAuthHandoff, meta: { requiresAuth: true } },
     { path: "/admin/users", name: "admin-users", component: userManagement, meta: { requiresAuth: true, siteOwnerOnly: true } },
     { path: "/admin/deleted-posts/:id?", name: "admin-deleted-posts", component: deletedPosts, meta: { requiresAuth: true, siteOwnerOnly: true } },

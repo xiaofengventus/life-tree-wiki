@@ -250,9 +250,13 @@ function renderSample(node) {
 }
 
 function renderReferences(node) {
-  const entries = node.attrs.entries || [];
-  const items = entries
-    .map((entry, index) => `<li id="ref-${index + 1}">${esc(entry)}</li>`)
+  // entries = [{ key, number, id, entry }]，entry 是 BibTeX 条目的展示文本
+  const items = (node.attrs.entries || [])
+    .map((item, index) => {
+      const text = typeof item === "string" ? item : item.entry?.text || item.key || "";
+      const id = typeof item === "string" ? `ref-${index + 1}` : item.id;
+      return `<li id="${esc(id)}">${esc(text)}</li>`;
+    })
     .join("\n");
   return `<section class="laup2-references">\n<h2>参考文献</h2>\n<ol>\n${items}\n</ol>\n</section>`;
 }
@@ -321,10 +325,11 @@ function renderInline(node, meta) {
         : `<span class="laup2-eqref-bad">(?)</span>`;
     }
     case "Cite": {
-      const numbers = node.attrs.numbers || [];
-      if (!numbers.length) return `<span class="laup2-cite-bad">[?]</span>`;
-      const links = numbers
-        .map((n) => `<a href="#ref-${n}">[${n}]</a>`)
+      // 条目自带编号（项目级 references.bib + 正文数引用顺序），没有编号即引用不到
+      const items = node.attrs.items || [];
+      if (!items.length) return `<span class="laup2-cite-bad">[?]</span>`;
+      const links = items
+        .map((item) => `<a class="laup2-cite" href="#ref-${item.id}">[${item.number}]</a>`)
         .join("");
       return `<sub class="laup2-cite">${links}</sub>`;
     }

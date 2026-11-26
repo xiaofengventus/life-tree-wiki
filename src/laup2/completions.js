@@ -40,12 +40,11 @@ export function cellCompletions() {
   return [
     { label: "[input]", apply: "[input]\n", type: "keyword", detail: "输入栏（纯文本）" },
     { label: "[output]", apply: "[output]\n", type: "keyword", detail: "输出栏（纯文本）" },
-    { label: "[references]", apply: "[references]\n", type: "keyword", detail: "参考文献声明（一行一条）" },
     ...LANGUAGES.map((lang) => ({
       label: `[${lang}]`,
       apply: `[${lang}]\n`,
       type: "keyword",
-      detail: "Laup 展示代码（首行声明，不执行）",
+      detail: "原生代码格（只展示，不执行）",
     })),
     { label: "\\cellbreak", apply: "\\cellbreak\n", type: "keyword", detail: "格分隔" },
   ];

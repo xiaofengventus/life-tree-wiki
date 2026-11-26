@@ -87,6 +87,13 @@ export function parseCells(source) {
     .map(classifyCell);
 }
 
+// v2 已经没有这些首行声明了：出现时把整格当正文（`[cpp]` 这类真语言声明照旧成立），
+// 并给一条提示，免得作者以为"写上去就该生效"。
+const RESERVED_DECLS = {
+  var: "[var] 已经没有变量格了：正文写 {{name}}，值由宿主传入",
+  references: "[references] 已经没有文献格了：现在用 \\cite{key} + references.bib",
+};
+
 function classifyCell(source) {
   const firstLine = source.split("\n")[0] ?? "";
   const head = firstLine.trim();
@@ -94,10 +101,10 @@ function classifyCell(source) {
   const declared = LANG_DECL.exec(head);
   if (declared) {
     const name = declared[1].toLowerCase();
+    if (RESERVED_DECLS[name]) return { type: "laup", source, reservedDecl: RESERVED_DECLS[name] };
     const body = source.slice(firstLine.length).replace(/^\n/, "");
-    if (name === "input" || name === "output") return { type: "code", pane: name, source, body };
-    if (name === "var") return { type: "laup", source };
-    if (name === "references") return { type: "reference", source, body };
+    // [input] / [output] 不是原生代码，是 Laup 格里的对照示例栏
+    if (name === "input" || name === "output") return { type: "laup", pane: name, source, body };
     return { type: "code", pane: null, lang: name, source, body };
   }
 
@@ -139,6 +146,7 @@ export function typesetCells(source, options = {}) {
   // ② 解析所有 Laup 格
   const docs = cells.map((cell) => {
     if (cell.type !== "laup") return null;
+    if (cell.reservedDecl) report.warn("W_LEGACY_DECL", cell.reservedDecl);
     const { doc, diagnostics: parseDiagnostics } = parse(cell.source, {
       mathDelimiters: options.mathDelimiters,
     });
@@ -146,19 +154,20 @@ export function typesetCells(source, options = {}) {
     return doc;
   });
 
-  // ③ 收集阶段：编号、目录、脚注、文献（跨格共享；文献统一进池）
-  const state = createSemanticState();
+  // ③ 收集阶段：编号、目录、脚注（跨格共享）。文献不在正文里，来自项目级 references.bib。
+  const state = createSemanticState({ bib: options.bib });
+
+  // 宿主逐格预览时，把"已渲染过的格"里出现过的文献带过来，保证编号接得上。
+  // 传进来的是 [{ key, entry }]，这里原样恢复编号顺序。
+  for (const item of options.citedReferences || []) {
+    if (item?.key && item.entry) state.resolveCite([item.key]);
+  }
+
   cells.forEach((cell, index) => {
-    if (cell.type === "reference") state.references.push(...readReferenceCell(cell));
-    if (docs[index]) {
-      collectSemantics(docs[index], state, { report, collectReferences: true });
-    }
+    if (docs[index]) collectSemantics(docs[index], state, { report });
   });
 
-  // 宿主逐格预览时，使用整篇 Notebook 的文献编号，而非当前格的局部编号。
-  if (options.referencePool) state.references = [...options.referencePool];
-
-  // ④ 回填阶段：使用宿主传入的变量和整篇文档的引用编号
+  // ④ 回填阶段：使用宿主传入的变量、文献库与引用编号
   cells.forEach((cell, index) => {
     if (docs[index]) {
       resolveSemantics(docs[index], { state, variables, report });
@@ -178,16 +187,10 @@ export function typesetCells(source, options = {}) {
   while (index < cells.length) {
     const cell = cells[index];
 
-    if (cell.type === "reference") {
-      results.push({ cell, html: "" });
-      index += 1;
-      continue;
-    }
-
-    if (cell.type === "code" && cell.pane === "input") {
+    if (cell.pane === "input") {
       const panes = [paneNode("input", cell)];
       const next = cells[index + 1];
-      if (next && next.type === "code" && next.pane === "output") {
+      if (next && next.pane === "output") {
         panes.push(paneNode("output", next));
         index += 1;
       }
@@ -196,7 +199,7 @@ export function typesetCells(source, options = {}) {
       continue;
     }
 
-    if (cell.type === "code" && cell.pane === "output") {
+    if (cell.pane === "output") {
       results.push({ cell, html: renderNodes([N.sample([paneNode("output", cell)])], meta) });
       index += 1;
       continue;
@@ -212,8 +215,9 @@ export function typesetCells(source, options = {}) {
     index += 1;
   }
 
-  if (state.references.length && options.showReferences !== false) {
-    results.push({ cell: null, html: renderNodes([N.references(state.references)], meta) });
+  // 文献表只列被引用过的条目，按引用顺序编号
+  if (state.cited.length && options.showReferences !== false) {
+    results.push({ cell: null, html: renderNodes([N.references(state.cited)], meta) });
   }
   if (state.footnotes.length) {
     results.push({ cell: null, html: renderFootnotes(meta) });
@@ -230,7 +234,7 @@ export function typesetCells(source, options = {}) {
     html,
     cells: results,
     variables,
-    references: state.references,
+    references: state.cited,
     footnotes: state.footnotes,
     toc: state.toc,
     diagnostics,

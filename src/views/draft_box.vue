@@ -128,7 +128,7 @@ onMounted(loadDrafts);
         <RouterLink to="/evolution-tree">制作树相</RouterLink>
         <!-- Laup 写作早就是站内路由了（见 services/drafts.js 的 draftEditorLocation），
              这里以前还挂着 public/laup/ 那份静态副本 → 整页跳转、两个入口落点不一致。 -->
-        <RouterLink to="/laup">写 Laup 文章</RouterLink>
+        <RouterLink to="/workbench">写 Laup 文章</RouterLink>
         <RouterLink to="/notebook">写 Notebook</RouterLink>
         <button
           class="clear-drafts"

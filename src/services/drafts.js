@@ -200,7 +200,7 @@ export function draftEditorLocation(draft) {
   }
   // 三种体裁现在**都在 Vue 路由表里**：Laup 已从 `public/laup/` 的静态页
   // 改成站内路由 `/laup`，所以统一返回路由地址，调用方一律 `router.push` 客户端跳转。
-  if (draft.contentType === "LAUP") return { path: "/laup", query };
+  if (draft.contentType === "LAUP") return { path: "/workbench", query };
   // Notebook 稿带内核标记（payload.kernel）：v2 公测页另存一份渲染管线，
   // 「继续编辑」必须回到它写的那一页，否则 v2 稿子会在 v1 内核下重渲。
   if (draft.contentType === "NOTEBOOK") {

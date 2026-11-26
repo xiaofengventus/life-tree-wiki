@@ -11,6 +11,10 @@
   font-family: "Helvetica Neue", Helvetica, Arial, "Microsoft YaHei", sans-serif;
   font-size: 14px;
   text-align: left;
+  /* 窄容器（工作台里被挤窄时）不许把行内文字挤成竖排 */
+  writing-mode: horizontal-tb;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 #notebook-page *, #notebook-page *::before, #notebook-page *::after { box-sizing: border-box; }
 
@@ -44,6 +48,20 @@
 
 /* ---------- Notebook ---------- */
 #notebook-page #notebook { max-width: 1000px; margin: 0 auto; padding: 10px 0 220px; }
+
+/* 嵌入工作台时：外层已经限高手，这里整块变成可滚动的编辑区，不再给底部留大空白 */
+#notebook-page.notebook-embedded { min-height: 0; height: 100%; display: flex; flex-direction: column; }
+#notebook-page.notebook-embedded #notebook {
+  flex: 1; min-height: 0; overflow: auto; max-width: none; margin: 0; padding: 6px 12px 120px;
+}
+#notebook-page #menubar { flex-wrap: wrap; row-gap: 4px; }
+#notebook-page #menubar button { white-space: nowrap; flex: none; }
+
+/* 窄屏（含工作台里被挤到 400px 左右的情形）：提示符收窄，正文按词换行而不是逐字竖排 */
+@media (max-width: 720px) {
+  #notebook-page .prompt { flex-basis: 56px; padding-right: 8px; }
+  #notebook-page .output, #notebook-page .input-area { min-width: 0; overflow-wrap: anywhere; }
+}
 
 #notebook-page .cell { display: flex; margin: 2px 0; }
 
@@ -128,7 +146,9 @@
 }
 
 /* ---------- 右上角工具栏（悬停浮现） ---------- */
-#notebook-page .toolbar {
+/* 只在独立页面（未嵌入）时挂在单元格右上角；嵌入工作台时改挂到左侧提示符列，
+   否则窄编辑区里它会盖住源码 —— 也就是「没地方输入」的那个样子。 */
+#notebook-page:not(.notebook-embedded) .toolbar {
   position: absolute;
   top: 3px;
   right: 6px;
@@ -163,6 +183,20 @@
   font-family: Consolas, Menlo, monospace;
   color: #2b6cb0;
 }
+
+#notebook-page.notebook-embedded .cell { align-items: flex-start; }
+#notebook-page.notebook-embedded .prompt { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+#notebook-page.notebook-embedded .toolbar {
+  position: static;
+  order: 2;
+  opacity: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 92px;
+  background: none;
+}
+#notebook-page.notebook-embedded .toolbar button { width: 20px; height: 20px; }
+#notebook-page.notebook-embedded .toolbar .type-badge { width: auto; padding: 0 4px; font-size: 10px; }
 
 /* ---------- 输出区 ---------- */
 #notebook-page .output { padding: 8px 10px; text-align: left; }

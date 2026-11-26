@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import AuthForm from "@/components/AuthForm.vue";
+import NavBar from "@/components/navBar.vue";
 import { apiRequest } from "@/services/api";
 import { useUserStore } from "@/stores/user";
 
@@ -69,34 +70,39 @@ onMounted(initialize);
 </script>
 
 <template>
-  <main class="mobile-auth-page">
-    <AuthForm
-      v-if="state === 'login'"
-      :redirect-on-login="false"
-      @authenticated="createHandoff"
-    />
-    <section v-else class="mobile-auth-status">
-      <h1>生命时序</h1>
-      <p v-if="state === 'loading' || state === 'ready'">正在验证并连接安卓应用...</p>
-      <template v-else-if="state === 'manual'">
-        <h2 style="margin:0;font-size:18px">移动端登录码</h2>
-        <p>把下面的验证码粘贴到 App 的「账号」页登录框（60 秒内有效）：</p>
-        <code class="handoff-code">{{ code }}</code>
-        <p v-if="sentToBridge" style="font-size:12px;color:#687a70">
-          已尝试唤起应用；若 App 没有反应，请复制验证码手动粘贴。
-        </p>
-        <button type="button" @click="copyCode">{{ copied ? "已复制 ✓" : "复制验证码" }}</button>
-        <p style="font-size:12px;color:#687a70">换一个码请刷新页面。验证码一次性使用，泄露无关紧要（60 秒即失效）。</p>
-      </template>
-      <template v-else>
-        <p>{{ errorMessage }}</p>
-        <button type="button" @click="createHandoff">重新连接</button>
-      </template>
-    </section>
-  </main>
+  <div class="mobile-auth-shell">
+    <NavBar />
+    <main class="mobile-auth-page">
+      <AuthForm
+        v-if="state === 'login'"
+        :redirect-on-login="false"
+        @authenticated="createHandoff"
+      />
+      <section v-else class="mobile-auth-status">
+        <h1>生命时序</h1>
+        <p v-if="state === 'loading' || state === 'ready'">正在验证并连接安卓应用...</p>
+        <template v-else-if="state === 'manual'">
+          <h2 style="margin:0;font-size:18px">移动端登录码</h2>
+          <p>把下面的验证码粘贴到 App 的「账号」页登录框（60 秒内有效）：</p>
+          <code class="handoff-code">{{ code }}</code>
+          <p v-if="sentToBridge" style="font-size:12px;color:#687a70">
+            已尝试唤起应用；若 App 没有反应，请复制验证码手动粘贴。
+          </p>
+          <button type="button" @click="copyCode">{{ copied ? "已复制 ✓" : "复制验证码" }}</button>
+          <p style="font-size:12px;color:#687a70">换一个码请刷新页面。验证码一次性使用，泄露无关紧要（60 秒即失效）。</p>
+        </template>
+        <template v-else>
+          <p>{{ errorMessage }}</p>
+          <button type="button" @click="createHandoff">重新连接</button>
+        </template>
+      </section>
+    </main>
+  </div>
 </template>
 
 <style scoped>
-.mobile-auth-page{min-height:100vh;background:#f3f7f4}.mobile-auth-status{display:grid;place-content:center;gap:12px;min-height:100vh;padding:32px;text-align:center;color:#263c33}.mobile-auth-status h1,.mobile-auth-status p{margin:0}.mobile-auth-status button{justify-self:center;padding:10px 16px;border:0;border-radius:6px;background:#20725e;color:#fff;font:inherit}
+.mobile-auth-shell{display:flex;flex-direction:column;min-height:100vh}
+.mobile-auth-page{flex:1;min-height:0;background:#f3f7f4}
+.mobile-auth-status{display:grid;place-content:center;gap:12px;min-height:calc(100vh - 64px);padding:32px;text-align:center;color:#263c33}.mobile-auth-status h1,.mobile-auth-status p{margin:0}.mobile-auth-status button{justify-self:center;padding:10px 16px;border:0;border-radius:6px;background:#20725e;color:#fff;font:inherit}
 .handoff-code{display:inline-block;max-width:92vw;padding:10px 14px;border:1px dashed #20725e;border-radius:6px;background:#fff;font-family:Consolas,monospace;font-size:14px;word-break:break-all;user-select:all}
 </style>

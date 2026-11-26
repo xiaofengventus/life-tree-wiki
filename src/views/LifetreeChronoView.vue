@@ -11,6 +11,7 @@ import { parseCodeDecl } from '@/utils/codeLang.js'
 import { parseLifetree } from '@/laup/extensions/lifetree.js'
 import { renderChrono } from '@/utils/lifeTreeChrono.js'
 import { chronoStyleOptions } from '@/utils/lifeTreeChronoStyle.js'
+import NavBar from '@/components/navBar.vue'
 
 const KEY = 'lifetree-preview-source'
 
@@ -44,7 +45,9 @@ const result = computed(() => {
 </script>
 
 <template>
-  <div class="lifetree-chrono-page">
+  <div class="lifetree-chrono-shell">
+    <NavBar />
+    <div class="lifetree-chrono-page">
     <header class="lc-head">
       <strong>生命时序 · 全局预览</strong>
       <span class="lc-sub">地质年代轴 / 时间标定分支 —— 与 [lifetree] 格同源渲染</span>
@@ -54,12 +57,15 @@ const result = computed(() => {
     </div>
     <div v-else class="lc-body" v-html="result.svg" />
     <div v-for="(d, i) in result.diags" :key="i" class="laup-warn lc-warn">⚠ {{ d.message }}</div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.lifetree-chrono-shell { min-height: 100vh; display: flex; flex-direction: column; }
 .lifetree-chrono-page {
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   padding: 20px 24px;
   background: #fff;
 }
