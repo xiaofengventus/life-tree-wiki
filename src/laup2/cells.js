@@ -23,7 +23,6 @@ import { createDiagnostics } from "./diagnostics.js";
 
 const CELLBREAK_START = /^[ \t]*\\cellbreak[ \t]*(?:=[ \t]*\[[ \t]*)?$/;
 const LANG_DECL = /^\[([A-Za-z0-9+#-]{1,16})\]$/;
-const CODE_MAGIC = /^%%(cpp|cxx)(?=[ \t]|$)/i;
 
 /** @typedef {{ type: 'laup'|'code', source: string, lang?: string }} CellInput */
 
@@ -41,9 +40,10 @@ export function parseCells(source) {
       }
       if (cell.type !== "code") throw new TypeError(`未知的格类型：${cell.type}`);
 
-      // 保留魔法命令以及完整代码文本，只标记展示语言，不执行。
+      // 原生代码格：完整源码原样保留（含 %%lang 魔法命令），只标记展示语言，不执行。
       const firstLine = text.split(/\r\n?|\n/, 1)[0];
-      const lang = CODE_MAGIC.test(firstLine) ? "cpp" : (cell.lang || "python");
+      const magic = /^%%([A-Za-z0-9_+#.-]{1,24})\b/.exec(firstLine.trim());
+      const lang = magic ? magic[1].toLowerCase() : (cell.lang || "python");
       return { type: "code", sourceType: "code", pane: null, lang, source: text, body: text };
     });
   }
@@ -87,24 +87,54 @@ export function parseCells(source) {
     .map(classifyCell);
 }
 
-// v2 已经没有这些首行声明了：出现时把整格当正文（`[cpp]` 这类真语言声明照旧成立），
-// 并给一条提示，免得作者以为"写上去就该生效"。
+// ── 语法单一来源表 ────────────────────────────────────────────────
+// 补全、诊断、文档都读这张表；新增一种声明只在这里加一行。
+//   pane   'input' / 'output' / 'references'：Laup 格内的栏位（不是代码）
+//   code   true：展示型代码，只排版不执行（语言就是方括号里的名字）
+export const CELL_DECL_TABLE = [
+  { name: "input", pane: "input", detail: "输入栏（纯文本）" },
+  { name: "output", pane: "output", detail: "输出栏（纯文本）" },
+  { name: "references", pane: "references", detail: "文献格（一行一条，按顺序编号）" },
+  ...["cpp", "c", "python", "javascript", "json", "bash", "html", "css", "text"].map((name) => ({
+    name,
+    code: true,
+    detail: "展示型代码声明（只排版，不执行）",
+  })),
+];
+
+/** 原生代码格（Jupyter 的 `%%lang` 魔法命令），只能本地运行 */
+export const CELL_MAGIC_TABLE = [
+  { name: "python", detail: "原生代码格（Jupyter，仅本地运行）" },
+  { name: "cpp", detail: "原生代码格（Jupyter，仅本地运行）" },
+  { name: "bash", detail: "原生代码格（Jupyter，仅本地运行）" },
+];
+
+const PANE_DECLS = new Map(CELL_DECL_TABLE.filter((d) => d.pane).map((d) => [d.name, d.pane]));
+
+// [var] 变量格：v2 已彻底移除，出现时整格当正文，并给一条提示。
 const RESERVED_DECLS = {
-  var: "[var] 已经没有变量格了：正文写 {{name}}，值由宿主传入",
-  references: "[references] 已经没有文献格了：现在用 \\cite{key} + references.bib",
+  var: "[var] 变量格已移除：v2 没有变量，正文直接写内容",
 };
 
 function classifyCell(source) {
   const firstLine = source.split("\n")[0] ?? "";
   const head = firstLine.trim();
 
+  // 真正的代码格：`%%lang` 魔法命令（Jupyter 风格），只能本地运行；
+  // 首行的 `[cpp]` 之类是 Laup 格内的**声明**，不是代码格。
+  const magic = /^%%([A-Za-z0-9_+#.-]{1,24})\b/.exec(head);
+  if (magic) {
+    return { type: "code", lang: magic[1].toLowerCase(), source, body: source };
+  }
+
   const declared = LANG_DECL.exec(head);
   if (declared) {
     const name = declared[1].toLowerCase();
     if (RESERVED_DECLS[name]) return { type: "laup", source, reservedDecl: RESERVED_DECLS[name] };
     const body = source.slice(firstLine.length).replace(/^\n/, "");
-    // [input] / [output] 不是原生代码，是 Laup 格里的对照示例栏
-    if (name === "input" || name === "output") return { type: "laup", pane: name, source, body };
+    // [input] / [output] / [references] 都是 Laup 格内的声明
+    if (PANE_DECLS.has(name)) return { type: "laup", pane: PANE_DECLS.get(name), source, body };
+    // [cpp] / [python] … 是 Laup 格内的展示型代码声明：只排版、不执行
     return { type: "code", pane: null, lang: name, source, body };
   }
 
@@ -143,9 +173,9 @@ export function typesetCells(source, options = {}) {
 
   const variables = { ...options.variables };
 
-  // ② 解析所有 Laup 格
+  // ② 解析所有 Laup 格（[references] 文献格不是正文，跳过解析）
   const docs = cells.map((cell) => {
-    if (cell.type !== "laup") return null;
+    if (cell.type !== "laup" || cell.pane === "references") return null;
     if (cell.reservedDecl) report.warn("W_LEGACY_DECL", cell.reservedDecl);
     const { doc, diagnostics: parseDiagnostics } = parse(cell.source, {
       mathDelimiters: options.mathDelimiters,
@@ -154,13 +184,18 @@ export function typesetCells(source, options = {}) {
     return doc;
   });
 
-  // ③ 收集阶段：编号、目录、脚注（跨格共享）。文献不在正文里，来自项目级 references.bib。
+  // ③ 收集阶段：编号、目录、脚注（跨格共享）。[references] 格的条目按格顺序分配编号。
   const state = createSemanticState({ bib: options.bib });
 
   // 宿主逐格预览时，把"已渲染过的格"里出现过的文献带过来，保证编号接得上。
   // 传进来的是 [{ key, entry }]，这里原样恢复编号顺序。
   for (const item of options.citedReferences || []) {
     if (item?.key && item.entry) state.resolveCite([item.key]);
+  }
+
+  // [references] 格先编号：\cite{1} 的回填发生在解析阶段，条目必须已经存在。
+  for (const cell of cells) {
+    if (cell.pane === "references") state.addManualReferences(readReferenceCell(cell));
   }
 
   cells.forEach((cell, index) => {
@@ -205,6 +240,12 @@ export function typesetCells(source, options = {}) {
       continue;
     }
 
+    // [references] 格：条目已在 ③ 阶段统一编号，格位置本身不产生正文（文末统一输出）。
+    if (cell.pane === "references") {
+      results.push({ cell, html: "" });
+      index += 1;
+      continue;
+    }
     if (cell.type === "code") {
       results.push({ cell, html: renderNodes([N.code(cell.lang, cell.body)], meta) });
       index += 1;
@@ -215,9 +256,9 @@ export function typesetCells(source, options = {}) {
     index += 1;
   }
 
-  // 文献表只列被引用过的条目，按引用顺序编号
-  if (state.cited.length && options.showReferences !== false) {
-    results.push({ cell: null, html: renderNodes([N.references(state.cited)], meta) });
+  // 脚注与文献：文末各输出一次（[references] 格的条目在渲染循环中已收集）
+  if (state.manualRefs.length) {
+    results.push({ cell: null, html: renderNodes([N.references(state.manualRefs)], meta) });
   }
   if (state.footnotes.length) {
     results.push({ cell: null, html: renderFootnotes(meta) });
@@ -234,7 +275,7 @@ export function typesetCells(source, options = {}) {
     html,
     cells: results,
     variables,
-    references: state.cited,
+    references: state.manualRefs,
     footnotes: state.footnotes,
     toc: state.toc,
     diagnostics,

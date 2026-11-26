@@ -415,10 +415,17 @@ const useNotebookStore = defineStore('notebook', {
       this.persist()
     },
 
+    // v1：laup → code → var → laup 循环。
+    // v2：格型由首行声明决定（[cpp] / [input] / %%python …），laup 与 code 不互转——
+    //     互转会把正文整段塞进代码格，看起来就像"点了 laup 变成 [cpp]"。
     cycleType(id) {
       const c = this.cells.find((x) => x.id === id)
       if (!c) return
-      this.setType(id, c.type === 'laup' ? 'code' : c.type === 'code' && this.kernel === 'v1' ? 'var' : 'laup')
+      if (this.kernel === 'v2') {
+        this.toast?.('v2 的格类型由首行声明决定：写 [cpp] / [input] / %%python 即切换')
+        return
+      }
+      this.setType(id, c.type === 'laup' ? 'code' : c.type === 'code' ? 'var' : 'laup')
     },
 
     // ---------- 导入导出 ----------

@@ -72,10 +72,23 @@ export function safeSize(raw) {
 
 /** BibTeX 键列表："knuth1984, lamport1994" → ["knuth1984", "lamport1994"]；空段丢弃 */
 export function parseCiteIds(raw) {
-  return String(raw ?? "")
-    .split(/[,，]/)
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const out = [];
+  for (const part of String(raw ?? "").split(/[,，]/)) {
+    const item = part.trim();
+    if (!item) continue;
+    // 区间 a-b / 1-3 展开：Laup v2 新增，避免手写一长串
+    const range = /^([^\s-]+?)\s*[-–]\s*([^\s-]+)$/.exec(item);
+    if (range) {
+      const from = Number(range[1]);
+      const to = Number(range[2]);
+      if (Number.isInteger(from) && Number.isInteger(to) && from <= to) {
+        for (let n = from; n <= to; n += 1) out.push(String(n));
+        continue;
+      }
+    }
+    out.push(item);
+  }
+  return out;
 }
 
 /** 装载全部内置命令 / 环境（resetRegistry 会再调一次） */

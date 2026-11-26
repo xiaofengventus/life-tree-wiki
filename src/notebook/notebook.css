@@ -226,7 +226,10 @@
   border-radius: 2px;
   font-size: 92%;
 }
-#notebook-page .output pre code { background: none; padding: 0; font-size: 100%; }
+#notebook-page .output pre code { background: none; padding: 0; font-size: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* 高亮器逐行包成 .ln：block 才能换行，也才能让 PDF 分页断在行间。
+   （不写成 .output 后代：渲染面板的纸面在 #notebook 之外，同样要有这条。） */
+.nb-ln { display: block; }
 
 /* `\begin{stay}` 原样块：逐行换行 */
 #notebook-page .output [data-life-stay] {

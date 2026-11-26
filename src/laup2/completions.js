@@ -6,8 +6,7 @@
  */
 
 import { commandNames, environmentNames, getCommand, getEnvironment } from "./registry.js";
-
-const LANGUAGES = ["cpp", "c", "python", "javascript", "json", "bash", "html", "css", "text"];
+import { CELL_DECL_TABLE, CELL_MAGIC_TABLE } from "./cells.js";
 
 export function commandCompletions() {
   return commandNames().map((name) => {
@@ -38,13 +37,17 @@ export function environmentCompletions() {
 
 export function cellCompletions() {
   return [
-    { label: "[input]", apply: "[input]\n", type: "keyword", detail: "输入栏（纯文本）" },
-    { label: "[output]", apply: "[output]\n", type: "keyword", detail: "输出栏（纯文本）" },
-    ...LANGUAGES.map((lang) => ({
-      label: `[${lang}]`,
-      apply: `[${lang}]\n`,
+    ...CELL_DECL_TABLE.map((item) => ({
+      label: `[${item.name}]`,
+      apply: `[${item.name}]\n`,
       type: "keyword",
-      detail: "原生代码格（只展示，不执行）",
+      detail: item.detail,
+    })),
+    ...CELL_MAGIC_TABLE.map((item) => ({
+      label: `%%${item.name}`,
+      apply: `%%${item.name}\n`,
+      type: "keyword",
+      detail: item.detail,
     })),
     { label: "\\cellbreak", apply: "\\cellbreak\n", type: "keyword", detail: "格分隔" },
   ];

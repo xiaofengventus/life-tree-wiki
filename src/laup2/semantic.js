@@ -26,25 +26,56 @@ export function createSemanticState(options = {}) {
     footnotes: [],
     bib,
     cited,
+    references: cited,
+    // [references] 格（一行一条）的条目，按格出现顺序编号；manualRefStart 记录已分配的条数
+    manualRefs: [],
+    manualRefStart: 0,
     /** 键数组 → [{ key, number, id, entry }]；库里没有的键不分配编号（由调用方报诊断）。 */
     resolveCite(keys) {
       const out = [];
       for (const key of keys) {
+        // 纯数字 = 指向 [references] 格的第 N 条（原方案），不需要查文献库
+        if (/^\d+$/.test(key)) {
+          const number = Number(key);
+          const rec = cited.find((item) => item.number === number) || numericCite(number);
+          if (!out.includes(rec)) out.push(rec);
+          continue;
+        }
         const entry = bib.get(key);
         if (!entry) continue;
         if (!citeOrder.has(key)) {
           const number = cited.length + 1;
           citeOrder.set(key, number);
-          cited.push({ key, number, id: `ref-${slugify(key) || number}`, entry });
+          cited.push({ key, number, id: `${slugify(key) || number}`, entry });
         }
         const rec = cited[citeOrder.get(key) - 1];
         if (!out.includes(rec)) out.push(rec);
       }
       return out;
     },
+    /**
+     * 给 [references] 格的条目分配编号（按格出现顺序连续）。
+     * 原方案：文献直接写在 [references] 格里，一行一条，不依赖 references.bib。
+     * 编号必须在解析阶段（renderDoc 之前）完成，这样 \cite{1} 回填时条目已经存在。
+     */
+    addManualReferences(list) {
+      const out = [];
+      for (const text of list || []) {
+        const number = cited.length + 1;
+        const rec = { key: `manual-${number}`, number, id: `${number}`, entry: { text } };
+        cited.push(rec);
+        out.push(rec);
+      }
+      this.manualRefs.push(...out);
+      return out;
+    },
   };
 }
 
+/** 数字序号的引用（\cite{1} / \cite{1-3}）：直接指向 [references] 格第 N 条 */
+function numericCite(number) {
+  return { key: String(number), number, id: `${number}`, entry: { text: "" } };
+}
 /** 复合块的行内节点挂在 attrs 上（不是 children），语义 pass 也要走进去 */
 function mapAttrInlines(node, fn) {
   if (node.type === "Card") {
@@ -142,21 +173,8 @@ export function resolveSemantics(doc, options = {}) {
       }
     }
 
-    if (node.type === "Cite") {
-      // 键式引用：在项目文献库（references.bib）里按键查；编号按"正文首次引用顺序"分配，
-      // 与 BibTeX 一致 —— 库里有 100 条，也只编被引用的那些。
-      const keys = node.attrs.ids || [];
-      node.attrs.items = state.resolveCite(keys);
-      const missing = keys.filter((key) => !node.attrs.items.some((item) => item.key === key));
-      if (missing.length) {
-        report.warn(
-          "E_CITE_KEY",
-          state.bib.size === 0
-            ? `\\cite{${missing.join(",")}} 找不到文献：当前文档还没有 references.bib`
-            : `\\cite 里这些键不在 references.bib：${missing.join(", ")}`,
-        );
-      }
-    }
+    // 先处理自己，再递归子节点：\cite 可能挂在复合块（表格 / 卡片）的属性里。
+    fillCite(node, state, report);
 
     if (Array.isArray(node.children)) node.children = node.children.map(resolve).filter(Boolean);
     if (node.type === "Env" && Array.isArray(node.attrs.value)) {
@@ -168,6 +186,34 @@ export function resolveSemantics(doc, options = {}) {
 
   resolve(doc);
   return doc;
+}
+
+/**
+ * 回填一个节点的 \cite。
+ * 两种写法都认：
+ *   \cite{1} / \cite{1,3} / \cite{1-3}  → 数字序号，指向 [references] 格的第 N 条（原方案）
+ *   \cite{key} / \cite{key1,key2}       → 键名，指向项目文献库 references.bib
+ * 数字引用不做"条目是否存在"的校验：条目在渲染期才收集，晚于本阶段。
+ */
+function fillCite(node, state, report) {
+  if (node.type !== "Cite") return;
+  const ids = node.attrs.ids || [];
+  node.attrs.items = state.resolveCite(ids);
+  const missing = ids.filter((key) => !/^\d+$/.test(key) && !state.bib.has(key));
+  if (missing.length) {
+    report.warn(
+      "E_CITE_KEY",
+      state.bib.size === 0
+        ? `\\cite{${missing.join(",")}} 找不到文献：当前文档还没有 references.bib`
+        : `\\cite 里这些键不在 references.bib：${missing.join(", ")}`,
+    );
+  }
+  // 数字引用越界（\cite{9} 但只有 2 条）在渲染阶段才知道条目总数，这里先记下来
+  const overflow = ids
+    .filter((key) => /^\d+$/.test(key) && !state.cited.some((item) => item.number === Number(key)));
+  if (overflow.length) {
+    report.warn("E_CITE_RANGE", `\\cite{${overflow.join(",")}} 超出 [references] 格已有的 ${state.cited.length} 条`);
+  }
 }
 
 /** 单文档便捷入口：两个阶段跑一遍 */

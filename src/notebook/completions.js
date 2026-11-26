@@ -300,9 +300,9 @@ export function codeDeclCompletionSource(context) {
       info: `输出栏：写在 [${PANE_INPUT}] 格的下一格，两格并成一张样例卡`,
     },
     {
-      label: `[${PANE_INPUT}:cpp]`, type: 'class', detail: '输入栏 + 语言',
-      apply: `[${PANE_INPUT}:cpp]`,
-      info: '输入栏想上色时这样写：冒号后面跟语言名，如 [input:python]',
+      label: `[cpp]`, type: 'class', detail: '输入栏内语言',
+      apply: `[cpp]\n`,
+      info: '栏内语言写在栏内首行（v2 起不再用 [input:cpp]）：[input] 下一行写 [cpp]',
     },
   ]
   // from 要含掉那个 `[`（标签本身也带 `[`）：CM 用 from→光标之间的文字做前缀过滤，

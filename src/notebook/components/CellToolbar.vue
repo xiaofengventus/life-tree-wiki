@@ -14,6 +14,14 @@ const badge = computed(() => {
   return decl.kind === 'none' ? 'code（未声明）' : decl.declText
 })
 
+// v2 的格型由首行声明决定；徽标点击对代码格是「删掉声明、回到 Laup」，对 Laup 格是「补上 [cpp]」。
+function onBadgeClick() {
+  if (store.kernel !== 'v2') { store.cycleType(props.cell.id); return }
+  const lines = props.cell.source.split('\n')
+  if (props.cell.type === 'code') store.setSource(props.cell.id, lines.slice(1).join('\n'))
+  else store.setSource(props.cell.id, `[cpp]\n${props.cell.source}`)
+}
+
 // 上传图片 → 校验后存为格附件，源码末尾追加引用并重跑
 async function onPickFiles(ev) {
   const files = [...(ev.target.files || [])]
@@ -48,6 +56,15 @@ const isLifetree = computed(
   () => props.cell.type === 'code' && parseCodeDecl(props.cell.source).raw === 'lifetree',
 )
 
+// v2 的格型由首行声明决定：点徽标 = 加/删首行声明（不做 laup↔code 互转）
+const typeTitle = computed(() =>
+  store.kernel === 'v2'
+    ? (props.cell.type === 'code'
+      ? `格类型：${badge.value}（点徽标删掉首行声明，回到 Laup 格）`
+      : 'Laup 格（点徽标在首行加 [cpp]，变成展示型代码；[input] / %%python 直接手写）')
+    : `格类型：${props.cell.type}（点击切换 laup→code→var）`,
+)
+
 const icons = {
   run: '<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 2l9 6-9 6z" fill="currentColor"/></svg>',
   dup: '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5" y="5" width="8" height="9" rx="1"/><path d="M11 5V3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h1"/></svg>',
@@ -62,8 +79,7 @@ const icons = {
 
 <template>
   <div class="toolbar" @dblclick.stop>
-    <button class="type-badge" :title="'格类型：' + cell.type + '（点击切换 laup→code→var）'"
-            @click="store.cycleType(cell.id)">{{ badge }}</button>
+    <button class="type-badge" :title="typeTitle" @click="onBadgeClick">{{ badge }}</button>
     <button title="重新渲染本格（Shift+Enter）" @click="store.runCell(cell.id, true)" v-html="icons.run" />
     <button v-if="isLifetree" title="全局预览（新窗口：时序图 + 地质年代轴）" @click="openGlobalPreview" v-html="icons.chrono" />
     <button title="上传图片（存为本格附件，也可直接拖拽/粘贴进输入区）" @click="fileInput.click()" v-html="icons.img" />

@@ -283,15 +283,12 @@ function paneSource(decl) {
 /**
  * 把对照卡某一栏的文本还原成一个代码格；空栏返回 null（空栏不生成格，
  * 否则重载一次就多出一格，往返不收敛）。
- * 栏内首行的语言声明折回栏位声明本身：`[input]` + `[cpp]` → `[input:cpp]`。
+ * 栏内首行的语言声明保留在栏内（v2 起不再折回 `[input:cpp]`，
+ * 而是原样写成两行：`[input]` 换行 `[cpp]`）。
  */
 function paneCell(kind, text) {
   const body = String(text ?? '')
   if (!body.trim()) return null
-  const decl = parseCodeDecl(body)
-  if (decl.kind === 'lang' && decl.raw) {
-    return { type: 'code', source: `[${kind}:${decl.raw}]\n${decl.body}\n` }
-  }
   return { type: 'code', source: `[${kind}]\n${body}\n` }
 }
 

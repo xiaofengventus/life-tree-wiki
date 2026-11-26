@@ -37,7 +37,7 @@ export function parseFirstLineLang(source) {
 // 也不参与高亮 —— 解析时整体剥掉，产物里不留痕。
 //     [cpp] / [python] / [js] …  普通代码块：Prism 上色 + 语言徽标
 //     [input] / [output]         输入 / 输出对照卡（相邻两格自动并成一张）
-//     [input:cpp]                对照卡的输入栏，并声明栏内代码语言
+//     [input] 下方写 [cpp]        栏内语言由栏内首行的 [lang] 声明决定（v2 起不再用 [input:cpp]）
 export const PANE_INPUT = 'input'
 export const PANE_OUTPUT = 'output'
 
@@ -162,7 +162,7 @@ export function highlightLaupCode(html) {
       const reopen = (stack) => { for (const open of stack) lines[lines.length - 1].push(open) }
       pushLine()
       walk(code, [])
-      code.innerHTML = lines.map((parts) => `<span class="ln">${parts.join('') || ' '}</span>`).join('')
+      code.innerHTML = lines.map((parts) => `<span class="ln nb-ln">${parts.join('') || ' '}</span>`).join('')
     }
 
     for (const code of doc.body.querySelectorAll('pre > code')) {

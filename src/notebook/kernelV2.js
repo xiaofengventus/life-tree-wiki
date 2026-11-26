@@ -60,6 +60,11 @@ function renderCodeCell(cell, refOptions, pane) {
   if (decl.kind === 'none') {
     return errorBlock('代码格首行必须写类型声明：[cpp] / [input] / [output] / [references]')
   }
+  // [references] 文献格：一行一条，不是代码（store 里它可能以 code 或 laup 格形式存在）
+  if (decl.kind === 'lang' && decl.raw === 'references') {
+    const result = typesetCells([{ type: 'laup', source: cell.source }], refOptions)
+    return sanitizeHtml(articleBody(result.html)) + warningBlock(result.diagnostics)
+  }
   if ((decl.kind === 'input' || decl.kind === 'output') && decl.raw) {
     return errorBlock(
       `v2 的输入/输出栏不声明语言：${decl.declText} 请改成 [${decl.kind}]；`
@@ -85,11 +90,9 @@ function renderCodeCell(cell, refOptions, pane) {
     return sanitizeHtml(articleBody(result.html)) + warningBlock(result.diagnostics)
   }
 
-  const result = decl.raw === 'references'
+  const result = decl.kind === 'input' || decl.kind === 'output'
     ? typesetCells([{ type: 'laup', source: cell.source }], refOptions)
-    : decl.kind === 'input' || decl.kind === 'output'
-      ? typesetCells([{ type: 'laup', source: cell.source }])
-      : typesetCells([{ type: 'code', lang: decl.raw, source: decl.body }])
+    : typesetCells([{ type: 'code', lang: decl.raw, source: decl.body }])
   return highlightLaupCode(sanitizeHtml(articleBody(result.html))) + warningBlock(result.diagnostics)
 }
 
@@ -97,7 +100,8 @@ function renderCodeCell(cell, refOptions, pane) {
 // v1 留在正文里的宿主层写法：v2 不会自己报错（会被当成普通文字），
 // 所以在这里点名，作为"手动迁移清单"的即时提示。
 const V1_IN_LAUP = [
-  [/^[ \t]*\\references[ \t]*=/m, 'v1 的 \\references=[…] 数据块在 v2 里要改成单独的 [references] 代码格（一条一行）'],
+  [/^[ \t]*\[var\][ \t]*(?:\r?\n|$)/m, 'v2 已移除 [var] 变量格：变量只由宿主传入，正文直接写内容'],
+  [/^[ \t]*\\references[ \t]*=/m, 'v1 的 \\references=[…] 数据块在 v2 里要改成单独的 [references] 格（一条一行）'],
   [/^[ \t]*\\varcell[ \t]*=/m, 'v1 的 \\varcell=[…] 数据块在 v2 里已停用，请保留原文备查并把需要展示的内容写入 Laup 正文'],
   [/^[ \t]*\\image[ \t]*[=!]/m, 'v2 用 ![说明](地址) 插图，不再用 \\image 数据块'],
   [/^[ \t]*\\tree[ \t]*=/m, 'v2 还没有 \\tree 研究树嵌入'],
@@ -218,7 +222,7 @@ export function importNotebookV2(source) {
   }))
 }
 
-/** 所有 [references] 代码格的条目，按格顺序汇总（= 全局编号）。 */
+/** 所有 [references] 格的条目，按格顺序汇总（= 全局编号）。 */
 export function collectV2References(cells) {
   const out = []
   for (const cell of Array.isArray(cells) ? cells : []) {
@@ -228,15 +232,12 @@ export function collectV2References(cells) {
 }
 
 function referenceSections(cell) {
-  if (cell?.type === 'laup') return parseCells(cell.source).filter((part) => part.type === 'reference')
-  if (cell?.type !== 'code') return []
-  const decl = parseCodeDecl(cell.source)
-  return decl.declText === '[references]'
-    ? parseCells([{ type: 'laup', source: cell.source }]).filter((part) => part.type === 'reference')
-    : []
+  if (!cell?.source) return []
+  const parts = parseCells([{ type: cell.type === 'laup' ? 'laup' : 'code', source: cell.source }])
+  return parts.filter((part) => part.pane === 'references')
 }
 
-/** 文献列表显示在首个 [references] 声明所在的编辑格中。 */
+/** 文献列表显示在首个 [references] 格中。 */
 export function v2ReferenceDisplayIndex(cells) {
   return (Array.isArray(cells) ? cells : []).findIndex((cell) => referenceSections(cell).length > 0)
 }

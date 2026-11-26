@@ -254,7 +254,7 @@ function renderReferences(node) {
   const items = (node.attrs.entries || [])
     .map((item, index) => {
       const text = typeof item === "string" ? item : item.entry?.text || item.key || "";
-      const id = typeof item === "string" ? `ref-${index + 1}` : item.id;
+      const id = typeof item === "string" ? `ref-${index + 1}` : `ref-${item.id}`;
       return `<li id="${esc(id)}">${esc(text)}</li>`;
     })
     .join("\n");

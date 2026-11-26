@@ -214,9 +214,10 @@ export { exportCells };
 function exportCells(source) {
   const cells = parseCells(source);
   const parts = cells.map((cell) => {
-    if (/^[ \t]*\[var\][ \t]*(?:\n|$)/i.test(cell.source)) return cell.source;
+    // 带首行声明（[cpp] / [input] / [references] / %%python）的格原样导出
+    if (cell.pane || cell.sourceType === "code") return cell.source.trim();
     if (cell.type !== "laup") return cell.source.trim();
     return exportSource(parse(cell.source).doc).trim();
   });
-  return `${parts.join("\n\n\\cellbreak=[\n]\n\n")}\n`;
+  return `${parts.join("\n\n\\cellbreak\n\n")}\n`;
 }

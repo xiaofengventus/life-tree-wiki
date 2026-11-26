@@ -11,6 +11,7 @@ import { fetchPost } from '@/services/posts'
 import { useUserStore } from '@/stores/user'
 import { detectLaupKernel } from '../../shared/laupKernel.js'
 import { importNotebookV2 } from './kernelV2.js'
+import { MEASURE_CSS, SHEET_HEIGHT_PX } from './printStyle.js'
 import NavBar from '@/components/navBar.vue'
 import MenuBar from './components/MenuBar.vue'
 import CellCard from './components/CellCard.vue'
@@ -40,35 +41,8 @@ const paper = ref(null)
 const rendered = computed(() => store.cells.filter((c) => c.outputHtml))
 const pages = ref([])
 
-// A4 版心（96dpi 下 210×297mm，四周留 18mm/16mm 页边）——
-// 高度一定要和样式表里的 .nb-sheet-body 高度保持一致，否则分页会和纸上内容对不上。
-const SHEET_WIDTH_PX = Math.round((210 - 32) * 96 / 25.4)
-const SHEET_HEIGHT_PX = Math.round((297 - 36) * 96 / 25.4)
-
-// 排版上下文：每张纸上都是一个 .nb-flow，块与块之间的外边距规则和纸上完全一致。
-// 不套 .nb-sheet-body 是因为 scoped 样式选择器（.nb-sheet-body[data-v-xxx]）
-// 匹配不到新增的离屏节点，必须让 .nb-flow 自己承载印刷体样式。
-const MEASURE_CONTEXT_CSS = `
-  .nb-measure-root { width: ${SHEET_WIDTH_PX}px; font: 11.5pt/1.75 "Songti SC", "Source Han Serif SC", "SimSun", Georgia, serif; color: #16181c; }
-  .nb-measure-root p { margin: 0; text-align: justify; text-indent: 2em; }
-  .nb-measure-root h1 { font-size: 1.85em; line-height: 1.35; margin: 0 0 .7em; text-align: center; }
-  .nb-measure-root h2 { font-size: 1.35em; margin: 1.1em 0 .5em; }
-  .nb-measure-root h3 { font-size: 1.12em; margin: 1em 0 .4em; }
-  .nb-measure-root h1 + p, .nb-measure-root h2 + p, .nb-measure-root h3 + p { text-indent: 0; }
-  .nb-measure-root ul, .nb-measure-root ol { margin: 0; padding-left: 2.2em; }
-  .nb-measure-root figure { margin: .8em 0; text-align: center; }
-  .nb-measure-root figcaption { font-size: .86em; color: #4b5563; margin-top: .35em; }
-  .nb-measure-root table { border-collapse: collapse; width: 100%; font-size: .9em; }
-  .nb-measure-root caption { font-size: .86em; color: #4b5563; margin-bottom: .3em; }
-  .nb-measure-root th, .nb-measure-root td { border: 1px solid #c7ccd1; padding: 3px 6px; text-align: left; }
-  .nb-measure-root thead th { background: #f2f4f6; }
-  .nb-measure-root pre { margin: 0; background: #f6f8fa; border: 1px solid #e5e8eb; border-radius: 4px; padding: 8px 10px; font: 9.5pt/1.55 Consolas, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .nb-measure-root code { font-family: Consolas, Menlo, monospace; font-size: .92em; }
-  .nb-measure-root img, .nb-measure-root svg { max-width: 100%; height: auto; }
-  .nb-measure-root blockquote { margin: 0; padding-left: 1em; border-left: 3px solid #d0d7de; color: #4b5563; }
-  .nb-measure-root .nb-flow > * + * { margin-top: .6em; }
-`
-
+// A4 版心 + 印刷体样式都在 printStyle.js：屏幕上的纸、离屏测量、导出 PDF 三处
+// 共用同一份 CSS，分页算出来的高度才对得上纸上的实际内容。
 const MEASURE_STYLE_ID = 'nb-measure-style'
 
 /** 把整篇 HTML 切成若干页（离屏量块高 → 按版心高度累加；超长块再按行切）。
@@ -78,7 +52,7 @@ function paginate(html) {
   if (!document.getElementById(MEASURE_STYLE_ID)) {
     const style = document.createElement('style')
     style.id = MEASURE_STYLE_ID
-    style.textContent = MEASURE_CONTEXT_CSS
+    style.textContent = MEASURE_CSS
     document.head.appendChild(style)
   }
   const stage = document.createElement('div')
@@ -120,9 +94,17 @@ function paginate(html) {
         used = height
         continue
       }
-      // 超长块（长代码、长表、长引用、长公式）：先结页，再逐行切开
+      // 超长块（长代码、长表、长引用、长公式）：先填满当前页的剩余高度，再逐行续到后续页
+      for (const piece of splitOversize(block, flow, SHEET_HEIGHT_PX - used, used > 0)) {
+        if (piece.text !== undefined) {
+          current += piece.text
+          used += piece.height
+          continue
+        }
+        flush()
+        result.push(piece.html)
+      }
       flush()
-      for (const piece of splitOversize(block, flow)) result.push(piece)
     }
     flush()
   } finally {
@@ -142,8 +124,14 @@ const escHtml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt
 const TAG_OPEN = (el) => `<${el.tagName.toLowerCase()}${el.className ? ` class="${el.className}"` : ''}>`
 const TAG_CLOSE = (el) => `</${el.tagName.toLowerCase()}>`
 
-/** 超长块按单元切页。返回若干「整页」HTML（每段都带自己的 nb-flow 包裹）。 */
-function splitOversize(block, flow) {
+/**
+ * 超长块按单元切页。
+ * 第一段可以续在当前页剩余高度里（remain 是当前页剩下的版心，continuePage 表示
+ * 当前页还有内容，所以第一段不能超过整页）——否则一段长代码永远从新页开始，
+ * 前面那半页就空着了。
+ * 返回 [{ text, height }]（续在当前页）或 { html }（独立成页）。
+ */
+function splitOversize(block, flow, remain = SHEET_HEIGHT_PX, continuePage = false) {
   const out = []
   const open = TAG_OPEN(block)
   const close = TAG_CLOSE(block)
@@ -152,16 +140,19 @@ function splitOversize(block, flow) {
   // 没有可切分的子元素（单行超长代码 / 单张超高图…）：整块独占一页，
   // 让它自己溢出，也不要把它后面的内容挤成空白页。
   if (!units.length) {
-    out.push(`<div class="nb-flow nb-overflow">${block.outerHTML}</div>`)
+    out.push({ html: `<div class="nb-flow nb-overflow">${block.outerHTML}</div>` })
     return out
   }
 
-  let pageRemain = SHEET_HEIGHT_PX
+  let pageRemain = continuePage ? remain : SHEET_HEIGHT_PX
   let chunk = ''
-  const flushChunk = () => {
+  let chunkHeight = 0
+  const flushChunk = (asNewPage) => {
     if (!chunk) return
-    out.push(`<div class="nb-flow">${open}${chunk}${close}</div>`)
+    if (asNewPage) out.push({ html: `<div class="nb-flow">${open}${chunk}${close}</div>` })
+    else out.push({ text: `${open}${chunk}${close}`, height: chunkHeight })
     chunk = ''
+    chunkHeight = 0
     pageRemain = SHEET_HEIGHT_PX
   }
 
@@ -171,20 +162,22 @@ function splitOversize(block, flow) {
     const unitHtml = unit.chunkText !== undefined ? escHtml(unit.chunkText) : unit.outerHTML
     if (unitHeight <= pageRemain) {
       chunk += unitHtml
+      chunkHeight += unitHeight
       pageRemain -= unitHeight
       continue
     }
-    flushChunk()
+    flushChunk(true)
     // 这一行自己就超过整页版心：单独占一页，不切行内文字
     if (unitHeight > SHEET_HEIGHT_PX) {
-      out.push(`<div class="nb-flow nb-overflow">${open}${unitHtml}${close}</div>`)
+      out.push({ html: `<div class="nb-flow nb-overflow">${open}${unitHtml}${close}</div>` })
       pageRemain = SHEET_HEIGHT_PX
       continue
     }
     chunk = unitHtml
+    chunkHeight = unitHeight
     pageRemain = SHEET_HEIGHT_PX - unitHeight
   }
-  flushChunk()
+  flushChunk(true)
   return out
 }
 
@@ -290,59 +283,33 @@ function startDrag(event) {
   window.addEventListener('pointerup', up)
 }
 
-// 导出 PDF：用浏览器自己的打印引擎出 A4、文字可选中，不额外塞一个 pdf 库。
-// 送进打印文档的是同一套分页结果，所以屏幕上看的样子就是印出来的样子。
-function exportPdf() {
+// 导出 PDF：真·PDF 文件（pdf-lib 自己写字形），不走 window.print()。
+// print() 会让打印驱动二次排版，屏幕正确、印出来错乱；这里把屏幕排好的坐标直接抄进 PDF。
+const exporting = ref(false)
+async function exportPdf() {
   if (!pages.value.length) {
     store.toast = '还没有可导出的内容'
     return
   }
-  const host = document.createElement('iframe')
-  host.setAttribute('aria-hidden', 'true')
-  host.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0'
-  document.body.appendChild(host)
-  const title = (store.draftTitle || 'Laup 文档').replace(/[<>&]/g, '')
-  const sheets = pages.value
-    .map((page) => `<section class="nb-print-sheet">${page}</section>`)
-    .join('')
-  const doc = host.contentDocument
-  doc.open()
-  doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
-<style>
-  @page { size: A4; margin: 18mm 16mm; }
-  * { box-sizing: border-box; }
-  body { margin: 0; color: #16181c; font: 11.5pt/1.75 "Songti SC", "Source Han Serif SC", "SimSun", Georgia, serif; }
-  .nb-print-sheet { break-after: page; }
-  .nb-print-sheet:last-child { break-after: auto; }
-  .nb-flow > * + * { margin-top: .6em; }
-  h1 { font-size: 1.85em; line-height: 1.35; margin: 0 0 .7em; text-align: center; }
-  h2 { font-size: 1.35em; margin: 1.1em 0 .5em; }
-  h3 { font-size: 1.12em; margin: 1em 0 .4em; }
-  p { margin: 0; text-align: justify; text-indent: 2em; hyphens: auto; }
-  .nb-flow > h1 + p, .nb-flow > h2 + p, .nb-flow > h3 + p, .nb-flow > ul + p, .nb-flow > table + p { text-indent: 0; }
-  ul, ol { margin: 0; padding-left: 2.2em; }
-  figure { margin: .8em 0; text-align: center; }
-  figcaption { font-size: .86em; color: #4b5563; margin-top: .35em; }
-  table { border-collapse: collapse; width: 100%; font-size: .9em; }
-  caption { font-size: .86em; color: #4b5563; margin-bottom: .3em; }
-  th, td { border: 1px solid #c7ccd1; padding: 3px 6px; text-align: left; }
-  thead th { background: #f2f4f6; }
-  pre { margin: 0; background: #f6f8fa; border: 1px solid #e5e8eb; border-radius: 4px; padding: 8px 10px; font: 9.5pt/1.55 Consolas, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-  code { font-family: Consolas, Menlo, monospace; font-size: .92em; }
-  img, svg { max-width: 100%; height: auto; }
-  blockquote { margin: 0; padding-left: 1em; border-left: 3px solid #d0d7de; color: #4b5563; }
-  hr { border: 0; border-top: 1px solid #d0d7de; }
-  .nb-flow, .nb-flow * { break-inside: auto; }
-  h1, h2, h3, caption, figcaption { break-after: avoid; }
-</style></head><body>${sheets}</body></html>`)
-  doc.close()
-  const fire = () => {
-    host.contentWindow.focus()
-    host.contentWindow.print()
-    setTimeout(() => host.remove(), 1500)
+  if (exporting.value) return
+  exporting.value = true
+  const title = (store.draftTitle || 'Laup 文档').trim()
+  try {
+    // 动态引入：pdf-lib + 11MB 字体只在真要导出时才加载，不拖慢编辑页
+    const { exportHtmlToPdf, downloadPdf } = await import('./pdfExport.js')
+    const bytes = await exportHtmlToPdf({
+      pagesHtml: pages.value,
+      title,
+      onProgress: (msg) => { store.toast = msg },
+    })
+    downloadPdf(bytes, `${title || 'laup'}.pdf`)
+    store.toast = `已导出 ${title}.pdf`
+  } catch (error) {
+    console.error('导出 PDF 失败', error)
+    store.toast = `导出失败：${error?.message || error}`
+  } finally {
+    exporting.value = false
   }
-  if (doc.readyState === 'complete') fire()
-  else host.onload = fire
 }
 
 // ── 草稿箱（与 laup_editor 同一套 IndexedDB 服务 + 自动保存 composable）──
@@ -550,7 +517,7 @@ onBeforeUnmount(() => {
             <button type="button" title="缩小" @click="zoom = Math.max(0.6, +(zoom - 0.1).toFixed(2))">−</button>
             <button type="button" class="nb-zoom-value" title="恢复 100%" @click="zoom = 1">{{ Math.round(zoom * 100) }}%</button>
             <button type="button" title="放大" @click="zoom = Math.min(2, +(zoom + 0.1).toFixed(2))">+</button>
-            <button type="button" title="导出为 PDF（浏览器打印，可选另存为 PDF）" @click="exportPdf">导出 PDF</button>
+            <button type="button" :disabled="exporting" title="导出为真正的 PDF 文件（文字可选中，中文已嵌字体）" @click="exportPdf">{{ exporting ? '导出中…' : '导出 PDF' }}</button>
             <button type="button" title="收起渲染区" @click="renderOpen = false">收起</button>
           </span>
         </div>
@@ -647,33 +614,49 @@ onBeforeUnmount(() => {
   text-align: center; font: 10px/1 system-ui, sans-serif; color: #9aa3ad;
 }
 .nb-sheet-body { width: 100%; }
+/* 纸面里的代码与编辑区一样按行换行：本组件不在 #notebook-page 里时
+   （Papilot 内嵌等），notebook.css 那条 .output 换行规则选不中纸面。 */
+.nb-sheet-body :deep(code) { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* 离屏测量：必须真实排版（不能 display:none / visibility:hidden），否则高度全是 0。
    印刷体样式由 paginate() 注入的全局 .nb-measure-root 提供（scoped 样式选不中后插的节点）。 */
 .nb-sheet-measure {
   position: fixed; left: -20000px; top: 0; z-index: -1;
   pointer-events: none; background: #fff;
 }
-.nb-sheet-body > .nb-flow > * + * { margin-top: .6em; }
+/* 纸面排版规则与 printStyle.js（测量 / 打印共用）保持一致：
+   三处只要有一处不同，分页算出来的高度就对不上纸上的内容。 */
+.nb-sheet-body :deep(.nb-flow) > * + * { margin-top: .6em; }
+.nb-sheet-body :deep(p) { margin: 0; text-align: justify; text-indent: 2em; }
 .nb-sheet-body :deep(h1) { font-size: 1.85em; line-height: 1.35; margin: 0 0 .7em; text-align: center; }
 .nb-sheet-body :deep(h2) { font-size: 1.35em; margin: 1.1em 0 .5em; }
 .nb-sheet-body :deep(h3) { font-size: 1.12em; margin: 1em 0 .4em; }
-.nb-sheet-body :deep(p) { margin: 0; text-align: justify; text-indent: 2em; }
-.nb-sheet-body :deep(h1 + p), .nb-sheet-body :deep(h2 + p), .nb-sheet-body :deep(h3 + p) { text-indent: 0; }
+.nb-sheet-body :deep(h4) { font-size: 1em; margin: .9em 0 .4em; }
+.nb-sheet-body :deep(h1 + p), .nb-sheet-body :deep(h2 + p), .nb-sheet-body :deep(h3 + p),
+.nb-sheet-body :deep(h4 + p), .nb-sheet-body :deep(ul + p), .nb-sheet-body :deep(ol + p),
+.nb-sheet-body :deep(table + p), .nb-sheet-body :deep(figure + p),
+.nb-sheet-body :deep(blockquote + p), .nb-sheet-body :deep(pre + p) { text-indent: 0; }
 .nb-sheet-body :deep(ul), .nb-sheet-body :deep(ol) { margin: 0; padding-left: 2.2em; }
+.nb-sheet-body :deep(li > p) { text-indent: 0; }
 .nb-sheet-body :deep(figure) { margin: .8em 0; text-align: center; }
-.nb-sheet-body :deep(figcaption) { font-size: .86em; color: #4b5563; margin-top: .35em; }
+.nb-sheet-body :deep(figcaption) { font-size: .86em; color: #4b5563; margin-top: .35em; text-indent: 0; }
 .nb-sheet-body :deep(table) { border-collapse: collapse; width: 100%; font-size: .9em; }
-.nb-sheet-body :deep(caption) { font-size: .86em; color: #4b5563; margin-bottom: .3em; }
+.nb-sheet-body :deep(caption) { font-size: .86em; color: #4b5563; margin-bottom: .3em; text-indent: 0; }
 .nb-sheet-body :deep(th), .nb-sheet-body :deep(td) { border: 1px solid #c7ccd1; padding: 3px 6px; text-align: left; }
 .nb-sheet-body :deep(thead th) { background: #f2f4f6; }
 .nb-sheet-body :deep(pre) {
   margin: 0; background: #f6f8fa; border: 1px solid #e5e8eb; border-radius: 4px;
   padding: 8px 10px; font: 9.5pt/1.55 Consolas, Menlo, monospace;
-  white-space: pre-wrap; overflow-wrap: anywhere;
+  white-space: pre-wrap; overflow-wrap: anywhere; text-indent: 0;
 }
 .nb-sheet-body :deep(code) { font-family: Consolas, Menlo, monospace; font-size: .92em; }
+/* 高亮器把代码逐行包成 .ln：必须 block，否则行与行会连成一整行（分页也切不开） */
+.nb-sheet-body :deep(.nb-ln) { display: block; }
 .nb-sheet-body :deep(img), .nb-sheet-body :deep(svg) { max-width: 100%; height: auto; }
 .nb-sheet-body :deep(blockquote) { margin: 0; padding-left: 1em; border-left: 3px solid #d0d7de; color: #4b5563; }
+.nb-sheet-body :deep(blockquote p) { text-indent: 0; }
+.nb-sheet-body :deep(hr) { border: 0; border-top: 1px solid #d0d7de; }
+/* 只读产物里的控件（待办复选框）在纸上不出现 */
+.nb-sheet-body :deep(button), .nb-sheet-body :deep(input) { display: none; }
 /* 单块高于整页（超长代码 / 长表 / 大图）：不硬切行内，让它自己撑出边界，
    下面垫一条警示色，避免被误当成"排版漏了" */
 .nb-sheet-body :deep(.nb-overflow) { outline: 2px dashed #e0a03a; outline-offset: 6px; }
