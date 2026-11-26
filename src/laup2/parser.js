@@ -273,8 +273,10 @@ function parseEnvironment(token, ctx) {
   }
 
   if (!def) {
+    // 不认识的命令不报错、不猜语义：整块原样当正文输出（v1 存量文档也能照常显示）
     ctx.report.warn("E_ENV_UNKNOWN", `未知环境 \\begin{${token.name}}，已原样输出`, token.span);
-    return withSpan(N.broken(`未知环境 ${token.name}`, token.body), token.span);
+    const raw = `\\begin{${token.name}}${token.meta || ""}\n${token.body}\n\\end{${token.name}}`;
+    return withSpan(N.para([N.text(raw)]), token.span);
   }
 
   if (token.name === "equation") {
@@ -327,8 +329,9 @@ function splitItems(body, ctx) {
 function parseBlockCommand(token, ctx) {
   const def = getCommand(token.name);
   if (!def) {
+    // 同上：没有的命令整行原样当正文（含命令名本身），不产出错误块
     ctx.report.warn("E_COMMAND_UNKNOWN", `未知命令 \\${token.name}`, token.span);
-    return [withSpan(N.para([N.text(token.rawArgs || "")]), token.span)];
+    return [withSpan(N.para([N.text(`\\${token.name}${token.rawArgs || ""}`)]), token.span)];
   }
   const args = readRawArgs(token.rawArgs, def, ctx);
   const built = def.build(args, ctx);

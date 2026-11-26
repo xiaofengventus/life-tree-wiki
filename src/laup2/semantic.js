@@ -37,8 +37,8 @@ export function createSemanticState(options = {}) {
         // 纯数字 = 指向 [references] 格的第 N 条（原方案），不需要查文献库
         if (/^\d+$/.test(key)) {
           const number = Number(key);
-          const rec = cited.find((item) => item.number === number) || numericCite(number);
-          if (!out.includes(rec)) out.push(rec);
+          const rec = this.manualRefs.find((item) => item.number === number);
+          if (rec && !out.includes(rec)) out.push(rec);
           continue;
         }
         const entry = bib.get(key);
@@ -72,10 +72,6 @@ export function createSemanticState(options = {}) {
   };
 }
 
-/** 数字序号的引用（\cite{1} / \cite{1-3}）：直接指向 [references] 格第 N 条 */
-function numericCite(number) {
-  return { key: String(number), number, id: `${number}`, entry: { text: "" } };
-}
 /** 复合块的行内节点挂在 attrs 上（不是 children），语义 pass 也要走进去 */
 function mapAttrInlines(node, fn) {
   if (node.type === "Card") {
@@ -208,12 +204,12 @@ function fillCite(node, state, report) {
         : `\\cite 里这些键不在 references.bib：${missing.join(", ")}`,
     );
   }
-  // 数字引用越界（\cite{9} 但只有 2 条）在渲染阶段才知道条目总数，这里先记下来
   const overflow = ids
-    .filter((key) => /^\d+$/.test(key) && !state.cited.some((item) => item.number === Number(key)));
+    .filter((key) => /^\d+$/.test(key) && !state.manualRefs.some((item) => item.number === Number(key)));
   if (overflow.length) {
-    report.warn("E_CITE_RANGE", `\\cite{${overflow.join(",")}} 超出 [references] 格已有的 ${state.cited.length} 条`);
+    report.warn("E_CITE_RANGE", `\\cite{${overflow.join(",")}} 超出 [references] 格已有的 ${state.manualRefs.length} 条`);
   }
+  node.attrs.hasMissing = missing.length > 0 || overflow.length > 0;
 }
 
 /** 单文档便捷入口：两个阶段跑一遍 */

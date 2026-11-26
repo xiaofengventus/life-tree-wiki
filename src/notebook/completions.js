@@ -7,12 +7,11 @@
 //   \textcolor{ / \colorbox{ → 常用颜色名
 //   src="     → 附件名 + {{var}} 两种形态
 // code 格：
-//   常用固定导入/调用片段 + lang-python 自带的局部/全局补全
+//   原生代码，不写声明；语言取项目设置（python 时带 lang-python 自带补全）
 
 import { snippetCompletion } from '@codemirror/autocomplete'
 import { globalCompletion, localCompletionSource } from '@codemirror/lang-python'
 import { languageOptions, PANE_INPUT, PANE_OUTPUT } from '@/utils/codeLang.js'
-import { PARAM_KEYS } from '@/laup/extensions/lifetree.js'
 
 // from 必须包含反斜杠本身（cmdM[0] 而非 cmdM[1]）：否则只输入 \ 就确认时，
 // 原反斜杠不被替换，snippet 又以 \ 开头 → 出现 \\textcolor 重复。
@@ -209,13 +208,13 @@ export function laupCompletionSource(store, cell) {
     if (fenceM) {
       const options = [
         snippetCompletion('```sample\n${代码}\n---\n${输出}\n```', {
-          label: '```sample', detail: '输入/输出对照块（= 代码格 [input] + [output] 两格）', type: 'function',
+          label: '```sample', detail: '输入/输出对照块（= [input] + [output] 两格）', type: 'function',
         }),
-        ...languageOptions().map(({ name, label }) => snippetCompletion('```' + name + '\n${代码}\n```', {
+        ...languageOptions().filter((o) => o.name !== 'lifetree').map(({ name, label }) => snippetCompletion('```' + name + '\n${代码}\n```', {
           label: '```' + name, detail: label + ' 代码块', type: 'function',
         })),
         snippetCompletion('```\n${文本}\n```', {
-          label: '```', detail: '不写语言的代码块（首行可写 [cpp] 声明）', type: 'function',
+          label: '```', detail: '不写语言的代码块（首行可写 [cpp] 指定语言）', type: 'function',
         }),
       ]
       return { from: context.pos - fenceM[0].length, options, validFor: /^`{2,3}\w*$/ }
@@ -278,8 +277,9 @@ export function pythonCompletionSources() {
   return [pythonSnippetSource, localCompletionSource, globalCompletion]
 }
 
-// ---------- 代码格补全源：首行类型声明 ----------
-// 只在第一行生效：打出 `[` 就把全部可用类型摆出来 —— 这是「提示有什么类型」的主入口。
+// ---------- Laup 格首行声明：展示型代码 / 输入输出 / 文献 ----------
+// 只在第一行生效：打出 `[` 就把全部可用的 Laup 标记摆出来。
+// 这些是 Laup 标记语言，不是原生代码格的语言声明（原生代码格写在项目设置里）。
 export function codeDeclCompletionSource(context) {
   const line = context.state.doc.lineAt(context.pos)
   if (line.number !== 1) return null
@@ -287,9 +287,9 @@ export function codeDeclCompletionSource(context) {
   const m = /^\[[A-Za-z0-9_+#-]*$/.exec(before)
   if (!m) return null
   const options = [
-    ...languageOptions().map(({ name, label }) => ({
+    ...languageOptions().filter((o) => o.name !== 'lifetree').map(({ name, label }) => ({
       label: `[${name}]`, type: 'keyword', detail: label, apply: `[${name}]`,
-      info: `首行写 [${name}] —— 这一格按 ${label} 上色`,
+      info: `首行写 [${name}] —— 一段只排版、不执行的 ${label} 代码展示块`,
     })),
     {
       label: `[${PANE_INPUT}]`, type: 'class', detail: '输入栏', apply: `[${PANE_INPUT}]`,
@@ -300,39 +300,11 @@ export function codeDeclCompletionSource(context) {
       info: `输出栏：写在 [${PANE_INPUT}] 格的下一格，两格并成一张样例卡`,
     },
     {
-      label: `[cpp]`, type: 'class', detail: '输入栏内语言',
-      apply: `[cpp]\n`,
-      info: '栏内语言写在栏内首行（v2 起不再用 [input:cpp]）：[input] 下一行写 [cpp]',
+      label: '[references]', type: 'class', detail: '文献格', apply: '[references]',
+      info: '文献声明：一行一条，按顺序编号；正文用 \\cite{1} 引用',
     },
   ]
   // from 要含掉那个 `[`（标签本身也带 `[`）：CM 用 from→光标之间的文字做前缀过滤，
   // 两边都带括号才过滤得动 —— 只带一边的话一敲字就一条选项都不剩。
   return { from: context.pos - m[0].length, options, validFor: /^\[[A-Za-z0-9_+#-]*$/ }
-}
-
-// ---------- lifetree 格补全源：行尾 [ 参数字段 ----------
-// [lifetree] 格里打出 `[` 就列出参数字段（拉丁名/阶元/作者/年份/时间/文献/备注/图片），
-// 选中插入 `键=`，值自己填 —— 与解析器的行尾参数段同一份键清单。
-const LIFETREE_PARAM_HINTS = {
-  拉丁名: '学名（覆盖正文解析出的拉丁名）',
-  阶元: '分类阶元：界/门/纲/目/科/属/种…',
-  作者: '命名人（正文里写了可省）',
-  年份: '命名年代（正文里写了可省）',
-  时间: '旧写法，等价于 生存（时序图画标记）',
-  生存: '生存时间：区间「老端-新端」画色带，单值画圆点（如 68-66 / 68）',
-  分化: '内节点分化时间（百万年前，一般不填，缺省自动估计）',
-  文献: '依据文献',
-  备注: '备注',
-  图片: '图片',
-}
-export function lifetreeCompletionSource(context) {
-  const line = context.state.doc.lineAt(context.pos)
-  if (line.number === 1) return null // 第一行是 [lifetree] 声明，不掺和
-  const before = line.text.slice(0, context.pos - line.from)
-  const m = /\[([A-Za-z_\u4e00-\u9fa5=,\s]*)$/.exec(before)
-  if (!m) return null
-  const options = PARAM_KEYS.map((key) => ({
-    label: `${key}=`, type: 'property', detail: LIFETREE_PARAM_HINTS[key] || '参数字段', apply: `${key}=`,
-  }))
-  return { from: context.pos - m[1].length, options, validFor: /^[A-Za-z_\u4e00-\u9fa5=,\s]*$/ }
 }

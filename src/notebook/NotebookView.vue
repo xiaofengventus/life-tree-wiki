@@ -1,21 +1,25 @@
 <script setup>
-// Notebook 页面壳（路由 /notebook）：菜单栏 + 单元格区 + 手册整页 + 提交对话框。
+// Notebook 页面壳（路由 /laup-v2）：菜单栏 + 单元格区 + 手册整页 + 提交对话框。
 // 键盘双模式（命令/编辑）对齐 Jupyter：Esc/Enter/j/k/a/b/d d/m/y/v。
 import { onBeforeUnmount, onMounted, ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotebook } from './store.js'
-import { parseLaupDoc } from './renderer.js'
 import { useDraftAutosave } from '@/composables/useDraftAutosave'
 import { getDraft, saveDraft, userDraftOwnerKey } from '@/services/drafts'
 import { fetchPost } from '@/services/posts'
 import { useUserStore } from '@/stores/user'
 import { detectLaupKernel } from '../../shared/laupKernel.js'
 import { importNotebookV2 } from './kernelV2.js'
-import { MEASURE_CSS, SHEET_HEIGHT_PX } from './printStyle.js'
+import { parseLaupDoc } from './renderer.js'
+import { MEASURE_CSS, PREVIEW_CSS, SHEET_CSS, SHEET_HEIGHT_PX } from './printStyle.js'
+import { renderMathIn } from './mathRender.js'
+import { buildHtmlDocument, downloadHtml, safeFileName } from './htmlExport.js'
 import NavBar from '@/components/navBar.vue'
 import MenuBar from './components/MenuBar.vue'
 import CellCard from './components/CellCard.vue'
 import HelpPanel from './components/HelpPanel.vue'
+import CreateProjectDialog from './CreateProjectDialog.vue'
+import RuntimeDialog from './runtime/RuntimeDialog.vue'
 import SubmitDialog from './SubmitDialog.vue'
 import './notebook.css'
 
@@ -23,13 +27,17 @@ const route = useRoute()
 const store = useNotebook()
 const userStore = useUserStore()
 
-// 渲染内核由路由决定：/notebook = v1（旧版），/laup-v2 = v2（公测）。
-// 编辑器、快捷键、草稿、提交链路完全共用，只有预览走不同的内核。
-const props = defineProps({ kernel: { type: String, default: 'v1' }, embedded: Boolean })
+// 编辑器只有一套内核：认不出的命令原样当正文，旧 v1 文章也能载入修改。
+// /notebook 旧链接由路由重定向到这里。
+const props = defineProps({ embedded: Boolean })
 
 const page = ref(null)
 const showHelp = ref(false)
 const showSubmit = ref(false)
+// 新建项目对话框：没有项目名（首次进入 / 点了「新建」）时先问基本信息
+const showCreate = ref(false)
+// 本机内核对话框：连接后代码格才会真的执行
+const showRuntime = ref(false)
 
 // ── 实时渲染区（可折叠、宽度可拖动、分页预览）──
 // 内容 = 各格 outputHtml 顺序拼接，也就是 v2 内核边打边出的产物。
@@ -38,17 +46,48 @@ const renderOpen = ref(true)
 const renderWidth = ref(44)
 const zoom = ref(1)
 const paper = ref(null)
-const rendered = computed(() => store.cells.filter((c) => c.outputHtml))
+// 纸面就是每格的渲染产物 —— 包括代码格的内核输出。
+// 与格下预览、导出 PDF / HTML 用同一份 outputHtml，四处不会各显示各的。
+const rendered = computed(() => store.cells.map((c) => String(c.outputHtml || '')).filter(Boolean))
 const pages = ref([])
+
+// 纸张底色：左边格下预览与右边纸面共用同一个 --nb-paper-bg，跟着本机走
+const PAPER_TONES = [
+  { id: 'white', label: '白', bg: '#ffffff' },
+  { id: 'ivory', label: '米黄', bg: '#fbf6ea' },
+  { id: 'celadon', label: '青瓷', bg: '#f2f6f4' },
+  { id: 'gray', label: '浅灰', bg: '#f5f6f8' },
+]
+const PAPER_TONE_KEY = 'nb-paper-tone'
+const paperTone = ref((() => {
+  try { return localStorage.getItem(PAPER_TONE_KEY) || 'white' } catch { return 'white' }
+})())
+const paperStyle = computed(() => ({
+  '--nb-paper-bg': (PAPER_TONES.find((t) => t.id === paperTone.value) || PAPER_TONES[0]).bg,
+}))
+watch(paperTone, (id) => {
+  try { localStorage.setItem(PAPER_TONE_KEY, id) } catch { /* 隐私模式下忽略 */ }
+})
 
 // A4 版心 + 印刷体样式都在 printStyle.js：屏幕上的纸、离屏测量、导出 PDF 三处
 // 共用同一份 CSS，分页算出来的高度才对得上纸上的实际内容。
 const MEASURE_STYLE_ID = 'nb-measure-style'
+const DOC_STYLE_ID = 'nb-doc-style'
+
+/** 格下预览与右侧纸面用同一份 DOC_CSS（只有作用域前缀不同）。 */
+function ensureDocStyle() {
+  if (document.getElementById(DOC_STYLE_ID)) return
+  const style = document.createElement('style')
+  style.id = DOC_STYLE_ID
+  style.textContent = `${PREVIEW_CSS}\n${SHEET_CSS}`
+  document.head.appendChild(style)
+}
 
 /** 把整篇 HTML 切成若干页（离屏量块高 → 按版心高度累加；超长块再按行切）。
  *  返回 { pages, pending }：pending 是测量时还没解码完的图片，宿主可据此补排。 */
 function paginate(html) {
   if (!html.trim()) return { pages: [], pending: [] }
+  ensureDocStyle()
   if (!document.getElementById(MEASURE_STYLE_ID)) {
     const style = document.createElement('style')
     style.id = MEASURE_STYLE_ID
@@ -59,6 +98,9 @@ function paginate(html) {
   stage.className = 'nb-measure-root nb-sheet-measure'
   stage.innerHTML = `<div class="nb-flow">${html}</div>`
   document.body.appendChild(stage)
+  // 公式必须先排成 KaTeX 再量高：占位节点量出来的是一个空 span 的高度，
+  // 分页就会错位，纸面上还会直接显示 \mathbf 之类的源码。
+  renderMathIn(stage)
   const flow = stage.firstElementChild
   const blocks = Array.from(flow.children)
   const result = []
@@ -211,7 +253,7 @@ function segmentUnits(el) {
 let pageTimer = null
 let pageSeq = 0
 function repaginate() {
-  const html = rendered.value.map((cell) => cell.outputHtml).join('')
+  const html = rendered.value.join('')
   if (!html.trim()) {
     pages.value = []
     return
@@ -253,7 +295,7 @@ function startPageObserver() {
 // 源码一变就重排（边打边出）：格数多时也只是几十次块高测量，成本很低。
 // 纸张固定 A4 尺寸，与面板宽度无关，所以拖动分隔条不重排。
 watch(
-  () => store.cells.map((c) => (c.outputHtml ? c.outputHtml.length : 0)).join(','),
+  () => store.cells.map((c) => String(c.outputHtml || '').length).join(','),
   () => {
     clearTimeout(pageTimer)
     pageTimer = setTimeout(repaginate, 90)
@@ -312,6 +354,25 @@ async function exportPdf() {
   }
 }
 
+// 导出 HTML：只有文档正文（站点导航、分页都不要），单文件、离线可看。
+// 与 PDF 用同一份「渲染后」内容（rendered），所以两者不会一个样一个样。
+function exportHtml() {
+  const html = rendered.value.join('')
+  if (!html.trim()) {
+    store.toast = '还没有可导出的内容'
+    return
+  }
+  const title = (store.draftTitle || 'Laup 文档').trim()
+  const filename = `${safeFileName(title)}.html`
+  try {
+    downloadHtml(buildHtmlDocument({ html, title }), filename)
+    store.toast = `已导出 ${filename}`
+  } catch (error) {
+    console.error('导出 HTML 失败', error)
+    store.toast = `导出失败：${error?.message || error}`
+  }
+}
+
 // ── 草稿箱（与 laup_editor 同一套 IndexedDB 服务 + 自动保存 composable）──
 // 快照/载荷都只含可序列化字段：格源码 + 附件 dataURL + 作用域 + 运行计数。
 function draftBody() {
@@ -321,8 +382,9 @@ function draftBody() {
     execCounter: store.execCounter,
     // 渲染位置（下方/原地/折叠）跟草稿一起走：换台机器继续编辑时观感一致
     renderMode: store.renderMode,
-    // 内核标记：草稿箱据此把「继续编辑」送回 /notebook 或 /laup-v2
-    kernel: store.kernel,
+    // 项目基本信息也进草稿：继续编辑时不用重新填名称与代码语言
+    projectName: store.projectName,
+    codeLang: store.codeLang,
   }
 }
 
@@ -355,14 +417,8 @@ watch([draftAutosave.draftId, draftAutosave.status, draftAutosave.lastSavedAt, d
 }, { immediate: true })
 
 onMounted(async () => {
-  // 渲染面板只在 v2 页面上首屏打开（v2 内核是边打边出，天生就是"实时"的）
-  if (props.kernel !== 'v2') {
-    renderOpen.value = false
-  } else {
-    // 面板首屏就是展开的，watch 不会触发，这里手动接管图片就绪后的重排
-    requestAnimationFrame(startPageObserver)
-  }
-  store.setKernel(props.kernel)
+  // 面板首屏就是展开的，watch 不会触发，这里手动接管图片就绪后的重排
+  requestAnimationFrame(startPageObserver)
   store.ensureLoaded()
   if (props.embedded) return
   // ?draft=<id>：从草稿箱「继续编辑」跳回来
@@ -382,11 +438,7 @@ onMounted(async () => {
         store.applyDraft(draft.payload || {})
         store.editPost = draft.payload?.editPost || null
         draftAutosave.setDraft(draft)
-        // 草稿带着内核标记：跨页打开时提示一下，避免"v2 稿子在 v1 页面里看着不对"被当成渲染 bug
-        const draftKernel = draft.payload?.kernel === 'v2' ? 'v2' : 'v1'
-        store.toast = draftKernel === props.kernel
-          ? '已载入本机草稿'
-          : `这份草稿是用 ${draftKernel} 内核保存的，当前是 ${props.kernel} 内核，建议回草稿箱重新打开`
+        store.toast = '已载入本机草稿'
       } else {
         store.toast = '没找到这份草稿（可能已被删除或换过浏览器）'
       }
@@ -403,17 +455,20 @@ onMounted(async () => {
       if (post?.contentType !== 'laup' || !post.contentSource) {
         store.toast = '这篇不是 Laup 正文，无法在 Notebook 中编辑'
       } else {
-        // 文档由哪套内核写的，就用哪套解析器装回格（v2 的格标记 v1 解析器不认）
+        // 内核只有一套：老文章按它自己的写法拆格，认不出的命令原样显示，
+        // 作者改好后直接保存 —— 不再有「v1 只能读」这道墙
         const docKernel = post.contentKernel === 'v1' || post.contentKernel === 'v2'
           ? post.contentKernel
           : detectLaupKernel(post.contentSource)
-        const cells = docKernel === 'v2'
-          ? importNotebookV2(post.contentSource)
-          : parseLaupDoc(post.contentSource)
-        store.applyDraft({ cells, scope: {}, execCounter: 0 })
-        store.toast = docKernel === props.kernel
-          ? `正在编辑文章「${post.title}」`
-          : `这篇是用 ${docKernel} 内核写的，当前是 ${props.kernel} 页面 —— 建议到对应入口编辑`
+        if (docKernel === 'v1') {
+          const cells = parseLaupDoc(post.contentSource).map((c) => ({ type: 'laup', source: c.source }))
+          store.applyDraft({ cells, scope: {}, execCounter: 0, projectName: post.title || '' })
+          store.toast = `「${post.title}」是旧写法文章，已载入编辑；认不出的命令会原样显示，改好保存即可`
+        } else {
+          const { cells, codeLang } = importNotebookV2(post.contentSource)
+          store.applyDraft({ cells, scope: {}, execCounter: 0, projectName: post.title || '', codeLang })
+          store.toast = `正在编辑文章「${post.title}」`
+        }
         store.editPost = {
           id: post.id,
           version: Number(post.version) || 1,
@@ -428,6 +483,10 @@ onMounted(async () => {
     } catch (e) {
       store.toast = `文章载入失败：${e?.message || '未知错误'}`
     }
+  }
+  // 新建：显式 ?new=1，或本地还没有项目名（旧快照 / 首次进入）→ 先问基本信息
+  if (String(route.query.new || '') === '1' || (!draftId && !editId && !store.projectName)) {
+    showCreate.value = true
   }
   draftAutosave.setReady(true)
 })
@@ -452,7 +511,6 @@ function onKeydown(e) {
   if (showHelp.value || showSubmit.value) return
   // Ctrl/Cmd+P：导出的 PDF 用面板的分页结果，别让浏览器去打印整个编辑界面
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
-    if (props.kernel !== 'v2') return
     e.preventDefault()
     exportPdf()
     return
@@ -484,7 +542,6 @@ function onKeydown(e) {
       if (lastKey === 'd') store.delCell()
       break
     case 'm': if (store.selectedId) store.setType(store.selectedId, 'laup'); break
-    case 'v': if (store.kernel === 'v1' && store.selectedId) store.setType(store.selectedId, 'var'); break
     case 'y': if (store.selectedId) store.setType(store.selectedId, 'code'); break
   }
   lastKey = e.key
@@ -499,10 +556,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div id="notebook-page" ref="page" :class="{ 'notebook-embedded': embedded }">
+  <div id="notebook-page" ref="page" :class="{ 'notebook-embedded': embedded }" :style="paperStyle">
     <template v-if="!showHelp">
       <NavBar v-if="!embedded" />
-      <MenuBar :embedded="embedded" @toggle-help="showHelp = true" @submit="showSubmit = true" />
+      <MenuBar :embedded="embedded" :paper-tone="paperTone" @set-paper-tone="paperTone = $event" @toggle-help="showHelp = true" @submit="showSubmit = true" @new-project="showCreate = true" @runtime="showRuntime = true" />
       <div id="notebook">
         <CellCard v-for="c in store.cells" :key="c.id" :cell="c" />
         <div class="ghost-add" title="在末尾新建 laup 格（快捷键 B）" @click="store.insertCell(store.cells.length - 1)">
@@ -518,6 +575,7 @@ onBeforeUnmount(() => {
             <button type="button" class="nb-zoom-value" title="恢复 100%" @click="zoom = 1">{{ Math.round(zoom * 100) }}%</button>
             <button type="button" title="放大" @click="zoom = Math.min(2, +(zoom + 0.1).toFixed(2))">+</button>
             <button type="button" :disabled="exporting" title="导出为真正的 PDF 文件（文字可选中，中文已嵌字体）" @click="exportPdf">{{ exporting ? '导出中…' : '导出 PDF' }}</button>
+            <button type="button" title="导出为独立 HTML 文件：只有正文，不含站点导航，也不分页；双击即可打开" @click="exportHtml">导出 HTML</button>
             <button type="button" title="收起渲染区" @click="renderOpen = false">收起</button>
           </span>
         </div>
@@ -543,6 +601,8 @@ onBeforeUnmount(() => {
 
     <HelpPanel v-else @close="showHelp = false" />
 
+    <CreateProjectDialog v-if="showCreate" dismissible @close="showCreate = false" />
+    <RuntimeDialog v-if="showRuntime" @close="showRuntime = false" />
     <SubmitDialog v-if="showSubmit" @close="showSubmit = false" />
   </div>
 </template>
@@ -604,7 +664,7 @@ onBeforeUnmount(() => {
   position: relative; flex: none;
   width: 178mm; min-height: 261mm;
   padding: 18mm 16mm;
-  background: #fff; box-sizing: border-box;
+  background: var(--nb-paper-bg, #fff); box-sizing: border-box;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .08), 0 6px 18px rgba(15, 23, 42, .10);
   color: #16181c;
   font: 11.5pt/1.75 "Songti SC", "Source Han Serif SC", "SimSun", Georgia, serif;
@@ -614,49 +674,14 @@ onBeforeUnmount(() => {
   text-align: center; font: 10px/1 system-ui, sans-serif; color: #9aa3ad;
 }
 .nb-sheet-body { width: 100%; }
-/* 纸面里的代码与编辑区一样按行换行：本组件不在 #notebook-page 里时
-   （Papilot 内嵌等），notebook.css 那条 .output 换行规则选不中纸面。 */
-.nb-sheet-body :deep(code) { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* 纸面排版（标题 / 段落缩进 / 表格 / 代码 / 卡片 / 公式）全部来自 printStyle.js 的
+   SHEET_CSS，和格下预览是同一份规则；这里只留纸面自己的盒模型。 */
 /* 离屏测量：必须真实排版（不能 display:none / visibility:hidden），否则高度全是 0。
-   印刷体样式由 paginate() 注入的全局 .nb-measure-root 提供（scoped 样式选不中后插的节点）。 */
+   版式由 paginate() 注入的全局 .nb-measure-root 提供（scoped 样式选不中后插的节点）。 */
 .nb-sheet-measure {
   position: fixed; left: -20000px; top: 0; z-index: -1;
   pointer-events: none; background: #fff;
 }
-/* 纸面排版规则与 printStyle.js（测量 / 打印共用）保持一致：
-   三处只要有一处不同，分页算出来的高度就对不上纸上的内容。 */
-.nb-sheet-body :deep(.nb-flow) > * + * { margin-top: .6em; }
-.nb-sheet-body :deep(p) { margin: 0; text-align: justify; text-indent: 2em; }
-.nb-sheet-body :deep(h1) { font-size: 1.85em; line-height: 1.35; margin: 0 0 .7em; text-align: center; }
-.nb-sheet-body :deep(h2) { font-size: 1.35em; margin: 1.1em 0 .5em; }
-.nb-sheet-body :deep(h3) { font-size: 1.12em; margin: 1em 0 .4em; }
-.nb-sheet-body :deep(h4) { font-size: 1em; margin: .9em 0 .4em; }
-.nb-sheet-body :deep(h1 + p), .nb-sheet-body :deep(h2 + p), .nb-sheet-body :deep(h3 + p),
-.nb-sheet-body :deep(h4 + p), .nb-sheet-body :deep(ul + p), .nb-sheet-body :deep(ol + p),
-.nb-sheet-body :deep(table + p), .nb-sheet-body :deep(figure + p),
-.nb-sheet-body :deep(blockquote + p), .nb-sheet-body :deep(pre + p) { text-indent: 0; }
-.nb-sheet-body :deep(ul), .nb-sheet-body :deep(ol) { margin: 0; padding-left: 2.2em; }
-.nb-sheet-body :deep(li > p) { text-indent: 0; }
-.nb-sheet-body :deep(figure) { margin: .8em 0; text-align: center; }
-.nb-sheet-body :deep(figcaption) { font-size: .86em; color: #4b5563; margin-top: .35em; text-indent: 0; }
-.nb-sheet-body :deep(table) { border-collapse: collapse; width: 100%; font-size: .9em; }
-.nb-sheet-body :deep(caption) { font-size: .86em; color: #4b5563; margin-bottom: .3em; text-indent: 0; }
-.nb-sheet-body :deep(th), .nb-sheet-body :deep(td) { border: 1px solid #c7ccd1; padding: 3px 6px; text-align: left; }
-.nb-sheet-body :deep(thead th) { background: #f2f4f6; }
-.nb-sheet-body :deep(pre) {
-  margin: 0; background: #f6f8fa; border: 1px solid #e5e8eb; border-radius: 4px;
-  padding: 8px 10px; font: 9.5pt/1.55 Consolas, Menlo, monospace;
-  white-space: pre-wrap; overflow-wrap: anywhere; text-indent: 0;
-}
-.nb-sheet-body :deep(code) { font-family: Consolas, Menlo, monospace; font-size: .92em; }
-/* 高亮器把代码逐行包成 .ln：必须 block，否则行与行会连成一整行（分页也切不开） */
-.nb-sheet-body :deep(.nb-ln) { display: block; }
-.nb-sheet-body :deep(img), .nb-sheet-body :deep(svg) { max-width: 100%; height: auto; }
-.nb-sheet-body :deep(blockquote) { margin: 0; padding-left: 1em; border-left: 3px solid #d0d7de; color: #4b5563; }
-.nb-sheet-body :deep(blockquote p) { text-indent: 0; }
-.nb-sheet-body :deep(hr) { border: 0; border-top: 1px solid #d0d7de; }
-/* 只读产物里的控件（待办复选框）在纸上不出现 */
-.nb-sheet-body :deep(button), .nb-sheet-body :deep(input) { display: none; }
 /* 单块高于整页（超长代码 / 长表 / 大图）：不硬切行内，让它自己撑出边界，
    下面垫一条警示色，避免被误当成"排版漏了" */
 .nb-sheet-body :deep(.nb-overflow) { outline: 2px dashed #e0a03a; outline-offset: 6px; }

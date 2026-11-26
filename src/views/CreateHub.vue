@@ -19,6 +19,13 @@ const tools = [
     desc: "建立、编辑与提交演化树，节点可挂文献、图片与说明。",
     icon: "M12 3v4M12 7c0 3-6 3-6 6v2M12 7c0 3 6 3 6 6v2M6 15v3M18 15v3M12 7v8",
   },
+  {
+    to: "/laup-v2?new=1",
+    name: "创建 Notebook",
+    en: "Laup Notebook",
+    desc: "先填项目名称与代码语言，再从空白、导入或模板开始写作。",
+    icon: "M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4",
+  },
 ];
 </script>
 

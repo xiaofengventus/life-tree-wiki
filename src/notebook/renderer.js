@@ -16,7 +16,7 @@ import {
 } from '@/utils/codeLang.js'
 import { parseCodeSampleText } from '@/utils/codeSample.js'
 import {
-  collectVars, interpolateVars, readVarBlock, readVarStatement, varBlockText,
+  collectVars, interpolateVars, readVarBlock, readVarStatement,
 } from '../../shared/notebookVars.js'
 import { computeLifeTreeLayout } from '@/utils/lifeTreeLayout.js'
 // v2 内核：阅读面与服务端发布共用同一套渲染器；内核按文档写法判定，不做跨版本翻译
@@ -352,25 +352,54 @@ export function codePreviewHtml(decl) {
 }
 
 /**
- * 规划所有代码格的渲染分工。**按格下标做键**（不按 id）——
+ * 规划所有「输入 / 输出」格的渲染分工。**按格下标做键**（不按 id）——
  * parseLaupDoc 产出的格还没有 id（id 由 store 的 emptyCell 发），
  * 按 id 做键会在那条路径上整片对不上。
+ * 首行声明是 Laup 标记语言，落在哪种编辑格里都一样认（v1 存量文档的
+ * `[input]` 格读进来就是 Laup 格，配对关系不能因此断掉）。
  * 返回 Map<格下标, plan>：
  *   { role: 'card', input, output, index }  这一格画一张对照卡
  *   { role: 'merged' }                      已被并进上一格的卡，本身不再渲染
- * 不在 Map 里的代码格 = 普通语言格（或还没写声明）。
+ * 不在 Map 里的格 = 普通格。
  */
+/**
+ * 一格里同时写了 `[input]` 和 `[output]`（老文档常见写法）→ 拆成两栏。
+ * 正常写法是两格相邻各写一栏，但单格里两段不能被塞进同一栏当正文，
+ * 否则读者会看到输入栏里又冒出一段 "输出" 文本。
+ */
+function splitPaneBody(decl) {
+  const body = String(decl.body ?? '')
+  const marker = /^[ \t]*\[(input|output)\](?::[A-Za-z0-9_+#-]{1,16})?[ \t]*\r?$/im
+  const m = marker.exec(body)
+  if (!m) return null
+  const otherKind = m[1].toLowerCase()
+  if (otherKind === decl.kind) return null
+  const first = { ...decl, body: body.slice(0, m.index).replace(/\s+$/, '') }
+  const second = parseCodeDecl(`${m[0].trim()}\n${body.slice(m.index + m[0].length)}`)
+  if (second.kind !== PANE_INPUT && second.kind !== PANE_OUTPUT) return null
+  return decl.kind === PANE_INPUT
+    ? { input: first, output: second }
+    : { input: second, output: first }
+}
+
 export function planCodePanes(cells) {
   const plan = new Map()
   const list = Array.isArray(cells) ? cells : []
   let cardIndex = 0
   for (let i = 0; i < list.length; i++) {
     const c = list[i]
-    if (c?.type !== 'code') continue
+    if (!c || c.type === 'var') continue
     const decl = parseCodeDecl(c.source)
     if (decl.kind !== PANE_INPUT && decl.kind !== PANE_OUTPUT) continue
+    // 单格里自带两栏：自己就够成一张对照卡，不再和下一格配对
+    const intertwined = splitPaneBody(decl)
+    if (intertwined) {
+      plan.set(i, { role: 'card', input: intertwined.input, output: intertwined.output, index: cardIndex })
+      cardIndex += 1
+      continue
+    }
     const next = list[i + 1]
-    const nextDecl = next?.type === 'code' ? parseCodeDecl(next.source) : null
+    const nextDecl = next && next.type !== 'var' ? parseCodeDecl(next.source) : null
     if (decl.kind === PANE_INPUT && nextDecl?.kind === PANE_OUTPUT) {
       plan.set(i, { role: 'card', input: decl, output: nextDecl, index: cardIndex })
       plan.set(i + 1, { role: 'merged' })
@@ -386,59 +415,6 @@ export function planCodePanes(cells) {
     cardIndex += 1
   }
   return plan
-}
-
-/**
- * 旧版代码格迁移：源码是一整块 `输入\n---\n输出`（没有首行声明）。
- * 拆成 [input] + [output] 两格 —— 与作者现在手写的形态对齐。
- * makeCell 由 store 传进来（id 生成规则归 store 管）。
- */
-export function migrateCodeCells(cells, makeCell) {
-  const out = []
-  for (const c of Array.isArray(cells) ? cells : []) {
-    if (c?.type === 'code' && parseCodeDecl(c.source).kind === 'none') {
-      const { input, output } = parseCodeSampleText(c.source)
-      if (output) {
-        out.push({ ...c, source: `[${PANE_INPUT}]\n${input}\n` })
-        out.push({
-          ...(makeCell ? makeCell() : { ...c, id: `${c.id}-out` }),
-          type: 'code',
-          source: `[${PANE_OUTPUT}]\n${output}\n`,
-          attachments: c.attachments || {},
-        })
-        continue
-      }
-    }
-    out.push(c)
-  }
-  return out
-}
-
-/**
- * 代码格 → ```code 围栏：格源码**原封不动**放进正文（首行的 `[cpp]` 声明也照写）。
- *
- * 为什么不用 ` ```cpp ` 那种「语言写在围栏上」的写法：那样一格源码被拆成两处存
- * （语言进围栏标签、正文进围栏体），重新载入只能靠还原规则把声明"拼"回来 ——
- * 一拼就有缝：没写声明的格（或首行是 `[foo]` 这种不认识的名字）回来时会退化成 laup 格。
- * 现在语言也留在正文里，装载时原样读回，`[cpp]` / 没声明 / `[foo]` 三种都无损。
- * 剥声明 + 上色仍由 highlightLaupCode 负责 —— 与阅读页同一条分支。
- */
-export function codeFence(source) {
-  return ['```' + CODE_FENCE_LANG, String(source ?? '').replace(/\s+$/, ''), '```'].join('\n')
-}
-
-/**
- * 对照卡 → ```sample 围栏（服务端 life 扩展的既有路线：`---` 切输入 / 输出）。
- *
- * ⚠️ 分隔符只有 `---` / `===` 两种，服务端取**第一个**独占一行的匹配 ——
- * 所以栏内自己出现独占一行的 `---` 时无药可救（换 `===` 也一样，只是把问题换个名字）。
- * 这是 sample 格式的固有约束（老版代码格同款，不是本次引入的），
- * 既然栏位现在是手写的，就让它在编辑器里**看得见**（见 paneHtml 的告警）。
- */
-export function sampleFence(inputDecl, outputDecl) {
-  const input = inputDecl ? paneSource(inputDecl) : ''
-  const output = outputDecl ? paneSource(outputDecl) : ''
-  return ['```sample', input, '---', output, '```'].join('\n')
 }
 
 // ---------- lifetree 格：[lifetree] 声明 → 分类树预览 ----------
@@ -563,88 +539,6 @@ export function runCellSource(cell, scope, refPool = [], citedSet = null, isRefD
     return { outputHtml: sanitizeHtml(out) + warns }
   } catch (e) {
     return { outputHtml: `<pre class="error-out">渲染失败：${esc(e.message)}</pre>` }
-  }
-}
-
-// ---------- 导出 .laup：变量定义随文档走、附件内联、代码格转围栏 ----------
-// urlMap（可选）：data URL → 站点媒体 URL 的映射，提交文章时把附件换成本站 /media/ 链接。
-// scope 参数保留但**不再使用** —— 见下面那段「不再插值」的理由。
-//
-// ⚠️ 这里**不再做变量插值**（.laup 不再是"内联后的快照"）：
-//   正文保留 {{name}}，变量定义以零输出的 \varcell 块随文档一起走。
-//   理由：专栏「编辑」= 把 content_laup 重新 parseLaupDoc 成格。旧做法在导出时把
-//   {{name}} 换成字面值、var 格整格丢掉，于是回编辑时变量格消失、正文也成了死文本；
-//   就算把 var 格补回去，它也只是个改不动任何东西的孤儿。
-//   ── 读者侧不受影响：发布时由服务端按同一口径解析变量（server/laup.js），
-//      阅读页拿到的仍然是内联好的 HTML。
-export function exportLaupDoc(cells, scope, urlMap = null) {
-  const parts = []
-  // 文档里只要有 lifetree 格，就带上 Lifeseqence 开关行（规范：可省，写了更明确）
-  if ((Array.isArray(cells) ? cells : []).some((c) => c?.type === 'code' && parseCodeDecl(c.source).raw === LIFETREE_LANG)) {
-    parts.push('import Lifeseqence')
-  }
-  parts.push('import "laup"')
-  const panes = planCodePanes(cells)
-  // 附件 data URL → 站点 /media 链接（导出成文件时 urlMap 为空，原样保留）
-  const swapMedia = (text) => (urlMap && urlMap.size
-    ? text.replace(/data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+/g,
-      (m) => urlMap.get(m) || m)
-    : text)
-  for (const [ci, c] of cells.entries()) {
-    // 变量格 → 零输出数据块。定义本身**不参与插值**：
-    // 作者写 `var a = "{{b}}"` 想存的就是字面量 {{b}}。
-    if (c.type === 'var') {
-      const block = varBlockText(c.source)
-      if (block) parts.push(swapMedia(block))
-      continue
-    }
-    if (c.type === 'code') {
-      const pane = panes.get(ci)
-      if (pane?.role === 'merged') continue // 已并进上一格的对照卡
-      // 对照卡**继续并成一格** ` ```sample `：那张卡是阅读页的融合格式，
-      // 拆成两个块读者只会看到两个孤立代码块。
-      if (pane?.role === 'card') { parts.push(sampleFence(pane.input, pane.output)); continue }
-      // [lifetree] 分类树格：落库成 ```lifetree 围栏（正文里剥掉声明行），
-      // 服务端发布由 Lifeseqence 扩展渲染；重新载入时 parseLaupDoc 还原成 [lifetree] 格
-      const decl = parseCodeDecl(c.source)
-      if (decl.kind === 'lang' && decl.raw === LIFETREE_LANG) {
-        parts.push(['```' + LIFETREE_LANG, swapMedia(String(decl.body ?? '').replace(/\s+$/, '')), '```'].join('\n'))
-        continue
-      }
-      // 普通代码格：整段源码原样进围栏（含首行声明），一处不转换。
-      parts.push(codeFence(c.source))
-      continue
-    }
-    // 导出为自包含文档：附件直接内联 data URL（提交文章时由 urlMap 换成 /media/ 链接）
-    const pre = preprocess(c.source, c, scope, { interpolate: false })
-    let text = swapMedia(restoreAttachments(pre.src, pre.atts)).trim()
-    // 格内的 \references 块上交全局池（文末统一输出一份），避免与合并块重复编号
-    text = stripRefBlocks(text).trim()
-    if (text) parts.push(text)
-  }
-  // 全局文献池（位置块 + var 数组声明）→ 并入最后一个正文格（不是独立一格）。
-  // 独立一格会让重载多出一格，破坏格数往返保真；并入后重载格数与编辑时一致。
-  const pool = buildRefPool(cells)
-  if (pool.length) {
-    const poolText = mergeRefBlocks(pool)
-    if (parts.length > 1) parts[parts.length - 1] += '\n\n' + poolText
-    else parts.push(poolText)
-  }
-  // 格边界用 \cellbreak 块标记（life 扩展的零输出块，阅读页看不到）。
-  // 不能只靠空行分格：格内段落之间的空行和格与格之间的空行长得一模一样，
-  // 只按空行切格的话，重新载入时一格会被拆成很多格。
-  // 注意核心语法要求数据块的 `=[` 后必须换行，所以是两行形式。
-  return parts.join('\n\n\\cellbreak=[\n]\n\n') + '\n'
-}
-
-// ---------- 手册页用：直接渲染一段 laup 源码为 HTML ----------
-export function renderLaupHtml(source, scope = {}) {
-  const { src, atts } = preprocess(source, null, scope)
-  try {
-    const r = render(src, 'html', { mode: 'edit' })
-    return sanitizeHtml(highlightLaupCode(restoreAttachments(r.output, atts)))
-  } catch (e) {
-    return `<pre class="error-out">渲染失败：${esc(e.message)}</pre>`
   }
 }
 

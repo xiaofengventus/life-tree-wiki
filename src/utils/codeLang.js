@@ -1,5 +1,7 @@
 // 代码语言声明 + Prism 高亮（wiki 端宿主层）。
-// 约定：sample 卡输入区 / 代码格的第一行可写 `[语言]` 声明，如 [cpp] [python] [sample]；
+// 约定：Laup 格的正文首行可写 `[语言]` 标记（如 [cpp] [python] [sample]）——
+// 那是 Laup 标记语言里的「展示型代码块」，不是原生代码格的语言声明
+// （原生代码格的语言是项目级设置，格里不写任何标记）。
 // Laup 核心零依赖只输出转义文本，剥声明行、上色、语言徽标全在这一层
 // （与 laup_vue 的 src/lib/codeLang.js 同源；token 配色复用 rich-content.css）。
 
@@ -32,12 +34,12 @@ export function parseFirstLineLang(source) {
   return { lang: normalizeLang(m[1]), raw: m[1].toLowerCase(), body: s.slice(m[0].length), declLen: m[0].length }
 }
 
-// ---------- 代码格首行声明（Notebook 宿主层语法） ----------
-// 代码格的第一行是「声明行」，它决定这一格走哪条渲染路线。声明行不是注释、
+// ---------- Laup 格首行标记（Laup 标记语言） ----------
+// Laup 格的正文第一行是「标记行」，它决定这一格里的内容走哪条渲染路线。标记行不是注释、
 // 也不参与高亮 —— 解析时整体剥掉，产物里不留痕。
-//     [cpp] / [python] / [js] …  普通代码块：Prism 上色 + 语言徽标
+//     [cpp] / [python] / [js] …  展示型代码块：Prism 上色 + 语言徽标
 //     [input] / [output]         输入 / 输出对照卡（相邻两格自动并成一张）
-//     [input] 下方写 [cpp]        栏内语言由栏内首行的 [lang] 声明决定（v2 起不再用 [input:cpp]）
+//     [input] 下方写 [cpp]        栏内语言由栏内首行的 [lang] 标记决定（v2 起不再用 [input:cpp]）
 export const PANE_INPUT = 'input'
 export const PANE_OUTPUT = 'output'
 
@@ -74,12 +76,12 @@ const DECLARABLE = new Set([
 const DECL_LINE_RE = /^\[([A-Za-z0-9_+#-]{1,16})(?::([A-Za-z0-9_+#-]{1,16}))?\][ \t]*(?:\r?\n|$)/
 
 /**
- * 解析代码格首行声明。返回：
+ * 解析 Laup 格首行标记。返回：
  *   kind     'lang' | 'input' | 'output' | 'none'
  *   lang     归一化后的 Prism 语言名（'' = 不上色）
- *   raw      声明里原样写的名字（语言徽标回显用）
- *   declText 声明行原文（如 `[cpp]`）
- *   body     剥掉声明行之后的正文
+ *   raw      标记里原样写的名字（语言徽标回显用）
+ *   declText 标记行原文（如 `[cpp]`）
+ *   body     剥掉标记行之后的正文
  */
 export function parseCodeDecl(source) {
   const text = String(source ?? '')

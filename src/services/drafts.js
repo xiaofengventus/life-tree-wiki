@@ -201,10 +201,9 @@ export function draftEditorLocation(draft) {
   // 三种体裁现在**都在 Vue 路由表里**：Laup 已从 `public/laup/` 的静态页
   // 改成站内路由 `/laup`，所以统一返回路由地址，调用方一律 `router.push` 客户端跳转。
   if (draft.contentType === "LAUP") return { path: "/workbench", query };
-  // Notebook 稿带内核标记（payload.kernel）：v2 公测页另存一份渲染管线，
-  // 「继续编辑」必须回到它写的那一页，否则 v2 稿子会在 v1 内核下重渲。
+  // Notebook 草稿一律回唯一的写作入口（v1 内核页面已停用）
   if (draft.contentType === "NOTEBOOK") {
-    return { path: draft.payload?.kernel === "v2" ? "/laup-v2" : "/notebook", query };
+    return { path: "/laup-v2", query };
   }
   // 纠偏：早期版本曾把 Notebook 草稿误归为 ARTICLE（payload.cells 是 Notebook 的指纹），
   // 不兜住的话「继续编辑」会落到 create-post 的文章编辑器里。
@@ -212,7 +211,7 @@ export function draftEditorLocation(draft) {
     draft.contentType === "ARTICLE" &&
     Array.isArray(draft.payload?.cells)
   ) {
-    return { path: draft.payload?.kernel === "v2" ? "/laup-v2" : "/notebook", query };
+    return { path: "/laup-v2", query };
   }
   return {
     path: draft.contentType === "TREE" ? "/evolution-tree" : "/create-post",

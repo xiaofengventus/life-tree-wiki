@@ -9,12 +9,9 @@ import { markdown } from '@codemirror/lang-markdown'
 import { python } from '@codemirror/lang-python'
 import { tags as t } from '@lezer/highlight'
 import { useNotebook } from '../store.js'
-import { parseCodeDecl } from '@/utils/codeLang.js'
 import {
   codeDeclCompletionSource, laupCompletionSource, pythonCompletionSources, varCompletionSource,
-  lifetreeCompletionSource,
 } from '../completions.js'
-import { lifetreeEditorExtensions } from '../lifetreeDecor.js'
 
 const props = defineProps({ cell: { type: Object, required: true } })
 const store = useNotebook()
@@ -22,6 +19,9 @@ const rootEl = ref(null)
 
 // 附件名 → 图片 alt 文案（去掉扩展名）
 const f2name = (n) => n.replace(/\.[^.]+$/, '')
+function imageSource(name, alt) {
+  return `![${alt}](attachment:${name})\n`
+}
 
 // 在光标处插入块级语法（\image 简写等）：光标前同行还有非空白字符时先换行再插。
 // 块级语法必须独占一行，直接插会粘成 ]\image=[、#\image=[（移动端实测的坏源码形态）。
@@ -64,37 +64,27 @@ const roComp = new Compartment()
 const edComp = new Compartment()
 const langComp = new Compartment()
 const acComp = new Compartment()
-const ltComp = new Compartment()
 
-// [lifetree] 格专属：分叉线装饰 + 光标祖先加深 + VS 式缩进键；其他格型不挂
-function ltFor(cell) {
-  if (cell.type === 'code' && parseCodeDecl(cell.source).raw === 'lifetree') {
-    return lifetreeEditorExtensions()
-  }
-  return []
-}
 
-// 代码格的源码就是它自己（首行声明 + 代码），不再从中间切一半 ——
-// 「输入 / 输出」现在是两个独立格（[input] / [output]），不靠 `---` 分割
+// 代码格的源码就是它自己（纯代码，没有声明行）——
+// 「输入 / 输出」是 Laup 格里的标记，不是代码格的一部分
 function docFor(cell) {
   return cell.source
 }
-// 代码格的语言：CodeMirror 这边只装了 python 一个语法包，其余语言退回纯文本 ——
-// 颜色由格下方的 Prism 预览出（与阅读页同一套），这里不假装能上色
+// 原生代码格的语言是项目级设置：CodeMirror 只装了 python 一个语法包，
+// 其余语言退回纯文本 —— 颜色由格下方的 Prism 预览出（与阅读页同一套）
 function langFor(cell) {
   if (cell.type !== 'code') return markdown({ codeLanguages: [PY_MD] })
-  return parseCodeDecl(cell.source).lang === 'python' ? python() : []
+  return store.codeLang === 'python' ? python() : []
 }
-// 补全配置：laup 格 = laup 语法源；var 格 = 文献数组声明模板；
-// code 格 = 首行类型声明清单 +（声明 python 时）lang-python 自带的局部/全局补全
+// 补全配置：laup 格 = 首行 [cpp] / [input] 等 Laup 标记 + laup 语法源；
+// 代码格 = 项目语言自带的补全（python 才有局部/全局补全）
 function acFor(cell) {
   if (cell.type === 'var') return autocompletion({ override: [varCompletionSource] })
-  if (cell.type !== 'code') return autocompletion({ override: [laupCompletionSource(store, cell)] })
-  const sources = [codeDeclCompletionSource]
-  if (parseCodeDecl(cell.source).lang === 'python') sources.push(...pythonCompletionSources())
-  // [lifetree] 分类树格：行尾 [ 参数字段补全
-  if (parseCodeDecl(cell.source).raw === 'lifetree') sources.push(lifetreeCompletionSource)
-  return autocompletion({ override: sources })
+  if (cell.type !== 'code') {
+    return autocompletion({ override: [codeDeclCompletionSource, laupCompletionSource(store, cell)] })
+  }
+  return autocompletion({ override: store.codeLang === 'python' ? pythonCompletionSources() : [] })
 }
 
 // markdown 围栏里的 python 高亮：必须包成 LanguageDescription，
@@ -120,7 +110,6 @@ onMounted(() => {
       edComp.of(EditorView.editable.of(isEditing())),
       langComp.of(langFor(cell)),
       acComp.of(acFor(cell)),
-      ltComp.of(ltFor(cell)),
       closeBrackets(), // 引号/括号自动配对（输入 " 自动补 "）
       theme,
       highlight,
@@ -156,9 +145,8 @@ onMounted(() => {
             ev.preventDefault()
             store.addImageFile(cell.id, f).then((name) => {
               if (!name) return
-              // laup 图片简写：{ } 里填图注，可写 \cite{N}（宿主层展开成 \image=[…] 块）
-              const md = `\\image![图片](attachment:${name}){}\n`
-              insertAtCursor(v, md)
+              insertAtCursor(v, imageSource(name, '图片'))
+              store.runCell(cell.id, false)
             })
             return true
           }
@@ -171,8 +159,11 @@ onMounted(() => {
           ev.preventDefault()
           const pos = v.posAtCoords({ x: ev.clientX, y: ev.clientY }) ?? v.state.selection.main.to
           Promise.all(files.map((f) => store.addImageFile(cell.id, f))).then((names) => {
-            const md = names.filter(Boolean).map((n) => `\\image![${f2name(n)}](attachment:${n}){}\n`).join('')
-            if (md) insertAtCursor(v, md, pos)
+            const md = names.filter(Boolean).map((n) => imageSource(n, f2name(n))).join('')
+            if (md) {
+              insertAtCursor(v, md, Math.min(pos, v.state.doc.length))
+              store.runCell(cell.id, false)
+            }
           })
           return true
         },
@@ -209,16 +200,15 @@ onMounted(() => {
   watch(() => cell.type, () => {
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: docFor(cell) },
-      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell)), ltComp.reconfigure(ltFor(cell))],
+      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell))],
     })
   })
 
-  // 首行声明改了（cpp→python、lifetree↔其他）→ 只换 compartment，不碰文档，
-  // 免得把正在打的字冲掉
-  watch(() => `${parseCodeDecl(cell.source).lang}|${parseCodeDecl(cell.source).raw}`, () => {
+  // 项目代码语言改了 → 代码格换高亮与补全（不碰文档，免得把正在打的字冲掉）
+  watch(() => store.codeLang, () => {
     if (!view || cell.type !== 'code') return
     view.dispatch({
-      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell)), ltComp.reconfigure(ltFor(cell))],
+      effects: [langComp.reconfigure(langFor(cell)), acComp.reconfigure(acFor(cell))],
     })
   })
 })

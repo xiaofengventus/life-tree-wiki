@@ -22,13 +22,11 @@ const treeContributions = () => import("@/views/tree_contributions.vue");
 const columns = () => import("@/views/Columns.vue");
 const collectionDetail = () => import("@/views/collection_detail.vue");
 // Laup Notebook（Jupyter 式多格编辑器）：模块在 src/notebook/。
+// 内核只有一套（认不出的命令原样当正文），旧 v1 文章也能载入编辑；
+// v1 渲染器仍保留给存量阅读页（WikiPostDetail 按落库内核版本选）。
 // 提交文章走同一条发布管道（contentFormat:'laup' → server/laup.js 重渲 → wiki-detail 展示）。
 const notebookView = () => import("@/notebook/NotebookView.vue")
-// Laup v2 公测：编辑器与 Notebook 完全共用（NotebookView），只有预览换 v2 内核。
-// 两套内核的本地稿互不可见（store 里按键隔离），v1 原样保留。
 const createHub = () => import("@/views/CreateHub.vue");
-// [lifetree] 格全局预览（新窗口）：时序图 + 地质年代轴，数据经 localStorage 传递
-const lifetreePreview = () => import("@/views/LifetreeChronoView.vue");
 // 移动端登录授权：网页登录后生成 60 秒一次性 code，App 粘贴换会话
 const mobileAuthHandoff = () => import("@/views/MobileAuthHandoff.vue");
 
@@ -44,16 +42,15 @@ const router = createRouter({
     { path: "/columns", name: "columns", component: columns },
     { path: "/collections/:id", name: "collection-detail", component: collectionDetail },
     { path: "/create-post", name: "create-post", component: createPost },
-    { path: "/notebook", name: "notebook", component: notebookView },
+    // v1 内核的 /notebook 已停用，旧链接一律回到唯一的写作入口
+    { path: "/notebook", redirect: "/laup-v2" },
     // 唯一写作入口：Laup v2 页面（单元格编辑 + 右侧可折叠的实时渲染 / PDF 预览）。
     // 旧的分散入口一律重定向过来，不再单独维护多套编辑器页面。
     { path: "/laup-v2", name: "laup-v2", component: notebookView, props: { kernel: "v2" } },
     { path: "/workbench", redirect: "/laup-v2" },
     { path: "/papilot", redirect: "/laup-v2" },
-    // 创作中心：六项创作入口的汇总页（B 站创作区式的左侧栏布局）
+    // 创作中心：文章 / 树 / Notebook 三个创作入口的汇总页（B 站创作区式的左侧栏布局）
     { path: "/create", name: "create", component: createHub },
-    // /notebook 是旧版 v1 内核页面，保留但不再从任何入口链接过去
-    { path: "/lifetree-preview", name: "lifetree-preview", component: lifetreePreview },
     { path: "/view-post/:id", name: "view-post", component: viewPost },
     { path: "/evolution-tree", name: "create-tree", component: createTree },
     { path: "/tree-contributions/:id?", name: "tree-contributions", component: treeContributions, meta: { requiresAuth: true } },

@@ -3,8 +3,8 @@
  *
  * 映射规则（只做「能对上就对上」，不做脑补）：
  *   markdown → laup 格：正文按 Laup 解析；Jupyter 的 \(…\) / \[…\] 折成 $…$ / $$…$$
- *   code     → `[语言]` 代码格；语言由 kernelspec 决定，认不出就退到 `[text]`
- *   code 输出 → 有文本输出时追加一个 `[output]` 格（对照卡的单栏形态）
+ *   code     → 原生代码格（纯代码，不带声明）；语言由 kernelspec 决定，回传给项目设置
+ *   code 输出 → 有文本输出时追加一个 [output] Laup 格（对照卡的单栏形态）
  *   raw      → `\begin{stay}…\end{stay}`，完全原样
  *   附件     → cell.attachments（base64）转成 dataURL 存进格的 attachments，
  *              markdown 里的 `attachment:xxx` 引用保持不动，由 kernelV2 换回 dataURL。
@@ -95,7 +95,7 @@ function outputText(outputs) {
 
 /**
  * @param {string|object} input ipynb 文本或已解析对象
- * @returns {{ cells: object[], stats: { markdown: number, code: number, raw: number, outputs: number, skipped: number } }}
+ * @returns {{ cells: object[], lang: string, stats: { markdown: number, code: number, raw: number, outputs: number, skipped: number } }}
  */
 export function ipynbToCells(input) {
   let notebook = input
@@ -133,13 +133,14 @@ export function ipynbToCells(input) {
         stats.skipped += 1
         continue
       }
-      // 代码格首行必须是语言声明；正文末尾空行去掉，免得导出时多出一堆空行
-      cells.push(makeCell('code', `[${lang}]\n${body.replace(/\s+$/, '')}`))
+      // 原生代码格：正文原样，语言由项目设置统一声明（导入后自动设为 kernelspec 的语言）
+      cells.push(makeCell('code', body.replace(/\s+$/, '')))
       stats.code += 1
 
       const text = outputText(raw.outputs)
       if (text.trim()) {
-        cells.push(makeCell('code', `[output]\n${text}`))
+        // 输出是纯文本展示：写成 Laup 格的 [output] 栏（v2 的对照卡语法）
+        cells.push(makeCell('laup', `[output]\n${text}`))
         stats.outputs += 1
       }
       continue
@@ -156,5 +157,5 @@ export function ipynbToCells(input) {
   }
 
   if (!cells.length) throw new Error('这个 notebook 里没有可导入的单元格')
-  return { cells, stats }
+  return { cells, lang, stats }
 }

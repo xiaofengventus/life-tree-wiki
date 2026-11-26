@@ -331,7 +331,8 @@ function renderInline(node, meta) {
       const links = items
         .map((item) => `<a class="laup2-cite" href="#ref-${item.id}">[${item.number}]</a>`)
         .join("");
-      return `<sub class="laup2-cite">${links}</sub>`;
+      const missing = node.attrs.hasMissing ? `<span class="laup2-cite-bad">[?]</span>` : "";
+      return `<sub class="laup2-cite">${links}${missing}</sub>`;
     }
     case "Break":
       return "<br>";

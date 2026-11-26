@@ -14,12 +14,13 @@ const router = useRouter()
 const userStore = useUserStore()
 const store = useNotebook()
 
-const title = ref(store.editPost?.title || '')
+const title = ref(store.editPost?.title || store.projectName || '')
 const author = ref(store.editPost?.author || userStore.user?.display_name || userStore.user?.nickname || '')
 const tagInput = ref((store.editPost?.tags || []).join(', '))
 const postType = ref(store.editPost?.type ?? '')
 const license = ref(store.editPost?.license || '支持闭源')
 const visibility = ref(store.editPost?.visibility || 'PUBLIC')
+const changeNote = ref('')
 const agreement = ref(false)
 const submitting = ref(false)
 const progress = ref('')
@@ -53,6 +54,8 @@ async function submit() {
         type: postType.value,
         license: license.value,
         visibility: visibility.value,
+        changeNote: changeNote.value,
+        codeLang: store.codeLang,
       },
       userStore.user,
       (done, total, stage) => {
@@ -61,7 +64,6 @@ async function submit() {
           : '提交中……'
       },
       store.editPost ? { id: store.editPost.id, version: store.editPost.version } : null,
-      store.kernel,
     )
     store.toast = store.editPost ? '文章已更新' : '文章已提交'
     // 发布成功后清理草稿（与 laup_editor 同规则：草稿箱页「发布成功后，对应草稿会自动清理」）
@@ -132,7 +134,7 @@ async function submit() {
 
       <p class="note">
         格里粘贴 / 上传的图片会先上传到你的媒体库再随文发布（单张压缩后 ≤2MB）。
-        变量在发布时由服务端解析成字面值；code 格原样存进 .laup（含首行的类型声明），读者看到的只有正文。
+        原生代码格按项目的代码语言（{{ store.codeLang }}）发布；变量在发布时由服务端解析成字面值。
       </p>
 
       <label v-if="visibility === 'PUBLIC'" class="agree">

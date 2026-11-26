@@ -12,6 +12,9 @@
  *   [references]      参考文献格（一行一条）
  *   其他                Laup 文档格
  *
+ * 原生代码格不写任何声明：首行的 `%%lang` 只是语言标记（发布时才写进文档），
+ * 正文保持原样。宿主的「代码语言」是项目级设置，不是格里的语法。
+ *
  * 格与格之间用独占一行的 `\cellbreak` 分隔（兼容 v1 的 `\cellbreak=[` 块写法）。
  */
 
@@ -23,6 +26,12 @@ import { createDiagnostics } from "./diagnostics.js";
 
 const CELLBREAK_START = /^[ \t]*\\cellbreak[ \t]*(?:=[ \t]*\[[ \t]*)?$/;
 const LANG_DECL = /^\[([A-Za-z0-9+#-]{1,16})\]$/;
+
+/** 原生代码格的首行 `%%lang` 只是语言标记，不是代码内容：排版时剥掉。 */
+function stripMagic(source, hasMagic) {
+  if (!hasMagic) return source;
+  return String(source).replace(/^[ \t]*%%[A-Za-z0-9_+#.-]{1,24}[ \t]*\r?\n?/, "");
+}
 
 /** @typedef {{ type: 'laup'|'code', source: string, lang?: string }} CellInput */
 
@@ -44,7 +53,7 @@ export function parseCells(source) {
       const firstLine = text.split(/\r\n?|\n/, 1)[0];
       const magic = /^%%([A-Za-z0-9_+#.-]{1,24})\b/.exec(firstLine.trim());
       const lang = magic ? magic[1].toLowerCase() : (cell.lang || "python");
-      return { type: "code", sourceType: "code", pane: null, lang, source: text, body: text };
+      return { type: "code", sourceType: "code", pane: null, lang, source: text, body: stripMagic(text, Boolean(magic)) };
     });
   }
 
@@ -124,7 +133,7 @@ function classifyCell(source) {
   // 首行的 `[cpp]` 之类是 Laup 格内的**声明**，不是代码格。
   const magic = /^%%([A-Za-z0-9_+#.-]{1,24})\b/.exec(head);
   if (magic) {
-    return { type: "code", lang: magic[1].toLowerCase(), source, body: source };
+    return { type: "code", lang: magic[1].toLowerCase(), source, body: stripMagic(source, true) };
   }
 
   const declared = LANG_DECL.exec(head);
@@ -194,8 +203,12 @@ export function typesetCells(source, options = {}) {
   }
 
   // [references] 格先编号：\cite{1} 的回填发生在解析阶段，条目必须已经存在。
-  for (const cell of cells) {
-    if (cell.pane === "references") state.addManualReferences(readReferenceCell(cell));
+  if (Array.isArray(options.referencePool)) {
+    state.addManualReferences(options.referencePool);
+  } else {
+    for (const cell of cells) {
+      if (cell.pane === "references") state.addManualReferences(readReferenceCell(cell));
+    }
   }
 
   cells.forEach((cell, index) => {
@@ -257,7 +270,7 @@ export function typesetCells(source, options = {}) {
   }
 
   // 脚注与文献：文末各输出一次（[references] 格的条目在渲染循环中已收集）
-  if (state.manualRefs.length) {
+  if (state.manualRefs.length && options.showReferences !== false) {
     results.push({ cell: null, html: renderNodes([N.references(state.manualRefs)], meta) });
   }
   if (state.footnotes.length) {
