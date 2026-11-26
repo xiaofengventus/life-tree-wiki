@@ -45,7 +45,7 @@ export default defineConfig(({ command }) => ({
   base: '/',
   plugins: [
     vue(),
-    command === 'serve' ? vueDevTools() : null,
+    command === 'serve' ? vueDevTools({ inspect: false }) : null,
     publicDirIndex(),
   ].filter(Boolean),
   resolve: {

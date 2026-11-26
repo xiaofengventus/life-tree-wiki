@@ -1,203 +1,234 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, provide, ref, watchEffect } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
-import { createPinia, disposePinia, getActivePinia, setActivePinia } from 'pinia'
-import DOMPurify from 'dompurify'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
-import '@/assets/rich-content.css'
-import '@/laup2/laup2.css'
+// Papilot 工作台（站内版，路由 /papilot）。
+//
+// 版式照 Papilot 的论文工作台：左栏是项目与导航，中间是编辑区，右栏是「渲染」，
+// 最右是可收起的 AI 区。数据全在站内，不走 Papilot 后端：
+//   · 项目 = 本机草稿箱里的 Notebook 草稿（与 /laup-v2、/drafts 同一张 IndexedDB 表）
+//   · 编辑区 = NotebookView 的 embedded 模式，内核 v2（只认 Laup / Code 两种格）
+//   · 保存 = 自动保存回草稿箱；导出 .laup / .lanb 走 Notebook 自带菜单
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useNotebook } from '@/notebook/store.js'
 import NotebookView from '@/notebook/NotebookView.vue'
-import { notebookContext, useNotebook } from '@/notebook/store.js'
-import { importNotebookV2 } from '@/notebook/kernelV2.js'
-import { ipynbToCells } from '@/notebook/ipynb.js'
-import { typesetCells } from '@/laup2/cells.js'
-import { translate } from '@/utils/mathKit.js'
+import { deleteDraft, getDraft, guestDraftOwnerKey, listDrafts, saveDraft, userDraftOwnerKey } from '@/services/drafts'
+import { useUserStore } from '@/stores/user'
 
-const previousPinia = getActivePinia()
-const pinia = createPinia()
-const store = useNotebook(pinia)
-setActivePinia(previousPinia)
-store.storageEnabled = false
-store.setKernel('v2')
-provide(notebookContext, store)
-onUnmounted(() => disposePinia(pinia))
+const router = useRouter()
+const store = useNotebook()
+const userStore = useUserStore()
 
-const title = ref('')
-const menu = ref(null)
-const picker = ref(null)
-const output = ref(null)
-const previewVisible = ref(true)
-const opening = ref(false)
-const error = ref('')
-const diagnostics = ref([])
-const snapshot = () => store.cells.map(({ type, source, attachments }) => ({ type, source, attachments }))
-const saved = ref('')
-const serialize = () => JSON.stringify({ cells: snapshot(), renderMode: store.renderMode })
-const dirty = computed(() => Boolean(title.value) && serialize() !== saved.value)
-const mayReplace = () => !dirty.value || window.confirm('当前项目有修改。确定不保存并继续吗？')
+const projects = ref([])
+const currentId = ref('')
+const loading = ref(true)
+const menuOpen = ref(false)
+const renderOpen = ref(true)
+const aiOpen = ref(true)
 
-onBeforeRouteLeave(mayReplace)
-function warnBeforeUnload(event) {
-  if (!dirty.value) return
-  event.preventDefault()
-  event.returnValue = ''
-}
-onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
-onUnmounted(() => window.removeEventListener('beforeunload', warnBeforeUnload))
+const current = computed(() => projects.value.find(p => p.id === currentId.value) || null)
+const folderName = computed(() => current.value?.title || '未选择项目')
+// 整篇预览的数据源：各格最近一次运行的渲染结果。
+const rendered = computed(() => store.cells.filter(c => c.outputHtml))
 
-function saveLaup() {
-  store.exportLanb(`${title.value.replace(/\.(?:lanb|laup|ipynb)$/i, '')}.lanb`)
-  saved.value = serialize()
+async function ownerKey() {
+  await userStore.initialize().catch(() => {})
+  return userStore.user ? userDraftOwnerKey(userStore.user) : guestDraftOwnerKey()
 }
 
-function load(name, payload = {}) {
-  store.applyDraft({ renderMode: 'below', ...payload })
-  title.value = name
-  saved.value = serialize()
-  error.value = ''
-  previewVisible.value = true
+// 项目列表 = 草稿箱里的 Notebook 草稿。Papilot 的「论文项目」在这里就是一篇稿子。
+async function refresh() {
+  const key = await ownerKey()
+  const drafts = await listDrafts({ ownerKeys: [key] })
+  projects.value = drafts.filter(d => d.contentType === 'NOTEBOOK')
+  loading.value = false
 }
 
-function newLaup() {
-  if (!mayReplace()) return
-  load('未命名 Laup')
-  if (menu.value) menu.value.open = false
-}
-
-async function openLaup(event) {
-  const input = event.currentTarget
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file || !mayReplace()) return
-  opening.value = true
-  try {
-    const text = await file.text()
-    let payload
-    if (/\.lanb$/i.test(file.name)) payload = JSON.parse(text)
-    else if (/\.ipynb$/i.test(file.name)) payload = ipynbToCells(text)
-    else if (/\.laup$/i.test(file.name)) payload = { cells: importNotebookV2(text) }
-    else throw new Error('请选择 .laup、.lanb 或 .ipynb 文件。')
-    if (!Array.isArray(payload?.cells) || !payload.cells.every(cell => typeof cell?.source === 'string')) {
-      throw new Error('文件没有有效的单元格数据。')
-    }
-    load(file.name, { ...payload, cells: payload.cells.map(cell => ({ ...cell, type: cell.type === 'code' ? 'code' : 'laup' })) })
-    if (menu.value) menu.value.open = false
-  } catch (cause) {
-    error.value = `打开 Laup 失败：${cause.message}`
-  } finally {
-    opening.value = false
+// 一格的源码就是这个项目的内容；标题跟着首格的首行走，和 Notebook 自己的草稿标题一致。
+function payloadOf(payload) {
+  return {
+    cells: payload.cells || [],
+    scope: payload.scope || {},
+    execCounter: payload.execCounter || 0,
+    renderMode: payload.renderMode || 'below',
+    kernel: 'v2',
   }
 }
 
-function closeProject() {
-  if (!mayReplace()) return
-  title.value = ''
-  error.value = ''
-  if (menu.value) menu.value.open = false
+async function open(id) {
+  menuOpen.value = false
+  if (!id || id === currentId.value) return
+  const draft = await getDraft(id)
+  if (!draft) return
+  store.setKernel('v2')
+  store.applyDraft(payloadOf(draft.payload || {}))
+  currentId.value = id
 }
 
-watchEffect((onCleanup) => {
-  const node = output.value
-  if (!node) return
-  const images = []
-  const cells = snapshot().filter(cell => cell.source.trim()).map(cell => ({
-    ...cell,
-    source: cell.type === 'code' ? cell.source : cell.source.replace(/attachment:([\w.\-\u4e00-\u9fa5]+)/g, (original, name) => {
-      const url = cell.attachments?.[name]
-      if (typeof url !== 'string' || !/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(url)) return original
-      return `__preview_attachment_${images.push(url) - 1}.png`
-    }),
-  }))
-  const timer = setTimeout(() => {
-    try {
-      const result = typesetCells(cells)
-      const fragment = DOMPurify.sanitize(result.html, {
-        RETURN_DOM_FRAGMENT: true,
-        FORBID_TAGS: ['style', 'iframe', 'object', 'embed', 'form'],
+async function create() {
+  menuOpen.value = false
+  const key = await ownerKey()
+  const draft = await saveDraft({
+    ownerKey: key,
+    contentType: 'NOTEBOOK',
+    mode: 'CREATE',
+    title: '未命名 Laup 项目',
+    payload: payloadOf({ cells: [{ type: 'laup', source: '' }] }),
+  })
+  await refresh()
+  await open(draft.id)
+}
+
+async function remove(id) {
+  if (!id) return
+  await deleteDraft(id)
+  if (id === currentId.value) {
+    currentId.value = ''
+    store.applyDraft(payloadOf({}))
+  }
+  await refresh()
+}
+
+// 自动保存：格源码变化 1 秒后写回当前草稿，和 /laup-v2 的自动保存同一口径。
+let timer = null
+watch(
+  () => store.cells.map(c => ({ type: c.type, source: c.source, attachments: c.attachments || {} })),
+  () => {
+    if (!currentId.value) return
+    clearTimeout(timer)
+    timer = setTimeout(async () => {
+      const draft = projects.value.find(p => p.id === currentId.value)
+      if (!draft) return
+      await saveDraft({
+        id: draft.id,
+        ownerKey: draft.ownerKey,
+        contentType: 'NOTEBOOK',
+        mode: draft.mode,
+        title: draft.title,
+        payload: JSON.parse(JSON.stringify({ ...payloadOf({ ...draft.payload, cells: store.cells }), editPost: draft.payload?.editPost || null })),
       })
-      for (const image of fragment.querySelectorAll('img[src]')) {
-        const token = /^__preview_attachment_(\d+)\.png$/.exec(image.getAttribute('src'))
-        if (token && images[Number(token[1])]) image.setAttribute('src', images[Number(token[1])])
-      }
-      for (const element of fragment.querySelectorAll('[data-tex]')) {
-        const tex = element.dataset.tex || ''
-        katex.render(translate(tex) ?? tex, element, {
-          displayMode: element.classList.contains('laup2-math-display'), throwOnError: false, trust: false,
-        })
-      }
-      node.replaceChildren(fragment)
-      diagnostics.value = result.diagnostics.map(diagnostic => diagnostic.toString())
-    } catch (cause) {
-      node.replaceChildren()
-      diagnostics.value = [cause.message]
-    }
-  }, 120)
-  onCleanup(() => clearTimeout(timer))
-})
+      await refresh()
+    }, 1000)
+  },
+  { deep: true },
+)
 
-async function newFromHome() {
-  newLaup()
-  await nextTick()
-  document.getElementById('papilot-preview-toggle')?.focus()
-}
+onMounted(async () => {
+  store.setKernel('v2')
+  await refresh()
+  if (projects.value.length) await open(projects.value[0].id)
+})
 </script>
 
 <template>
-  <div class="paper-workbench">
-    <header class="paper-toolbar">
-      <RouterLink to="/create">返回创作中心</RouterLink>
-      <details ref="menu" class="project-menu">
-        <summary>{{ title || 'Papilot 项目' }}</summary>
-        <div class="project-actions">
-          <button type="button" :disabled="opening" @click="newLaup">新建 Laup</button>
-          <button type="button" :disabled="opening" @click="picker?.click()">导入 Laup / Notebook</button>
-          <button v-if="title" type="button" :disabled="opening" @click="closeProject">返回项目首页</button>
+  <div class="pp-shell">
+    <aside class="pp-sidebar">
+      <div class="pp-brand"><span class="pp-logo">P</span>Papilot</div>
+      <div class="pp-project">
+        <button class="pp-project-btn" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
+          <span class="pp-project-copy"><b>{{ folderName }}</b><small>本机草稿箱</small></span>
+          <span class="pp-chevron">⌄</span>
+        </button>
+        <div v-if="menuOpen" class="pp-menu">
+          <button class="pp-menu-item primary" @click="create">＋ 新建 Laup</button>
+          <button class="pp-menu-item" @click="router.push('/laup-v2')">新建论文</button>
+          <button class="pp-menu-item" @click="router.push('/laup-v2')">导入 TeX 项目</button>
+          <button class="pp-menu-item" @click="router.push('/laup-v2')">导入 Laup 项目</button>
+          <div class="pp-menu-sep"></div>
+          <p class="pp-menu-label">草稿箱</p>
+          <p v-if="loading" class="pp-menu-empty">载入中……</p>
+          <p v-else-if="!projects.length" class="pp-menu-empty">还没有项目，点上面「新建 Laup」</p>
+          <div v-for="p in projects" :key="p.id" class="pp-menu-row" :class="{ active: p.id === currentId }">
+            <button class="pp-menu-item" :title="p.title" @click="open(p.id)">{{ p.title || '未命名' }}</button>
+            <button class="pp-menu-del" :aria-label="`删除 ${p.title}`" @click="remove(p.id)">×</button>
+          </div>
         </div>
-      </details>
-      <button v-if="title" type="button" :disabled="opening" @click="saveLaup">下载项目 (.lanb)</button>
-      <button v-if="title" id="papilot-preview-toggle" type="button" :aria-expanded="previewVisible" @click="previewVisible = !previewVisible">{{ previewVisible ? '收起整篇预览' : '展开整篇预览' }}</button>
-      <input ref="picker" hidden type="file" accept=".laup,.lanb,.ipynb" @change="openLaup" />
-    </header>
-    <p v-if="error" role="alert" class="paper-error">{{ error }}</p>
-    <main v-if="!title" class="paper-home">
-      <h1>Papilot 工作台</h1>
-      <p>新建一份 Laup 文档，或打开已有的 Laup / Notebook 文件。</p>
-      <button type="button" :disabled="opening" @click="newFromHome">新建 Laup</button>
-      <button type="button" :disabled="opening" @click="picker?.click()">导入 Laup / Notebook</button>
-      <p>当前站内入口只支持 Laup。TeX、PDF、审阅和 AI 仍在原 Papilot 应用中。</p>
-    </main>
-    <main v-else class="paper-layout" :class="{ 'with-preview': previewVisible }">
-      <NotebookView kernel="v2" embedded />
-      <section v-if="previewVisible" class="paper-preview" aria-label="整篇排版预览">
-        <h2>整篇排版预览</h2>
-        <div ref="output" class="article-content"></div>
-        <details v-if="diagnostics.length">
-          <summary>排版诊断（{{ diagnostics.length }}）</summary>
-          <ul><li v-for="(message, index) in diagnostics" :key="index">{{ message }}</li></ul>
-        </details>
-      </section>
+      </div>
+      <nav class="pp-nav">
+        <button class="pp-nav-item active">Laup</button>
+        <button class="pp-nav-item" @click="router.push('/drafts')">稿件</button>
+        <button class="pp-nav-item" @click="router.push('/drafts')">文献库</button>
+      </nav>
+    </aside>
+
+    <main class="pp-main">
+      <header class="pp-head">
+        <span class="pp-crumb"><span>{{ folderName }}</span> › <b>Laup</b></span>
+        <span class="pp-hint">右侧渲染随编辑实时更新</span>
+        <div class="pp-head-actions">
+          <button class="pp-chip" :aria-pressed="renderOpen" @click="renderOpen = !renderOpen">渲染</button>
+          <button class="pp-chip" :aria-pressed="aiOpen" @click="aiOpen = !aiOpen">AI</button>
+        </div>
+      </header>
+      <div class="pp-body">
+        <!-- 编辑器就是 /laup-v2 那一套：embedded 去掉站点导航，内核 v2。 -->
+        <div class="pp-cells">
+          <NotebookView kernel="v2" embedded />
+        </div>
+        <section v-if="renderOpen" class="pp-pane pp-render">
+          <header class="pp-pane-head">渲染<button class="pp-pane-fold" aria-label="收起渲染" @click="renderOpen = false">›</button></header>
+          <div class="pp-pane-body pp-render-body">
+            <!-- 只读整篇预览：取各格最近一次运行产出的 HTML，不另挂一个编辑器。 -->
+            <template v-if="rendered.length">
+              <div v-for="(cell, i) in rendered" :key="i" class="pp-render-cell" v-html="cell.outputHtml"></div>
+            </template>
+            <p v-else class="pp-ai-note">左侧还没有输出。在单元格里写内容并运行，这里显示整篇渲染。</p>
+          </div>
+        </section>
+        <section v-if="aiOpen" class="pp-pane pp-ai">
+          <header class="pp-pane-head">AI<button class="pp-pane-fold" aria-label="收起 AI" @click="aiOpen = false">›</button></header>
+          <div class="pp-pane-body pp-ai-body">
+            <p class="pp-ai-title">接下来要修改什么？</p>
+            <p class="pp-ai-note">AI 任务面板接入后会显示在这里。它占自己这一栏，不与渲染互相替换。</p>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 </template>
 
 <style scoped>
-.paper-workbench { min-height: 100dvh; background: #f6f7f8; color: #202122; }
-.paper-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #dce1e6; background: #fff; }
-.paper-toolbar button, .paper-home button { padding: 6px 12px; border: 1px solid #cbd3db; border-radius: 5px; background: #fff; cursor: pointer; }
-.project-menu { position: relative; }
-.project-menu summary { cursor: pointer; font-weight: 600; }
-.project-actions { position: absolute; inset: 100% auto auto 0; z-index: 60; display: grid; gap: 6px; padding: 8px; background: white; border: 1px solid #dce1e6; white-space: nowrap; }
-.paper-home { max-width: 680px; margin: 8vh auto; padding: 24px; }
-.paper-home button + button { margin-left: 8px; }
-.paper-layout { display: grid; grid-template-columns: minmax(0, 1fr); }
-.paper-layout.with-preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.paper-preview { min-width: 0; padding: 16px 24px; background: #fff; border-left: 1px solid #dce1e6; }
-.paper-preview h2 { font-size: 15px; }
-.article-content { font: 16px/1.9 Georgia, "Noto Serif SC", "Songti SC", serif; overflow-wrap: anywhere; }
-.article-content :deep(img) { max-width: 100%; height: auto; }
-.paper-error { color: #a12525; margin: 12px 20px; }
-.paper-layout :deep(.notebook-embedded) { min-width: 0; }
-.paper-layout :deep(.notebook-embedded #menubar) { flex-wrap: wrap; top: 0; }
-@media (max-width: 900px) { .paper-layout.with-preview { grid-template-columns: minmax(0, 1fr); } }
+.pp-shell { display: flex; height: 100dvh; overflow: hidden; background: #fff; color: #1f2328; }
+.pp-sidebar { display: flex; flex-direction: column; flex: 0 0 232px; padding: 12px; border-right: 1px solid #e6e8eb; background: #fafbfc; }
+.pp-brand { display: flex; align-items: center; gap: 8px; padding: 4px 6px 14px; font: 600 14px/1 system-ui, sans-serif; }
+.pp-logo { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #1f2328; color: #fff; font-size: 12px; }
+.pp-project { position: relative; }
+.pp-project-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; border: 1px solid #e6e8eb; border-radius: 8px; background: #fff; text-align: left; cursor: pointer; }
+.pp-project-copy { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
+.pp-project-copy b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 13px/1.2 system-ui, sans-serif; }
+.pp-project-copy small { color: #8b949e; font-size: 11px; }
+.pp-chevron { margin-left: auto; color: #8b949e; }
+.pp-menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: 100%; max-height: 60vh; overflow: auto; padding: 6px; border: 1px solid #e6e8eb; border-radius: 10px; background: #fff; box-shadow: 0 10px 26px rgba(15, 23, 42, .13); }
+.pp-menu-item { display: block; width: 100%; padding: 7px 8px; border: 0; border-radius: 6px; background: none; color: inherit; font: 13px/1.3 system-ui, sans-serif; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-menu-item:hover { background: #f3f5f7; }
+.pp-menu-item.primary { font-weight: 600; }
+.pp-menu-sep { height: 1px; margin: 6px 2px; background: #eef0f2; }
+.pp-menu-label, .pp-menu-empty { margin: 4px 8px; color: #8b949e; font: 11px/1.4 system-ui, sans-serif; }
+.pp-menu-row { display: flex; align-items: center; }
+.pp-menu-row .pp-menu-item { flex: 1; min-width: 0; }
+.pp-menu-row.active .pp-menu-item { background: #eef4ff; color: #1a6fc4; font-weight: 600; }
+.pp-menu-del { padding: 0 6px; border: 0; background: none; color: #b42318; font-size: 15px; cursor: pointer; }
+.pp-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 16px; }
+.pp-nav-item { padding: 8px 10px; border: 0; border-radius: 7px; background: none; color: inherit; font: 13px/1.3 system-ui, sans-serif; text-align: left; cursor: pointer; }
+.pp-nav-item:hover { background: #eef0f2; }
+.pp-nav-item.active { background: #e9edf1; font-weight: 600; }
+.pp-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.pp-head { display: flex; align-items: center; gap: 10px; flex: none; height: 42px; padding: 0 12px; border-bottom: 1px solid #e6e8eb; }
+.pp-crumb { font: 13px/1 system-ui, sans-serif; color: #8b949e; }
+.pp-crumb b { color: #1f2328; }
+.pp-hint { overflow: hidden; color: #8b949e; font: 12px/1 system-ui, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.pp-head-actions { display: flex; gap: 6px; margin-left: auto; }
+.pp-chip { padding: 4px 10px; border: 1px solid #d6dae0; border-radius: 999px; background: #fff; font: 12px/1 system-ui, sans-serif; cursor: pointer; }
+.pp-chip[aria-pressed="true"] { border-color: #1f2328; background: #1f2328; color: #fff; }
+.pp-body { display: flex; flex: 1; min-height: 0; }
+.pp-cells { flex: 1; min-width: 0; overflow: auto; }
+.pp-pane { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid #e6e8eb; }
+.pp-render { flex: 0 0 40%; }
+.pp-ai { flex: 0 0 300px; }
+.pp-pane-head { display: flex; align-items: center; gap: 8px; flex: none; height: 34px; padding: 0 10px; border-bottom: 1px solid #e6e8eb; font: 600 12px/1 system-ui, sans-serif; }
+.pp-pane-fold { margin-left: auto; border: 0; background: none; color: #8b949e; font-size: 15px; cursor: pointer; }
+.pp-pane-body { flex: 1; min-height: 0; overflow: auto; }
+.pp-render-body { padding: 16px; background: #fff; }
+.pp-render-cell + .pp-render-cell { margin-top: 16px; }
+.pp-ai-body { padding: 14px; }
+.pp-ai-title { margin: 0 0 6px; font: 600 13px/1.4 system-ui, sans-serif; }
+.pp-ai-note { margin: 0; color: #8b949e; font: 12px/1.6 system-ui, sans-serif; }
 </style>

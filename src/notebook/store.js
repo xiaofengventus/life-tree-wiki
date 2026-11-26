@@ -197,8 +197,9 @@ const useNotebookStore = defineStore('notebook', {
       const refreshReferences = this.kernel === 'v2' && c.type === 'code'
         && /^\[references\][ \t]*(?:\r?\n|$)/im.test(`${c.source}\n${source}`)
       c.source = source
-      // 代码格边打边预览；文献声明变化时同步更新编号和列表。
-      if (c.type === 'code') this.renderCodeCells(refreshReferences)
+      // 代码格与 v2 的 laup 格边打边预览；文献声明变化时同步更新编号和列表。
+      // v2 的渲染是纯函数（不写入变量作用域），所以编辑 Laup 也能实时重排。
+      if (c.type === 'code' || this.kernel === 'v2') this.renderCodeCells(refreshReferences)
       this.persist()
     },
 
